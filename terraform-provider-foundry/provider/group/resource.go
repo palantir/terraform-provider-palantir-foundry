@@ -22,14 +22,15 @@ import (
 	"net/http"
 	"slices"
 
-	v2 "github.com/ericanderson/foundry-terraform/gateway-client/v2"
-	providerError "github.com/ericanderson/foundry-terraform/terraform-provider-foundry/provider/errors"
-	"github.com/ericanderson/foundry-terraform/terraform-provider-foundry/provider/helper"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	v2 "github.com/palantir/terraform-provider-palantir-foundry/gateway-client/v2"
+	"github.com/palantir/terraform-provider-palantir-foundry/terraform-provider-foundry/provider/constants"
+	providerError "github.com/palantir/terraform-provider-palantir-foundry/terraform-provider-foundry/provider/errors"
+	"github.com/palantir/terraform-provider-palantir-foundry/terraform-provider-foundry/provider/helper"
 )
 
 // Ensure the implementation satisfies the expected interfaces
@@ -280,6 +281,10 @@ func (r *groupResource) ReadGroup(ctx context.Context, resp *resource.ReadRespon
 	}
 	// Check the response status code
 	if httpResp.StatusCode != http.StatusOK {
+		if httpResp.StatusCode == http.StatusNotFound {
+			resp.State.RemoveResource(ctx)
+			return fmt.Errorf("group not found, removing resource from Terraform state: %w", err)
+		}
 		returnString, err := providerError.FormatHTTPError(httpResp)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to format error logging from AdminGetGroup response", err.Error())
@@ -313,9 +318,8 @@ func (r *groupResource) ReadGroup(ctx context.Context, resp *resource.ReadRespon
 }
 
 func (r *groupResource) ReadGroupMembers(ctx context.Context, resp *resource.ReadResponse, state *groupResourceModel) error {
-	httpResp, err := r.client.AdminListGroupMembers(ctx, state.ID.ValueString(), &v2.AdminListGroupMembersParams{
-		//TODO: add pagination support and transitive support if needed
-	})
+	pageSize := constants.PageSize
+	httpResp, err := r.client.AdminListGroupMembers(ctx, state.ID.ValueString(), &v2.AdminListGroupMembersParams{PageSize: &pageSize})
 
 	if err != nil {
 		return fmt.Errorf("AdminListGroupMembers request failed: %w", err)

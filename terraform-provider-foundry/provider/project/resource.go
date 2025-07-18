@@ -23,9 +23,6 @@ import (
 	"net/http"
 	"slices"
 
-	v2 "github.com/ericanderson/foundry-terraform/gateway-client/v2"
-	providerError "github.com/ericanderson/foundry-terraform/terraform-provider-foundry/provider/errors"
-	"github.com/ericanderson/foundry-terraform/terraform-provider-foundry/provider/helper"
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -33,6 +30,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	v2 "github.com/palantir/terraform-provider-palantir-foundry/gateway-client/v2"
+	"github.com/palantir/terraform-provider-palantir-foundry/terraform-provider-foundry/provider/constants"
+	providerError "github.com/palantir/terraform-provider-palantir-foundry/terraform-provider-foundry/provider/errors"
+	"github.com/palantir/terraform-provider-palantir-foundry/terraform-provider-foundry/provider/helper"
 )
 
 // Ensure the implementation satisfies the expected interfaces
@@ -377,6 +378,10 @@ func (r *projectResource) ReadProject(ctx context.Context, resp *resource.ReadRe
 
 	// Check the response status code
 	if httpResp.StatusCode != http.StatusOK {
+		if httpResp.StatusCode == http.StatusNotFound {
+			resp.State.RemoveResource(ctx)
+			return fmt.Errorf("project not found, removing resource from Terraform state: %w", err)
+		}
 		returnString, err := providerError.FormatHTTPError(httpResp)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to format error logging from FilesystemGetProject response", err.Error())
@@ -409,8 +414,9 @@ func (r *projectResource) ReadProject(ctx context.Context, resp *resource.ReadRe
 }
 
 func (r *projectResource) ReadOrganizations(ctx context.Context, state *projectResourceModel) error {
-	previewMode := true
-	filesystemListOrganizationsOfProjectParams := v2.FilesystemListOrganizationsOfProjectParams{Preview: &previewMode}
+	previewMode := constants.PreviewMode
+	pageSize := constants.PageSize
+	filesystemListOrganizationsOfProjectParams := v2.FilesystemListOrganizationsOfProjectParams{Preview: &previewMode, PageSize: &pageSize}
 	httpResp, err := r.client.FilesystemListOrganizationsOfProject(ctx, state.RID.ValueString(), &filesystemListOrganizationsOfProjectParams)
 
 	if err != nil {
@@ -443,8 +449,9 @@ func (r *projectResource) ReadOrganizations(ctx context.Context, state *projectR
 }
 
 func (r *projectResource) ReadResourceRoles(ctx context.Context, state *projectResourceModel) error {
-	previewMode := true
-	filesystemListResourceRolesParams := v2.FilesystemListResourceRolesParams{Preview: &previewMode}
+	previewMode := constants.PreviewMode
+	pageSize := constants.PageSize
+	filesystemListResourceRolesParams := v2.FilesystemListResourceRolesParams{Preview: &previewMode, PageSize: &pageSize}
 	httpResp, err := r.client.FilesystemListResourceRoles(ctx, state.RID.ValueString(), &filesystemListResourceRolesParams)
 
 	if err != nil {
@@ -530,8 +537,9 @@ func (r *projectResource) ReadResourceRoles(ctx context.Context, state *projectR
 }
 
 func (r *projectResource) ReadMarkings(ctx context.Context, state *projectResourceModel) error {
-	previewMode := true
-	filesystemListMarkingsOfResourceParams := v2.FilesystemListMarkingsOfResourceParams{Preview: &previewMode}
+	previewMode := constants.PreviewMode
+	pageSize := constants.PageSize
+	filesystemListMarkingsOfResourceParams := v2.FilesystemListMarkingsOfResourceParams{Preview: &previewMode, PageSize: &pageSize}
 	httpResp, err := r.client.FilesystemListMarkingsOfResource(ctx, state.RID.ValueString(), &filesystemListMarkingsOfResourceParams)
 
 	if err != nil {
