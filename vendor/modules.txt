@@ -35,8 +35,6 @@ github.com/hashicorp/go-plugin/runner
 # github.com/hashicorp/go-uuid v1.0.3
 ## explicit
 github.com/hashicorp/go-uuid
-# github.com/hashicorp/terraform-plugin-docs v0.22.0
-## explicit; go 1.23.7
 # github.com/hashicorp/terraform-plugin-framework v1.15.0
 ## explicit; go 1.23.0
 github.com/hashicorp/terraform-plugin-framework/attr
