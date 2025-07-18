@@ -19,8 +19,8 @@ import (
 	"flag"
 	"log"
 
-	"github.com/ericanderson/foundry-terraform/terraform-provider-foundry/provider"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
+	"github.com/palantir/terraform-provider-palantir-foundry/terraform-provider-foundry/provider"
 )
 
 // Run "go generate" to format example terraform files and generate the docs for the registry
@@ -44,7 +44,7 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
-		Address: "registry.terraform.io/ericanderson/foundry",
+		Address: "registry.terraform.io/palantir/terraform-provider-palantir-foundry",
 		Debug:   debug,
 	}
 

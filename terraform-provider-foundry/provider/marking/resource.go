@@ -22,9 +22,6 @@ import (
 	"net/http"
 	"slices"
 
-	v2 "github.com/ericanderson/foundry-terraform/gateway-client/v2"
-	providerError "github.com/ericanderson/foundry-terraform/terraform-provider-foundry/provider/errors"
-	"github.com/ericanderson/foundry-terraform/terraform-provider-foundry/provider/helper"
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -32,6 +29,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	v2 "github.com/palantir/terraform-provider-palantir-foundry/gateway-client/v2"
+	"github.com/palantir/terraform-provider-palantir-foundry/terraform-provider-foundry/provider/constants"
+	providerError "github.com/palantir/terraform-provider-palantir-foundry/terraform-provider-foundry/provider/errors"
+	"github.com/palantir/terraform-provider-palantir-foundry/terraform-provider-foundry/provider/helper"
 )
 
 // Ensure the implementation satisfies the expected interfaces
@@ -289,6 +290,10 @@ func (r *markingResource) ReadMarking(ctx context.Context, resp *resource.ReadRe
 	}
 	// Check the response status code
 	if httpResp.StatusCode != http.StatusOK {
+		if httpResp.StatusCode == http.StatusNotFound {
+			resp.State.RemoveResource(ctx)
+			return fmt.Errorf("organization not found, removing resource from Terraform state: %w", err)
+		}
 		returnString, err := providerError.FormatHTTPError(httpResp)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to format error logging from AdminGetMarking response", err.Error())
@@ -320,8 +325,9 @@ func (r *markingResource) ReadMarking(ctx context.Context, resp *resource.ReadRe
 }
 
 func (r *markingResource) ReadMarkingMembers(ctx context.Context, state *markingResourceModel, markingUUID uuid.UUID) error {
-	previewMode := true
-	adminListMarkingMembersParams := v2.AdminListMarkingMembersParams{Preview: &previewMode}
+	previewMode := constants.PreviewMode
+	pageSize := constants.PageSize
+	adminListMarkingMembersParams := v2.AdminListMarkingMembersParams{Preview: &previewMode, PageSize: &pageSize}
 	httpResp, err := r.client.AdminListMarkingMembers(ctx, markingUUID, &adminListMarkingMembersParams)
 
 	if err != nil {
@@ -359,8 +365,9 @@ func (r *markingResource) ReadMarkingMembers(ctx context.Context, state *marking
 }
 
 func (r *markingResource) ReadMarkingRoles(ctx context.Context, state *markingResourceModel, markingUUID uuid.UUID) error {
-	previewMode := true
-	adminListMarkingRoleAssignmentsParams := v2.AdminListMarkingRoleAssignmentsParams{Preview: &previewMode}
+	previewMode := constants.PreviewMode
+	pageSize := constants.PageSize
+	adminListMarkingRoleAssignmentsParams := v2.AdminListMarkingRoleAssignmentsParams{Preview: &previewMode, PageSize: &pageSize}
 	httpResp, err := r.client.AdminListMarkingRoleAssignments(ctx, markingUUID, &adminListMarkingRoleAssignmentsParams)
 
 	if err != nil {

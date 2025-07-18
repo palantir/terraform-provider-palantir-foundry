@@ -18,13 +18,6 @@ import (
 	"context"
 	"os"
 
-	v2 "github.com/ericanderson/foundry-terraform/gateway-client/v2"
-	"github.com/ericanderson/foundry-terraform/terraform-provider-foundry/auth"
-	"github.com/ericanderson/foundry-terraform/terraform-provider-foundry/provider/enrollment"
-	"github.com/ericanderson/foundry-terraform/terraform-provider-foundry/provider/group"
-	"github.com/ericanderson/foundry-terraform/terraform-provider-foundry/provider/marking"
-	"github.com/ericanderson/foundry-terraform/terraform-provider-foundry/provider/organization"
-	"github.com/ericanderson/foundry-terraform/terraform-provider-foundry/provider/project"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -32,6 +25,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/oapi-codegen/oapi-codegen/v2/pkg/securityprovider"
+	v2 "github.com/palantir/terraform-provider-palantir-foundry/gateway-client/v2"
+	"github.com/palantir/terraform-provider-palantir-foundry/terraform-provider-foundry/auth"
+	"github.com/palantir/terraform-provider-palantir-foundry/terraform-provider-foundry/provider/enrollment"
+	"github.com/palantir/terraform-provider-palantir-foundry/terraform-provider-foundry/provider/group"
+	"github.com/palantir/terraform-provider-palantir-foundry/terraform-provider-foundry/provider/marking"
+	"github.com/palantir/terraform-provider-palantir-foundry/terraform-provider-foundry/provider/organization"
+	"github.com/palantir/terraform-provider-palantir-foundry/terraform-provider-foundry/provider/project"
 )
 
 // Ensure the implementation satisfies the expected interfaces

@@ -1,4 +1,4 @@
-module github.com/ericanderson/foundry-terraform
+module github.com/palantir/terraform-provider-palantir-foundry
 
 go 1.24.0
 

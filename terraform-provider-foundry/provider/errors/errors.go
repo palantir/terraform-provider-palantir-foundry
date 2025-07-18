@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/ericanderson/foundry-terraform/terraform-provider-foundry/provider/helper"
+	"github.com/palantir/terraform-provider-palantir-foundry/terraform-provider-foundry/provider/helper"
 )
 
 // FormatHTTPError extracts error details from an HTTP response and returns a formatted error message

@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/ericanderson/foundry-terraform/terraform-provider-foundry/provider/helper"
+	"github.com/palantir/terraform-provider-palantir-foundry/terraform-provider-foundry/provider/helper"
 )
 
 type OAuth2TokenResponse struct {
