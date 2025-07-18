@@ -17,9 +17,10 @@ package main
 import (
 	"context"
 	"flag"
+	"log"
+
 	"github.com/ericanderson/foundry-terraform/terraform-provider-foundry/provider"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"log"
 )
 
 // Run "go generate" to format example terraform files and generate the docs for the registry
