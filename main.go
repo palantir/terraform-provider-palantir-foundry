@@ -23,9 +23,6 @@ import (
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider"
 )
 
-// Run "go generate" to format example terraform files and generate the docs for the registry
-//go:generate terraform fmt -recursive ./examples/
-
 // Run "go build" to build the binary
 //go:generate go build -o terraform-provider-foundry
 
