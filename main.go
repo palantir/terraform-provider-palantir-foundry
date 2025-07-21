@@ -15,9 +15,36 @@
 package main
 
 import (
-	"fmt"
+	"context"
+	"flag"
+	"github.com/hashicorp/terraform-plugin-framework/providerserver"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider"
+	"log"
 )
 
+// Run "go generate" to format example terraform files and generate the docs for the registry
+//go:generate terraform fmt -recursive ./examples/
+
+// Run "go build" to build the binary
+//go:generate go build -o terraform-provider-foundry
+
+// Provider documentation generation
+//go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-name palantir-foundry
+
 func main() {
-	fmt.Println("Hello, foundry-terraform!")
+	var debug bool
+
+	flag.BoolVar(&debug, "debug", false, "set to true to run the provider with support for debuggers like delve")
+	flag.Parse()
+
+	opts := providerserver.ServeOpts{
+		Address: "registry.terraform.io/palantir/palantir-foundry",
+		Debug:   debug,
+	}
+
+	err := providerserver.Serve(context.Background(), provider.New, opts)
+
+	if err != nil {
+		log.Fatal(err.Error())
+	}
 }

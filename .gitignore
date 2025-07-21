@@ -39,4 +39,4 @@ Thumbs.db
 tmp/
 node_modules/
 
-terraform-provider-foundry/terraform-provider-foundry
+terraform-provider-foundry
