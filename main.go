@@ -29,7 +29,7 @@ import (
 //go:generate go build -o terraform-provider-foundry
 
 // Provider documentation generation
-//go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-name palantir-foundry
+//go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-name foundry
 
 func main() {
 	var debug bool
