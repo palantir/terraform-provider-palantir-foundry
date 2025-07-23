@@ -90,7 +90,7 @@ func (r *markingResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Required:    true,
 			},
 			"category_id": schema.StringAttribute{
-				Description: "Category id of the marking",
+				Description: "The ID of a marking category. For user-created categories, this will be a UUID. Markings associated with Organizations are placed in a category with ID \"Organization\". This field is immutable after creation.",
 				Required:    true,
 			},
 			"description": schema.StringAttribute{
@@ -99,16 +99,16 @@ func (r *markingResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"planned_marking_members": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "Planned list of members in this marking",
+				Description: "Planned list of the PrincipalIds of the members (users or groups) in this marking",
 				Required:    true,
 			},
 			"marking_members": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "Actual list of members in this marking, computed after successful addition/removal of marking members",
+				Description: "Actual list of the PrincipalIds of the members (users or groups) in this marking, computed after successful addition/removal of marking members",
 				Computed:    true,
 			},
 			"planned_marking_roles": schema.SetAttribute{
-				Description: "Planned list of roles assigned to this marking",
+				Description: "Planned list of roles assigned to this marking. At least one ADMIN role must be provided.",
 				Required:    true,
 				ElementType: types.ObjectType{
 					AttrTypes: map[string]attr.Type{
@@ -118,7 +118,7 @@ func (r *markingResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"marking_roles": schema.SetAttribute{
-				Description: "Actual list of roles assigned to this marking, computed after successful addition/removal of marking roles",
+				Description: "Actual list of roles assigned to this marking, computed after successful addition/removal of marking roles.",
 				Computed:    true,
 				ElementType: types.ObjectType{
 					AttrTypes: map[string]attr.Type{

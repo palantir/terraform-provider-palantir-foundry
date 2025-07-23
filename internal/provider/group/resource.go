@@ -93,7 +93,7 @@ func (r *groupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 			},
 			"organizations": schema.ListAttribute{
 				ElementType: types.StringType,
-				Description: "List of organizations the group is under.",
+				Description: "RIDs of the Organizations whose members can see this group. At least one Organization RID must be listed.",
 				Required:    true,
 			},
 			"realm": schema.StringAttribute{
@@ -102,12 +102,12 @@ func (r *groupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 			},
 			"planned_group_members": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "Planned list of members in this group",
+				Description: "Planned list of the PrincipalIds of the members (users or groups) in this group",
 				Required:    true,
 			},
 			"group_members": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "Actual list of members in this group, computed after successful addition/removal of group members.",
+				Description: "Actual list of the PrincipalIds of the members (users or groups) in this group, computed after successful addition/removal of group members.",
 				Computed:    true,
 			},
 		},

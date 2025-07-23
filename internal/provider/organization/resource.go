@@ -81,7 +81,7 @@ func (r *organizationResource) Schema(_ context.Context, _ resource.SchemaReques
 		Description: "Manages a Foundry organization.",
 		Attributes: map[string]schema.Attribute{
 			"rid": schema.StringAttribute{
-				Description: "Identifier of the organization.",
+				Description: "Resource identifier of the organization.",
 				Computed:    true,
 			},
 			"name": schema.StringAttribute{
@@ -102,16 +102,16 @@ func (r *organizationResource) Schema(_ context.Context, _ resource.SchemaReques
 			},
 			"planned_organization_members": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "Planned list of members in this organization",
+				Description: "Planned list of the PrincipalIds of the members (users or groups) in this organization.",
 				Required:    true,
 			},
 			"organization_members": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "Actual list of members in this organization, computed after successful addition/removal of members",
+				Description: "Actual list of the PrincipalIds of the members (users or groups) in this organization., computed after successful addition/removal of members",
 				Computed:    true,
 			},
 			"planned_organization_roles": schema.SetAttribute{
-				Description: "Planned list of roles assigned to this organization",
+				Description: "Planned list of roles assigned to principals for this organization",
 				Required:    true,
 				ElementType: types.ObjectType{
 					AttrTypes: map[string]attr.Type{
@@ -121,7 +121,7 @@ func (r *organizationResource) Schema(_ context.Context, _ resource.SchemaReques
 				},
 			},
 			"organization_roles": schema.SetAttribute{
-				Description: "Actual list of roles in this organization, computed after successful addition/removal of roles",
+				Description: "Actual list of roles assigned to principals for this organization, computed after successful addition/removal of roles",
 				Computed:    true,
 				ElementType: types.ObjectType{
 					AttrTypes: map[string]attr.Type{
