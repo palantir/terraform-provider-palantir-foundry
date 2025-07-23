@@ -99,12 +99,12 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"planned_organizations": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "planned organizations associated to this project",
+				Description: "planned list of organizations associated to this project",
 				Required:    true,
 			},
 			"organizations": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "Actual organizations associated to this project, computed after successful addition/removal of organizations",
+				Description: "Actual list of organizations associated to this project, computed after successful addition/removal of organizations",
 				Computed:    true,
 			},
 			"planned_role_resources": schema.SetAttribute{
@@ -141,12 +141,12 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"planned_markings": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "Planned set of markings associated with this project.",
+				Description: "Planned set of markings applied to this project.",
 				Required:    true,
 			},
 			"markings": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "Actual set of markings associated with this project, computed after successful addition/removal of markings.",
+				Description: "Actual set of markings applied to this project, computed after successful addition/removal of markings.",
 				Computed:    true,
 			},
 			"trash_status": schema.StringAttribute{
