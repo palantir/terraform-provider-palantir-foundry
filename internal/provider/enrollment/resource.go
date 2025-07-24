@@ -79,7 +79,7 @@ func (r *enrollmentResource) Schema(_ context.Context, _ resource.SchemaRequest,
 	resp.Schema = schema.Schema{
 		Description: "Manages a Foundry Enrollment.",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
+			"rid": schema.StringAttribute{
 				Description: "Identifier of the Enrollment.",
 				Computed:    true,
 			},
