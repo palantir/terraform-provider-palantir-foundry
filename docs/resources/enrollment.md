@@ -41,7 +41,7 @@ resource "foundry_enrollment" "example-enrollment" {
 ### Read-Only
 
 - `enrollment_roles` (Set of Object) Actual list of roles assigned to principals for this enrollment, computed after successful addition/removal of roles (see [below for nested schema](#nestedatt--enrollment_roles))
-- `id` (String) Identifier of the Enrollment.
+- `rid` (String) Identifier of the Enrollment.
 
 <a id="nestedatt--planned_enrollment_roles"></a>
 ### Nested Schema for `planned_enrollment_roles`
