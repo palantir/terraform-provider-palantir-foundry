@@ -24,7 +24,7 @@ resource "foundry_project" "example-project" {
   display_name = "Example project name"
   space_rid    = "ri.compass.main.folder.example-space-rid"
   organizations = ["example-organization-rid"]
-  role_resources = [
+  planned_role_resources = [
     {
       resource_role_principal = {
         principal_id = "example-group-id"

@@ -681,6 +681,16 @@ type AdminCreateMarkingRequest struct {
 	Name                   AdminMarkingName          `json:"name"`
 }
 
+// AdminCreateOrganizationRequest defines model for Admin.CreateOrganizationRequest.
+type AdminCreateOrganizationRequest struct {
+	// Administrators The initial administrators of the Organization. At least one principal must be provided.
+	Administrators *[]CorePrincipalID    `json:"administrators,omitempty"`
+	Description    *string               `json:"description,omitempty"`
+	EnrollmentRid  CoreEnrollmentRid     `json:"enrollmentRid"`
+	Host           *AdminHostName        `json:"host,omitempty"`
+	Name           AdminOrganizationName `json:"name"`
+}
+
 // AdminEnrollment defines model for Admin.Enrollment.
 type AdminEnrollment struct {
 	// CreatedTime The time at which the resource was created.
@@ -5375,7 +5385,7 @@ type OntologiesAggregateObjectsRequestV2 struct {
 
 // OntologiesAggregateObjectsResponseItemV2 defines model for Ontologies.AggregateObjectsResponseItemV2.
 type OntologiesAggregateObjectsResponseItemV2 struct {
-	Group   *map[string]OntologiesAggregationGroupValueV2 `json:"group,omitempty"`
+	Group   *map[string]OntologiesAggregationGroupValueV2 `json:"group"`
 	Metrics *[]OntologiesAggregationMetricResultV2        `json:"metrics,omitempty"`
 }
 
@@ -5420,13 +5430,19 @@ type OntologiesAggregationDurationGroupingV2 struct {
 
 // OntologiesAggregationExactGroupingV2 Divides objects into groups according to an exact value.
 type OntologiesAggregationExactGroupingV2 struct {
+	// DefaultValue Includes a group with the specified default value that includes all objects where the specified field's value is null.
+	// Cannot be used with includeNullValues.
 	DefaultValue *string `json:"defaultValue,omitempty"`
 
 	// Field The name of the property in the API. To find the API name for your property, use the `Get object type`
 	// endpoint or check the **Ontology Manager**.
-	Field         OntologiesPropertyAPIName `json:"field"`
-	MaxGroupCount *int                      `json:"maxGroupCount,omitempty"`
-	Type          string                    `json:"type"`
+	Field OntologiesPropertyAPIName `json:"field"`
+
+	// IncludeNullValues Includes a group with a null value that includes all objects where the specified field's value is null.
+	// Cannot be used with defaultValue or orderBy clauses on the aggregation.
+	IncludeNullValues *bool  `json:"includeNullValues,omitempty"`
+	MaxGroupCount     *int   `json:"maxGroupCount,omitempty"`
+	Type              string `json:"type"`
 }
 
 // OntologiesAggregationFixedWidthGroupingV2 Divides objects into groups with the specified width.
@@ -5557,6 +5573,15 @@ type OntologiesApproximatePercentileAggregationV2 struct {
 	// Name A user-specified alias for an aggregation metric name.
 	Name *OntologiesAggregationMetricName `json:"name,omitempty"`
 	Type string                           `json:"type"`
+}
+
+// OntologiesArrayConstraint defines model for Ontologies.ArrayConstraint.
+type OntologiesArrayConstraint struct {
+	MaximumSize     *int                           `json:"maximumSize,omitempty"`
+	MinimumSize     *int                           `json:"minimumSize,omitempty"`
+	Type            string                         `json:"type"`
+	UniqueValues    bool                           `json:"uniqueValues"`
+	ValueConstraint *OntologiesValueTypeConstraint `json:"valueConstraint,omitempty"`
 }
 
 // OntologiesArrayEntryEvaluatedConstraint Evaluated constraints for entries of array parameters for which per-entry evaluation is supported.
@@ -6144,6 +6169,12 @@ type OntologiesEntrySetType struct {
 	ValueType OntologiesQueryDataType `json:"valueType"`
 }
 
+// OntologiesEnumConstraint defines model for Ontologies.EnumConstraint.
+type OntologiesEnumConstraint struct {
+	Options *[]interface{} `json:"options,omitempty"`
+	Type    string         `json:"type"`
+}
+
 // OntologiesEqualsQuery Returns objects where the specified field is equal to a value.
 type OntologiesEqualsQuery struct {
 	// Field A reference to an Ontology object property with the form `properties.{propertyApiName}`.
@@ -6675,6 +6706,13 @@ type OntologiesIsNullQueryV2 struct {
 type OntologiesLeastPropertyExpression struct {
 	Properties *[]OntologiesDerivedPropertyDefinition `json:"properties,omitempty"`
 	Type       string                                 `json:"type"`
+}
+
+// OntologiesLengthConstraint defines model for Ontologies.LengthConstraint.
+type OntologiesLengthConstraint struct {
+	MaximumLength *float64 `json:"maximumLength,omitempty"`
+	MinimumLength *float64 `json:"minimumLength,omitempty"`
+	Type          string   `json:"type"`
 }
 
 // OntologiesLinkSideObject defines model for Ontologies.LinkSideObject.
@@ -8006,6 +8044,20 @@ type OntologiesRangeConstraint struct {
 	Type string       `json:"type"`
 }
 
+// OntologiesRangesConstraint defines model for Ontologies.RangesConstraint.
+type OntologiesRangesConstraint struct {
+	MaximumValue *interface{} `json:"maximumValue,omitempty"`
+	MinimumValue *interface{} `json:"minimumValue,omitempty"`
+	Type         string       `json:"type"`
+}
+
+// OntologiesRegexConstraint defines model for Ontologies.RegexConstraint.
+type OntologiesRegexConstraint struct {
+	PartialMatch bool   `json:"partialMatch"`
+	Pattern      string `json:"pattern"`
+	Type         string `json:"type"`
+}
+
 // OntologiesRelativeTime A relative time, such as "3 days before" or "2 hours after" the current moment.
 type OntologiesRelativeTime struct {
 	Unit  OntologiesRelativeTimeSeriesTimeUnit `json:"unit"`
@@ -8031,6 +8083,11 @@ type OntologiesRelativeTimeSeriesTimeUnit string
 
 // OntologiesReturnEditsMode defines model for Ontologies.ReturnEditsMode.
 type OntologiesReturnEditsMode string
+
+// OntologiesRidConstraint The string must be a valid RID (Resource Identifier).
+type OntologiesRidConstraint struct {
+	Type string `json:"type"`
+}
 
 // OntologiesRollingAggregateWindowPoints Number of points in each window.
 type OntologiesRollingAggregateWindowPoints struct {
@@ -8371,6 +8428,13 @@ type OntologiesStringRegexMatchConstraint struct {
 	Type  string `json:"type"`
 }
 
+// OntologiesStructConstraint defines model for Ontologies.StructConstraint.
+type OntologiesStructConstraint struct {
+	// Properties A map of the properties of the struct type to the value type applied to that property.
+	Properties *map[string]OntologiesValueTypeAPIName `json:"properties,omitempty"`
+	Type       string                                 `json:"type"`
+}
+
 // OntologiesStructEvaluatedConstraint Represents the validity of a singleton struct parameter.
 type OntologiesStructEvaluatedConstraint struct {
 	StructFields *map[string]OntologiesStructFieldEvaluationResult `json:"structFields,omitempty"`
@@ -8602,6 +8666,11 @@ type OntologiesUnevaluableConstraint struct {
 	Type string `json:"type"`
 }
 
+// OntologiesUUIDConstraint The string must be a valid UUID (Universally Unique Identifier).
+type OntologiesUUIDConstraint struct {
+	Type string `json:"type"`
+}
+
 // OntologiesValidateActionResponseV2 defines model for Ontologies.ValidateActionResponseV2.
 type OntologiesValidateActionResponseV2 struct {
 	Parameters *map[string]OntologiesParameterEvaluationResult `json:"parameters,omitempty"`
@@ -8613,6 +8682,14 @@ type OntologiesValidateActionResponseV2 struct {
 
 // OntologiesValidationResult Represents the state of a validation.
 type OntologiesValidationResult string
+
+// OntologiesValueTypeAPIName The name of the value type in the API in camelCase format.
+type OntologiesValueTypeAPIName = string
+
+// OntologiesValueTypeConstraint defines model for Ontologies.ValueTypeConstraint.
+type OntologiesValueTypeConstraint struct {
+	union json.RawMessage
+}
 
 // OntologiesVersionedQueryTypeAPIName The name of the Query in the API and an optional version identifier separated by a colon.
 // If the API name contains a colon, then a version identifier of either "latest" or a semantic version must
@@ -10187,6 +10264,12 @@ type AdminAddMarkingRoleAssignmentsParams struct {
 
 // AdminRemoveMarkingRoleAssignmentsParams defines parameters for AdminRemoveMarkingRoleAssignments.
 type AdminRemoveMarkingRoleAssignmentsParams struct {
+	// Preview Enables the use of preview functionality.
+	Preview *CorePreviewMode `form:"preview,omitempty" json:"preview,omitempty"`
+}
+
+// AdminCreateOrganizationParams defines parameters for AdminCreateOrganization.
+type AdminCreateOrganizationParams struct {
 	// Preview Enables the use of preview functionality.
 	Preview *CorePreviewMode `form:"preview,omitempty" json:"preview,omitempty"`
 }
@@ -11899,6 +11982,9 @@ type AdminAddMarkingRoleAssignmentsJSONRequestBody = AdminAddMarkingRoleAssignme
 
 // AdminRemoveMarkingRoleAssignmentsJSONRequestBody defines body for AdminRemoveMarkingRoleAssignments for application/json ContentType.
 type AdminRemoveMarkingRoleAssignmentsJSONRequestBody = AdminRemoveMarkingRoleAssignmentsRequest
+
+// AdminCreateOrganizationJSONRequestBody defines body for AdminCreateOrganization for application/json ContentType.
+type AdminCreateOrganizationJSONRequestBody = AdminCreateOrganizationRequest
 
 // AdminReplaceOrganizationJSONRequestBody defines body for AdminReplaceOrganization for application/json ContentType.
 type AdminReplaceOrganizationJSONRequestBody = AdminReplaceOrganizationRequest
@@ -26987,6 +27073,275 @@ func (t *OntologiesTimeSeriesRollingAggregateWindow) UnmarshalJSON(b []byte) err
 	return err
 }
 
+// AsOntologiesStructConstraint returns the union data inside the OntologiesValueTypeConstraint as a OntologiesStructConstraint
+func (t OntologiesValueTypeConstraint) AsOntologiesStructConstraint() (OntologiesStructConstraint, error) {
+	var body OntologiesStructConstraint
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromOntologiesStructConstraint overwrites any union data inside the OntologiesValueTypeConstraint as the provided OntologiesStructConstraint
+func (t *OntologiesValueTypeConstraint) FromOntologiesStructConstraint(v OntologiesStructConstraint) error {
+	v.Type = "struct"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeOntologiesStructConstraint performs a merge with any union data inside the OntologiesValueTypeConstraint, using the provided OntologiesStructConstraint
+func (t *OntologiesValueTypeConstraint) MergeOntologiesStructConstraint(v OntologiesStructConstraint) error {
+	v.Type = "struct"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsOntologiesRegexConstraint returns the union data inside the OntologiesValueTypeConstraint as a OntologiesRegexConstraint
+func (t OntologiesValueTypeConstraint) AsOntologiesRegexConstraint() (OntologiesRegexConstraint, error) {
+	var body OntologiesRegexConstraint
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromOntologiesRegexConstraint overwrites any union data inside the OntologiesValueTypeConstraint as the provided OntologiesRegexConstraint
+func (t *OntologiesValueTypeConstraint) FromOntologiesRegexConstraint(v OntologiesRegexConstraint) error {
+	v.Type = "regex"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeOntologiesRegexConstraint performs a merge with any union data inside the OntologiesValueTypeConstraint, using the provided OntologiesRegexConstraint
+func (t *OntologiesValueTypeConstraint) MergeOntologiesRegexConstraint(v OntologiesRegexConstraint) error {
+	v.Type = "regex"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsOntologiesArrayConstraint returns the union data inside the OntologiesValueTypeConstraint as a OntologiesArrayConstraint
+func (t OntologiesValueTypeConstraint) AsOntologiesArrayConstraint() (OntologiesArrayConstraint, error) {
+	var body OntologiesArrayConstraint
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromOntologiesArrayConstraint overwrites any union data inside the OntologiesValueTypeConstraint as the provided OntologiesArrayConstraint
+func (t *OntologiesValueTypeConstraint) FromOntologiesArrayConstraint(v OntologiesArrayConstraint) error {
+	v.Type = "array"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeOntologiesArrayConstraint performs a merge with any union data inside the OntologiesValueTypeConstraint, using the provided OntologiesArrayConstraint
+func (t *OntologiesValueTypeConstraint) MergeOntologiesArrayConstraint(v OntologiesArrayConstraint) error {
+	v.Type = "array"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsOntologiesLengthConstraint returns the union data inside the OntologiesValueTypeConstraint as a OntologiesLengthConstraint
+func (t OntologiesValueTypeConstraint) AsOntologiesLengthConstraint() (OntologiesLengthConstraint, error) {
+	var body OntologiesLengthConstraint
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromOntologiesLengthConstraint overwrites any union data inside the OntologiesValueTypeConstraint as the provided OntologiesLengthConstraint
+func (t *OntologiesValueTypeConstraint) FromOntologiesLengthConstraint(v OntologiesLengthConstraint) error {
+	v.Type = "length"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeOntologiesLengthConstraint performs a merge with any union data inside the OntologiesValueTypeConstraint, using the provided OntologiesLengthConstraint
+func (t *OntologiesValueTypeConstraint) MergeOntologiesLengthConstraint(v OntologiesLengthConstraint) error {
+	v.Type = "length"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsOntologiesRangesConstraint returns the union data inside the OntologiesValueTypeConstraint as a OntologiesRangesConstraint
+func (t OntologiesValueTypeConstraint) AsOntologiesRangesConstraint() (OntologiesRangesConstraint, error) {
+	var body OntologiesRangesConstraint
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromOntologiesRangesConstraint overwrites any union data inside the OntologiesValueTypeConstraint as the provided OntologiesRangesConstraint
+func (t *OntologiesValueTypeConstraint) FromOntologiesRangesConstraint(v OntologiesRangesConstraint) error {
+	v.Type = "range"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeOntologiesRangesConstraint performs a merge with any union data inside the OntologiesValueTypeConstraint, using the provided OntologiesRangesConstraint
+func (t *OntologiesValueTypeConstraint) MergeOntologiesRangesConstraint(v OntologiesRangesConstraint) error {
+	v.Type = "range"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsOntologiesRidConstraint returns the union data inside the OntologiesValueTypeConstraint as a OntologiesRidConstraint
+func (t OntologiesValueTypeConstraint) AsOntologiesRidConstraint() (OntologiesRidConstraint, error) {
+	var body OntologiesRidConstraint
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromOntologiesRidConstraint overwrites any union data inside the OntologiesValueTypeConstraint as the provided OntologiesRidConstraint
+func (t *OntologiesValueTypeConstraint) FromOntologiesRidConstraint(v OntologiesRidConstraint) error {
+	v.Type = "rid"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeOntologiesRidConstraint performs a merge with any union data inside the OntologiesValueTypeConstraint, using the provided OntologiesRidConstraint
+func (t *OntologiesValueTypeConstraint) MergeOntologiesRidConstraint(v OntologiesRidConstraint) error {
+	v.Type = "rid"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsOntologiesUUIDConstraint returns the union data inside the OntologiesValueTypeConstraint as a OntologiesUUIDConstraint
+func (t OntologiesValueTypeConstraint) AsOntologiesUUIDConstraint() (OntologiesUUIDConstraint, error) {
+	var body OntologiesUUIDConstraint
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromOntologiesUUIDConstraint overwrites any union data inside the OntologiesValueTypeConstraint as the provided OntologiesUUIDConstraint
+func (t *OntologiesValueTypeConstraint) FromOntologiesUUIDConstraint(v OntologiesUUIDConstraint) error {
+	v.Type = "uuid"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeOntologiesUUIDConstraint performs a merge with any union data inside the OntologiesValueTypeConstraint, using the provided OntologiesUUIDConstraint
+func (t *OntologiesValueTypeConstraint) MergeOntologiesUUIDConstraint(v OntologiesUUIDConstraint) error {
+	v.Type = "uuid"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsOntologiesEnumConstraint returns the union data inside the OntologiesValueTypeConstraint as a OntologiesEnumConstraint
+func (t OntologiesValueTypeConstraint) AsOntologiesEnumConstraint() (OntologiesEnumConstraint, error) {
+	var body OntologiesEnumConstraint
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromOntologiesEnumConstraint overwrites any union data inside the OntologiesValueTypeConstraint as the provided OntologiesEnumConstraint
+func (t *OntologiesValueTypeConstraint) FromOntologiesEnumConstraint(v OntologiesEnumConstraint) error {
+	v.Type = "enum"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeOntologiesEnumConstraint performs a merge with any union data inside the OntologiesValueTypeConstraint, using the provided OntologiesEnumConstraint
+func (t *OntologiesValueTypeConstraint) MergeOntologiesEnumConstraint(v OntologiesEnumConstraint) error {
+	v.Type = "enum"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t OntologiesValueTypeConstraint) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"type"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t OntologiesValueTypeConstraint) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "array":
+		return t.AsOntologiesArrayConstraint()
+	case "enum":
+		return t.AsOntologiesEnumConstraint()
+	case "length":
+		return t.AsOntologiesLengthConstraint()
+	case "range":
+		return t.AsOntologiesRangesConstraint()
+	case "regex":
+		return t.AsOntologiesRegexConstraint()
+	case "rid":
+		return t.AsOntologiesRidConstraint()
+	case "struct":
+		return t.AsOntologiesStructConstraint()
+	case "uuid":
+		return t.AsOntologiesUUIDConstraint()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (t OntologiesValueTypeConstraint) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *OntologiesValueTypeConstraint) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsGeoGeoPoint returns the union data inside the OntologiesWithinBoundingBoxPoint as a GeoGeoPoint
 func (t OntologiesWithinBoundingBoxPoint) AsGeoGeoPoint() (GeoGeoPoint, error) {
 	var body GeoGeoPoint
@@ -28841,6 +29196,11 @@ type ClientInterface interface {
 
 	AdminRemoveMarkingRoleAssignments(ctx context.Context, markingID CoreMarkingID, params *AdminRemoveMarkingRoleAssignmentsParams, body AdminRemoveMarkingRoleAssignmentsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// AdminCreateOrganizationWithBody request with any body
+	AdminCreateOrganizationWithBody(ctx context.Context, params *AdminCreateOrganizationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	AdminCreateOrganization(ctx context.Context, params *AdminCreateOrganizationParams, body AdminCreateOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// AdminGetOrganization request
 	AdminGetOrganization(ctx context.Context, organizationRid CoreOrganizationRid, params *AdminGetOrganizationParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -30306,6 +30666,30 @@ func (c *Client) AdminRemoveMarkingRoleAssignmentsWithBody(ctx context.Context, 
 
 func (c *Client) AdminRemoveMarkingRoleAssignments(ctx context.Context, markingID CoreMarkingID, params *AdminRemoveMarkingRoleAssignmentsParams, body AdminRemoveMarkingRoleAssignmentsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewAdminRemoveMarkingRoleAssignmentsRequest(c.Server, markingID, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) AdminCreateOrganizationWithBody(ctx context.Context, params *AdminCreateOrganizationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAdminCreateOrganizationRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) AdminCreateOrganization(ctx context.Context, params *AdminCreateOrganizationParams, body AdminCreateOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAdminCreateOrganizationRequest(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -36153,6 +36537,68 @@ func NewAdminRemoveMarkingRoleAssignmentsRequestWithBody(server string, markingI
 	}
 
 	operationPath := fmt.Sprintf("/v2/admin/markings/%s/roleAssignments/remove", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Preview != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "preview", runtime.ParamLocationQuery, *params.Preview); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewAdminCreateOrganizationRequest calls the generic AdminCreateOrganization builder with application/json body
+func NewAdminCreateOrganizationRequest(server string, params *AdminCreateOrganizationParams, body AdminCreateOrganizationJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewAdminCreateOrganizationRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewAdminCreateOrganizationRequestWithBody generates requests for AdminCreateOrganization with any type of body
+func NewAdminCreateOrganizationRequestWithBody(server string, params *AdminCreateOrganizationParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v2/admin/organizations")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -52297,6 +52743,11 @@ type ClientWithResponsesInterface interface {
 
 	AdminRemoveMarkingRoleAssignmentsWithResponse(ctx context.Context, markingID CoreMarkingID, params *AdminRemoveMarkingRoleAssignmentsParams, body AdminRemoveMarkingRoleAssignmentsJSONRequestBody, reqEditors ...RequestEditorFn) (*AdminRemoveMarkingRoleAssignmentsHttpResp, error)
 
+	// AdminCreateOrganizationWithBodyWithResponse request with any body
+	AdminCreateOrganizationWithBodyWithResponse(ctx context.Context, params *AdminCreateOrganizationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AdminCreateOrganizationHttpResp, error)
+
+	AdminCreateOrganizationWithResponse(ctx context.Context, params *AdminCreateOrganizationParams, body AdminCreateOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*AdminCreateOrganizationHttpResp, error)
+
 	// AdminGetOrganizationWithResponse request
 	AdminGetOrganizationWithResponse(ctx context.Context, organizationRid CoreOrganizationRid, params *AdminGetOrganizationParams, reqEditors ...RequestEditorFn) (*AdminGetOrganizationHttpResp, error)
 
@@ -53901,6 +54352,28 @@ func (r AdminRemoveMarkingRoleAssignmentsHttpResp) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r AdminRemoveMarkingRoleAssignmentsHttpResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type AdminCreateOrganizationHttpResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *AdminOrganization
+}
+
+// Status returns HTTPResponse.Status
+func (r AdminCreateOrganizationHttpResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r AdminCreateOrganizationHttpResp) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -59301,6 +59774,23 @@ func (c *ClientWithResponses) AdminRemoveMarkingRoleAssignmentsWithResponse(ctx 
 	return ParseAdminRemoveMarkingRoleAssignmentsHttpResp(rsp)
 }
 
+// AdminCreateOrganizationWithBodyWithResponse request with arbitrary body returning *AdminCreateOrganizationHttpResp
+func (c *ClientWithResponses) AdminCreateOrganizationWithBodyWithResponse(ctx context.Context, params *AdminCreateOrganizationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AdminCreateOrganizationHttpResp, error) {
+	rsp, err := c.AdminCreateOrganizationWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAdminCreateOrganizationHttpResp(rsp)
+}
+
+func (c *ClientWithResponses) AdminCreateOrganizationWithResponse(ctx context.Context, params *AdminCreateOrganizationParams, body AdminCreateOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*AdminCreateOrganizationHttpResp, error) {
+	rsp, err := c.AdminCreateOrganization(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAdminCreateOrganizationHttpResp(rsp)
+}
+
 // AdminGetOrganizationWithResponse request returning *AdminGetOrganizationHttpResp
 func (c *ClientWithResponses) AdminGetOrganizationWithResponse(ctx context.Context, organizationRid CoreOrganizationRid, params *AdminGetOrganizationParams, reqEditors ...RequestEditorFn) (*AdminGetOrganizationHttpResp, error) {
 	rsp, err := c.AdminGetOrganization(ctx, organizationRid, params, reqEditors...)
@@ -62768,6 +63258,32 @@ func ParseAdminRemoveMarkingRoleAssignmentsHttpResp(rsp *http.Response) (*AdminR
 	response := &AdminRemoveMarkingRoleAssignmentsHttpResp{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseAdminCreateOrganizationHttpResp parses an HTTP response from a AdminCreateOrganizationWithResponse call
+func ParseAdminCreateOrganizationHttpResp(rsp *http.Response) (*AdminCreateOrganizationHttpResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &AdminCreateOrganizationHttpResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AdminOrganization
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	}
 
 	return response, nil

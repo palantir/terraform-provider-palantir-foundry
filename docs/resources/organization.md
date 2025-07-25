@@ -24,8 +24,8 @@ resource "foundry_organization" "example-organization" {
   name         = "Example organization nmae"
   description  = "An example organization in Foundry"
   host_name = "example.palantirfoundry.com"
-  organization_members = ["example-user-id", "example-group-id"]
-  organization_roles = [
+  planned_organization_members = ["example-user-id", "example-group-id"]
+  planned_organization_roles = [
     {
       "role_id" : "organization:example-role",
       "principal_id" : "example-user-id",
@@ -43,6 +43,7 @@ resource "foundry_organization" "example-organization" {
 
 ### Required
 
+- `enrollment_rid` (String) The RID of the enrollment this organization belongs to. This field is immutable after creation.
 - `name` (String) Name of the organization.
 - `planned_organization_members` (Set of String) Planned list of the PrincipalIds of the members (users or groups) in this organization.
 - `planned_organization_roles` (Set of Object) Planned list of roles assigned to principals for this organization (see [below for nested schema](#nestedatt--planned_organization_roles))

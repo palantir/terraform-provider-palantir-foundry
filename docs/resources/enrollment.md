@@ -18,7 +18,7 @@ description: |-
 
 ```terraform
 resource "foundry_enrollment" "example-enrollment" {
-  organization_roles = [
+  planned_organization_roles = [
     {
       "role_id" : "enrollment:example-role",
       "principal_id" : "example-user-id",

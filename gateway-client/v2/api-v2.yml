@@ -1436,6 +1436,46 @@ paths:
       security:
       - BearerAuth: []
       x-releaseStage: PUBLIC_BETA
+  /v2/admin/organizations:
+    post:
+      tags:
+      - AdminApiService
+      description: Creates a new Organization.
+      operationId: adminCreateOrganization
+      parameters:
+      - name: preview
+        in: query
+        description: Enables the use of preview functionality.
+        required: false
+        schema:
+          $ref: "#/components/schemas/Core.PreviewMode"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Admin.CreateOrganizationRequest"
+            example:
+              administrators:
+              - f05f8da4-b84c-4fca-9c77-8af0b13d11de
+              enrollmentRid: ri.control-panel.main.customer.466f812b-f974-4478-9d4f-90402cd3def6
+              host: example.palantirfoundry.com
+              name: Example Organization
+        required: true
+      responses:
+        "200":
+          description: The created Organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Admin.Organization"
+              example:
+                host: example.palantirfoundry.com
+                markingId: 18212f9a-0e63-4b79-96a0-aae04df23336
+                name: Example Organization
+                rid: ri.multipass..organization.c30ee6ad-b5e4-4afe-a74f-fe4a289f2faa
+      security:
+      - BearerAuth: []
+      x-releaseStage: PRIVATE_BETA
   /v2/admin/organizations/{organizationRid}:
     get:
       tags:
@@ -13336,6 +13376,69 @@ components:
         - principalId: f05f8da4-b84c-4fca-9c77-8af0b13d11de
           role: ADMINISTER
         name: PII
+    Admin.CreateOrganizationMissingInitialAdminRole:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - INVALID_ARGUMENT
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          type: object
+      description: At least one organization:administrator role grant must be provided
+        when creating a organization.
+    Admin.CreateOrganizationPermissionDenied:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - PERMISSION_DENIED
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          type: object
+      description: Could not create the Organization.
+    Admin.CreateOrganizationRequest:
+      required:
+      - enrollmentRid
+      - name
+      type: object
+      properties:
+        administrators:
+          type: array
+          description: |
+            The initial administrators of the Organization. At least one principal must be provided.
+          items:
+            $ref: "#/components/schemas/Core.PrincipalId"
+        description:
+          type: string
+        enrollmentRid:
+          $ref: "#/components/schemas/Core.EnrollmentRid"
+        host:
+          $ref: "#/components/schemas/Admin.HostName"
+        name:
+          $ref: "#/components/schemas/Admin.OrganizationName"
+      example:
+        administrators:
+        - f05f8da4-b84c-4fca-9c77-8af0b13d11de
+        enrollmentRid: ri.control-panel.main.customer.466f812b-f974-4478-9d4f-90402cd3def6
+        host: example.palantirfoundry.com
+        name: Example Organization
     Admin.DeleteGroupPermissionDenied:
       required:
       - errorName
@@ -14760,6 +14863,29 @@ components:
         rid: ri.multipass..organization.c30ee6ad-b5e4-4afe-a74f-fe4a289f2faa
     Admin.OrganizationName:
       type: string
+    Admin.OrganizationNameAlreadyExists:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - INVALID_ARGUMENT
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          required:
+          - displayName
+          type: object
+          properties:
+            displayName:
+              type: string
+      description: An organization with the same name already exists.
     Admin.OrganizationNotFound:
       required:
       - errorName
@@ -28899,6 +29025,7 @@ components:
           type: object
           additionalProperties:
             $ref: "#/components/schemas/Ontologies.AggregationGroupValueV2"
+          nullable: true
         metrics:
           type: array
           items:
@@ -29032,8 +29159,16 @@ components:
       properties:
         defaultValue:
           type: string
+          description: |
+            Includes a group with the specified default value that includes all objects where the specified field's value is null.
+            Cannot be used with includeNullValues.
         field:
           $ref: "#/components/schemas/Ontologies.PropertyApiName"
+        includeNullValues:
+          type: boolean
+          description: |
+            Includes a group with a null value that includes all objects where the specified field's value is null.
+            Cannot be used with defaultValue or orderBy clauses on the aggregation.
         maxGroupCount:
           type: integer
         type:
@@ -29470,6 +29605,22 @@ components:
           type: string
         value:
           type: string
+    Ontologies.ArrayConstraint:
+      required:
+      - type
+      - uniqueValues
+      type: object
+      properties:
+        maximumSize:
+          type: integer
+        minimumSize:
+          type: integer
+        type:
+          type: string
+        uniqueValues:
+          type: boolean
+        valueConstraint:
+          $ref: "#/components/schemas/Ontologies.ValueTypeConstraint"
     Ontologies.ArrayEntryEvaluatedConstraint:
       description: Evaluated constraints for entries of array parameters for which
         per-entry evaluation is supported.
@@ -30178,6 +30329,25 @@ components:
         The result of a CipherText decryption. If successful, the plaintext decrypted value will be returned. Otherwise, an error will be thrown.
       example:
         plaintext: Jane Doe
+    Ontologies.DefaultAndNullGroupsNotSupported:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - INVALID_ARGUMENT
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          type: object
+      description: |
+        Exact match groupBy clause cannot specify a default value and allow null values.
     Ontologies.DeleteInterfaceObjectRule:
       required:
       - interfaceTypeApiName
@@ -30461,6 +30631,16 @@ components:
           type: string
         valueType:
           $ref: "#/components/schemas/Ontologies.QueryDataType"
+    Ontologies.EnumConstraint:
+      required:
+      - type
+      type: object
+      properties:
+        options:
+          type: array
+          items: {}
+        type:
+          type: string
     Ontologies.EqualsQuery:
       required:
       - field
@@ -31199,6 +31379,25 @@ components:
           type: object
       description: |
         Aggregation ordering can only be applied to metrics with exactly one groupBy clause.
+    Ontologies.InvalidAggregationOrderingWithNullValues:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - INVALID_ARGUMENT
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          type: object
+      description: |
+        Aggregation ordering cannot be applied for groupBy clauses that allow null values.
     Ontologies.InvalidAggregationRange:
       required:
       - errorName
@@ -31875,6 +32074,19 @@ components:
           type: string
       description: |
         Finds least of two or more numeric, date or timestamp values.
+    Ontologies.LengthConstraint:
+      required:
+      - type
+      type: object
+      properties:
+        maximumLength:
+          type: number
+          format: double
+        minimumLength:
+          type: number
+          format: double
+        type:
+          type: string
     Ontologies.LinkAlreadyExists:
       required:
       - errorName
@@ -34334,6 +34546,32 @@ components:
         rid:
           $ref: "#/components/schemas/Ontologies.OntologyRid"
       description: Metadata about an Ontology.
+    Ontologies.OntologyValueType:
+      required:
+      - apiName
+      - displayName
+      - rid
+      - version
+      type: object
+      properties:
+        apiName:
+          $ref: "#/components/schemas/Ontologies.ValueTypeApiName"
+        constraints:
+          type: array
+          items:
+            $ref: "#/components/schemas/Ontologies.ValueTypeConstraint"
+        description:
+          type: string
+        displayName:
+          $ref: "#/components/schemas/Core.DisplayName"
+        fieldType:
+          $ref: "#/components/schemas/Ontologies.ObjectPropertyType"
+        rid:
+          $ref: "#/components/schemas/Ontologies.ValueTypeRid"
+        status:
+          $ref: "#/components/schemas/Ontologies.ValueTypeStatus"
+        version:
+          type: string
     Ontologies.OrQuery:
       required:
       - type
@@ -35708,6 +35946,15 @@ components:
           type: string
       description: |
         The parameter value must be within the defined range.
+    Ontologies.RangesConstraint:
+      required:
+      - type
+      type: object
+      properties:
+        maximumValue: {}
+        minimumValue: {}
+        type:
+          type: string
     Ontologies.RateLimitReached:
       required:
       - errorName
@@ -35795,6 +36042,19 @@ components:
           type: string
       description: |
         The list of updated Foundry Objects cannot be provided. The object set must be refreshed using Object Set Service.
+    Ontologies.RegexConstraint:
+      required:
+      - partialMatch
+      - pattern
+      - type
+      type: object
+      properties:
+        partialMatch:
+          type: boolean
+        pattern:
+          type: string
+        type:
+          type: string
     Ontologies.RelativeTime:
       required:
       - unit
@@ -35849,6 +36109,14 @@ components:
       - ALL
       - ALL_V2_WITH_DELETIONS
       - NONE
+    Ontologies.RidConstraint:
+      required:
+      - type
+      type: object
+      properties:
+        type:
+          type: string
+      description: The string must be a valid RID (Resource Identifier).
     Ontologies.RollingAggregateWindowPoints:
       required:
       - count
@@ -36505,6 +36773,19 @@ components:
           type: string
       description: |
         The parameter value must match a predefined regular expression.
+    Ontologies.StructConstraint:
+      required:
+      - type
+      type: object
+      properties:
+        properties:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/Ontologies.ValueTypeApiName"
+          description: A map of the properties of the struct type to the value type
+            applied to that property.
+        type:
+          type: string
     Ontologies.StructEvaluatedConstraint:
       required:
       - type
@@ -37071,6 +37352,14 @@ components:
         parameters:
           type: object
       description: The requested object set is not supported.
+    Ontologies.UuidConstraint:
+      required:
+      - type
+      type: object
+      properties:
+        type:
+          type: string
+      description: The string must be a valid UUID (Universally Unique Identifier).
     Ontologies.ValidateActionRequest:
       type: object
       properties:
@@ -37142,6 +37431,61 @@ components:
         | Struct              | `Struct<T>` where `T` contains field name and type pairs, e.g. `Struct<{ firstName: String, lastName: string }>`  |
         | Timeseries          | `TimeSeries<T>` where `T` is either `String` for an enum series or `Double` for a numeric series.                 |
         | Timestamp           | `Timestamp`                                                                                                       |
+    Ontologies.ValueTypeApiName:
+      type: string
+      description: The name of the value type in the API in camelCase format.
+    Ontologies.ValueTypeConstraint:
+      discriminator:
+        propertyName: type
+        mapping:
+          array: "#/components/schemas/Ontologies.ArrayConstraint"
+          enum: "#/components/schemas/Ontologies.EnumConstraint"
+          length: "#/components/schemas/Ontologies.LengthConstraint"
+          range: "#/components/schemas/Ontologies.RangesConstraint"
+          regex: "#/components/schemas/Ontologies.RegexConstraint"
+          rid: "#/components/schemas/Ontologies.RidConstraint"
+          struct: "#/components/schemas/Ontologies.StructConstraint"
+          uuid: "#/components/schemas/Ontologies.UuidConstraint"
+      oneOf:
+      - $ref: "#/components/schemas/Ontologies.StructConstraint"
+      - $ref: "#/components/schemas/Ontologies.RegexConstraint"
+      - $ref: "#/components/schemas/Ontologies.ArrayConstraint"
+      - $ref: "#/components/schemas/Ontologies.LengthConstraint"
+      - $ref: "#/components/schemas/Ontologies.RangesConstraint"
+      - $ref: "#/components/schemas/Ontologies.RidConstraint"
+      - $ref: "#/components/schemas/Ontologies.UuidConstraint"
+      - $ref: "#/components/schemas/Ontologies.EnumConstraint"
+    Ontologies.ValueTypeNotFound:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - NOT_FOUND
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          type: object
+          properties:
+            rid:
+              $ref: "#/components/schemas/Ontologies.ValueTypeRid"
+            valueType:
+              $ref: "#/components/schemas/Ontologies.ValueTypeApiName"
+      description: "The value type is not found, or the user does not have access\
+        \ to it."
+    Ontologies.ValueTypeRid:
+      type: string
+    Ontologies.ValueTypeStatus:
+      type: string
+      enum:
+      - ACTIVE
+      - DEPRECATED
     Ontologies.VersionedQueryTypeApiName:
       type: string
       description: |
