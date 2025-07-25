@@ -16,11 +16,22 @@ package enrollment
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"slices"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	v2 "github.com/palantir/terraform-provider-palantir-foundry/gateway-client/v2"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/constants"
+	providerError "github.com/palantir/terraform-provider-palantir-foundry/internal/provider/errors"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/helper"
 )
 
 // Ensure the implementation satisfies the expected interfaces
@@ -35,18 +46,27 @@ func NewEnrollmentResource() resource.Resource {
 }
 
 // enrollmentResource is the resource implementation.
-type enrollmentResource struct{}
-
-// enrollmentResourceModel maps the resource schema data.
-type enrollmentResourceModel struct {
-	ID          types.String `tfsdk:"id"`
-	Name        types.String `tfsdk:"name"`
-	Description types.String `tfsdk:"description"`
+type enrollmentResource struct {
+	client *v2.ClientWithResponses
 }
 
-// Configure adds the provider configured client to the resource.
-func (r *enrollmentResource) Configure(_ context.Context, req resource.ConfigureRequest, _ *resource.ConfigureResponse) {
-	// No configuration needed for this stub
+func (r *enrollmentResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+
+	client, ok := req.ProviderData.(*v2.ClientWithResponses)
+
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Resource Configure Type",
+			fmt.Sprintf("Expected v2.ClientWithResponses, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
+
+		return
+	}
+
+	r.client = client
 }
 
 // Metadata returns the resource type name.
@@ -59,17 +79,29 @@ func (r *enrollmentResource) Schema(_ context.Context, _ resource.SchemaRequest,
 	resp.Schema = schema.Schema{
 		Description: "Manages a Foundry Enrollment.",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
+			"rid": schema.StringAttribute{
 				Description: "Identifier of the Enrollment.",
 				Computed:    true,
 			},
-			"name": schema.StringAttribute{
-				Description: "Name of the Enrollment.",
+			"planned_enrollment_roles": schema.SetAttribute{
+				Description: "Planned list of roles assigned to principals for this enrollment",
 				Required:    true,
+				ElementType: types.ObjectType{
+					AttrTypes: map[string]attr.Type{
+						"role_id":      types.StringType,
+						"principal_id": types.StringType,
+					},
+				},
 			},
-			"description": schema.StringAttribute{
-				Description: "Description of the Enrollment.",
-				Optional:    true,
+			"enrollment_roles": schema.SetAttribute{
+				Description: "Actual list of roles assigned to principals for this enrollment, computed after successful addition/removal of roles",
+				Computed:    true,
+				ElementType: types.ObjectType{
+					AttrTypes: map[string]attr.Type{
+						"role_id":      types.StringType,
+						"principal_id": types.StringType,
+					},
+				},
 			},
 		},
 	}
@@ -78,27 +110,10 @@ func (r *enrollmentResource) Schema(_ context.Context, _ resource.SchemaRequest,
 // Create creates a new resource and sets the initial Terraform state.
 func (r *enrollmentResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	// Retrieve values from plan
-	var plan enrollmentResourceModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// Generate a new ID for the Enrollment
-	plan.ID = types.StringValue("enrollment-123456")
-
-	tflog.Info(ctx, "Created enrollment resource", map[string]any{
-		"name": plan.Name.ValueString(),
-		"id":   plan.ID.ValueString(),
-	})
-
-	// Set state to fully populated data
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	tflog.Error(ctx, "Enrollments cannot be created")
+	resp.Diagnostics.AddError("Enrollments cannot be created",
+		"Foundry terraform provider currently does not support creating enrollments")
+	return
 }
 
 // Read refreshes the Terraform state with the latest data.
@@ -111,8 +126,11 @@ func (r *enrollmentResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	// For this stub, we'll just keep the state as is
-	// In a real implementation, we would refresh from the API
+	err := r.ReadEnrollmentRoles(ctx, &state)
+	if err != nil {
+		resp.Diagnostics.AddWarning("Error reading the enrollment roles",
+			err.Error())
+	}
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -120,6 +138,60 @@ func (r *enrollmentResource) Read(ctx context.Context, req resource.ReadRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
+}
+
+func (r *enrollmentResource) ReadEnrollmentRoles(ctx context.Context, state *enrollmentResourceModel) error {
+	previewMode := constants.PreviewMode
+	adminListEnrollmentRoleAssignmentsParams := v2.AdminListEnrollmentRoleAssignmentsParams{Preview: &previewMode}
+	httpResp, err := r.client.AdminListEnrollmentRoleAssignments(ctx, state.RID.ValueString(), &adminListEnrollmentRoleAssignmentsParams)
+
+	if err != nil {
+		return fmt.Errorf("AdminListEnrollmentRoleAssignments request failed: %w", err)
+	}
+
+	// Check the response status code
+	if httpResp.StatusCode != http.StatusOK {
+		returnString, err := providerError.FormatHTTPError(httpResp)
+		if err != nil {
+			return fmt.Errorf("failed to format error logging from AdminListEnrollmentRoleAssignments response: %w", err)
+		}
+		return errors.New(returnString)
+	}
+
+	bodyBytes, err := helper.ExtractBodyFromResponse(httpResp)
+	if err != nil {
+		return fmt.Errorf("failed to parse response from AdminListEnrollmentRoleAssignments: %w", err)
+	}
+	var httpEnrollmentRolesResponseBody enrollmentRolesResponseBody
+	if err := json.Unmarshal(bodyBytes, &httpEnrollmentRolesResponseBody); err != nil {
+		return fmt.Errorf("error decoding response: %w", err)
+	}
+
+	roleAssignmentType := types.ObjectType{
+		AttrTypes: map[string]attr.Type{
+			"principal_id": types.StringType,
+			"role_id":      types.StringType,
+		},
+	}
+
+	// Convert each entry to a map of attribute values
+	roleAssignments := make([]attr.Value, 0)
+	//var objects []attr.Value
+	for _, entry := range httpEnrollmentRolesResponseBody.Data {
+		roleAssignment, _ := types.ObjectValue(
+			roleAssignmentType.AttrTypes,
+			map[string]attr.Value{
+				"principal_id": types.StringValue(entry.PrincipalID),
+				"role_id":      types.StringValue(entry.RoleID),
+			},
+		)
+		roleAssignments = append(roleAssignments, roleAssignment)
+	}
+
+	// Create the set from the list of objects
+	state.EnrollmentRoles, _ = types.SetValueFrom(ctx, roleAssignmentType, roleAssignments)
+	state.PlannedEnrollmentRoles = state.EnrollmentRoles
+	return nil
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
@@ -140,9 +212,11 @@ func (r *enrollmentResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	// Use plan values as we're just stubbing
-	state.Name = plan.Name
-	state.Description = plan.Description
+	err := r.UpdateEnrollmentRoles(ctx, &plan, &state)
+	if err != nil {
+		resp.Diagnostics.AddWarning("Error updating the enrollment roles",
+			err.Error())
+	}
 
 	// Set updated state
 	diags = resp.State.Set(ctx, state)
@@ -152,20 +226,153 @@ func (r *enrollmentResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 }
 
+func (r *enrollmentResource) UpdateEnrollmentRoles(ctx context.Context, plan *enrollmentResourceModel, state *enrollmentResourceModel) error {
+
+	var oldEnrollmentRoles []enrollmentRolesRequestBodyEntry
+	diags := state.EnrollmentRoles.ElementsAs(ctx, &oldEnrollmentRoles, false)
+	if diags.HasError() {
+		return fmt.Errorf("failed to convert enrollment roles to Go slice")
+	}
+
+	var newEnrollmentRoles []enrollmentRolesRequestBodyEntry
+	diags = plan.PlannedEnrollmentRoles.ElementsAs(ctx, &newEnrollmentRoles, false)
+	if diags.HasError() {
+		return fmt.Errorf("failed to convert enrollment roles to Go slice")
+	}
+
+	previewMode := constants.PreviewMode
+
+	if !slices.Equal(oldEnrollmentRoles, newEnrollmentRoles) {
+		// Determine members to add and remove
+		rolesToAdd, rolesToRemove := findEnrollmentRolesDiff(oldEnrollmentRoles, newEnrollmentRoles)
+		if len(rolesToAdd) != 0 {
+
+			roleUpdates := make([]v2.CoreRoleAssignmentUpdate, len(rolesToAdd))
+			for i, role := range rolesToAdd {
+				roleUpdates[i] = v2.CoreRoleAssignmentUpdate{
+					RoleID:      role.RoleID,
+					PrincipalID: role.PrincipalID,
+				}
+			}
+			adminAddEnrollmentRoleAssignmentsParams := v2.AdminAddEnrollmentRoleAssignmentsParams{Preview: &previewMode}
+			httpResp, err := r.client.AdminAddEnrollmentRoleAssignments(ctx, state.RID.ValueString(), &adminAddEnrollmentRoleAssignmentsParams, v2.AdminAddEnrollmentRoleAssignmentsJSONRequestBody{
+				RoleAssignments: &roleUpdates,
+			})
+
+			if err != nil {
+				return fmt.Errorf("AdminAddEnrollmentRoleAssignments request failed: %w", err)
+			}
+
+			// Check the response status code
+			if httpResp.StatusCode != http.StatusNoContent {
+				returnString, err := providerError.FormatHTTPError(httpResp)
+				if err != nil {
+					return fmt.Errorf("failed to format error logging from AdminAddEnrollmentRoleAssignments response: %w", err)
+				}
+				if plan.EnrollmentRoles.IsUnknown() {
+					plan.EnrollmentRoles = state.EnrollmentRoles
+				}
+				state.PlannedEnrollmentRoles = plan.PlannedEnrollmentRoles
+				return errors.New(returnString)
+			}
+			plan.EnrollmentRoles = plan.PlannedEnrollmentRoles
+		}
+		if len(rolesToRemove) != 0 {
+			roleUpdates := make([]v2.CoreRoleAssignmentUpdate, len(rolesToRemove))
+			for i, role := range rolesToRemove {
+				roleUpdates[i] = v2.CoreRoleAssignmentUpdate{
+					RoleID:      role.RoleID,
+					PrincipalID: role.PrincipalID,
+				}
+			}
+
+			adminRemoveEnrollmentRoleAssignmentsParams := v2.AdminRemoveEnrollmentRoleAssignmentsParams{Preview: &previewMode}
+			httpResp, err := r.client.AdminRemoveEnrollmentRoleAssignments(ctx, state.RID.ValueString(), &adminRemoveEnrollmentRoleAssignmentsParams, v2.AdminRemoveEnrollmentRoleAssignmentsJSONRequestBody{
+				RoleAssignments: &roleUpdates,
+			})
+
+			if err != nil {
+				return fmt.Errorf("AdminRemoveEnrollmentRoleAssignments request failed: %w", err)
+			}
+
+			// Check the response status code
+			if httpResp.StatusCode != http.StatusNoContent {
+				returnString, err := providerError.FormatHTTPError(httpResp)
+				if err != nil {
+					return fmt.Errorf("failed to format error logging from AdminRemoveEnrollmentRoleAssignments response: %w", err)
+				}
+				if plan.EnrollmentRoles.IsUnknown() {
+					plan.EnrollmentRoles = state.EnrollmentRoles
+				}
+				state.PlannedEnrollmentRoles = plan.PlannedEnrollmentRoles
+				return errors.New(returnString)
+			}
+			plan.EnrollmentRoles = plan.PlannedEnrollmentRoles
+		}
+		state.EnrollmentRoles = plan.EnrollmentRoles
+	}
+	state.PlannedEnrollmentRoles = plan.PlannedEnrollmentRoles
+	return nil
+}
+
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *enrollmentResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	// Retrieve values from state
-	var state enrollmentResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	tflog.Error(ctx, "Enrollments cannot be deleted")
+	resp.Diagnostics.AddError("Enrollments cannot be deleted",
+		"The Terraform provider does not currently support deleting Enrollments")
+	return
+}
+
+func (r *enrollmentResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	// The import ID is expected to be the organization RID
+	enrollmentRID := req.ID
+
+	// Validate the ID format (optional, can add your own validation logic)
+	if enrollmentRID == "" {
+		resp.Diagnostics.AddError(
+			"Invalid Import ID",
+			"The import ID must be the enrollment RID",
+		)
 		return
 	}
 
-	// For this stub, we'll just log the deletion
-	// In a real implementation, we would delete from the API
-	tflog.Info(ctx, "Deleted enrollment resource", map[string]any{
-		"name": state.Name.ValueString(),
-		"id":   state.ID.ValueString(),
-	})
+	tflog.Info(ctx, fmt.Sprintf("Importing enrollment with RID %s", enrollmentRID))
+
+	// Set the organization RID in state
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("rid"), enrollmentRID)...)
+
+	// The Read method will be called automatically after ImportState
+	// to refresh all the other attributes based on the RID
+}
+
+func findEnrollmentRolesDiff(oldSlice, newSlice []enrollmentRolesRequestBodyEntry) (added, removed []enrollmentRolesRequestBodyEntry) {
+	// Create maps for quick lookup
+	oldMap := make(map[string]enrollmentRolesRequestBodyEntry)
+	newMap := make(map[string]enrollmentRolesRequestBodyEntry)
+
+	// Populate the maps with elements from the slices
+	for _, item := range oldSlice {
+		key := item.PrincipalID + "|" + item.RoleID
+		oldMap[key] = item
+	}
+	for _, item := range newSlice {
+		key := item.PrincipalID + "|" + item.RoleID
+		newMap[key] = item
+	}
+
+	// Find added elements (in newSlice but not in oldSlice)
+	for key, item := range newMap {
+		if _, exists := oldMap[key]; !exists {
+			added = append(added, item)
+		}
+	}
+
+	// Find removed elements (in oldSlice but not in newSlice)
+	for key, item := range oldMap {
+		if _, exists := newMap[key]; !exists {
+			removed = append(removed, item)
+		}
+	}
+
+	return added, removed
 }

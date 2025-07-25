@@ -182,7 +182,7 @@ func (r *organizationResource) Read(ctx context.Context, req resource.ReadReques
 }
 
 func (r *organizationResource) ReadOrganization(ctx context.Context, resp *resource.ReadResponse, state *organizationResourceModel) error {
-	previewMode := true
+	previewMode := constants.PreviewMode
 	adminGetOrganizationParams := v2.AdminGetOrganizationParams{Preview: &previewMode}
 
 	httpResp, err := r.client.AdminGetOrganization(ctx, state.RID.ValueString(), &adminGetOrganizationParams)
@@ -369,7 +369,7 @@ func (r *organizationResource) Update(ctx context.Context, req resource.UpdateRe
 }
 
 func (r *organizationResource) UpdateOrganization(ctx context.Context, resp *resource.UpdateResponse, plan *organizationResourceModel, state *organizationResourceModel) error {
-	previewMode := true
+	previewMode := constants.PreviewMode
 
 	adminReplaceOrganizationParams := v2.AdminReplaceOrganizationParams{Preview: &previewMode}
 	description := plan.Description.ValueString()
@@ -435,7 +435,7 @@ func (r *organizationResource) UpdateOrganizationMembers(ctx context.Context, pl
 		return fmt.Errorf("failed to convert planned organization members to Go slice")
 	}
 
-	previewMode := true
+	previewMode := constants.PreviewMode
 
 	if !slices.Equal(oldMarkingMembers, newMarkingMembers) {
 		membersToAdd, membersToRemove := helper.FindStringSliceDiff(oldMarkingMembers, newMarkingMembers)
@@ -511,7 +511,7 @@ func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan
 		return fmt.Errorf("failed to convert org roles to Go slice")
 	}
 
-	previewMode := true
+	previewMode := constants.PreviewMode
 
 	if !slices.Equal(oldOrganizationRoles, newOrganizationRoles) {
 		// Determine members to add and remove
@@ -544,7 +544,7 @@ func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan
 				if plan.OrganizationRoles.IsUnknown() {
 					plan.OrganizationRoles = state.OrganizationRoles
 				}
-				state.PlannedOrganizationMembers = plan.PlannedOrganizationMembers
+				state.PlannedOrganizationRoles = plan.PlannedOrganizationRoles
 				return errors.New(returnString)
 			}
 			plan.OrganizationRoles = plan.PlannedOrganizationRoles
@@ -571,12 +571,12 @@ func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan
 			if httpResp.StatusCode != http.StatusNoContent {
 				returnString, err := providerError.FormatHTTPError(httpResp)
 				if err != nil {
-					return fmt.Errorf("failed to format error logging from AdminAddOrganizationRoleAssignments response: %w", err)
+					return fmt.Errorf("failed to format error logging from AdminRemoveOrganizationRoleAssignments response: %w", err)
 				}
 				if plan.OrganizationRoles.IsUnknown() {
 					plan.OrganizationRoles = state.OrganizationRoles
 				}
-				state.PlannedOrganizationMembers = plan.PlannedOrganizationMembers
+				state.PlannedOrganizationRoles = plan.PlannedOrganizationRoles
 				return errors.New(returnString)
 			}
 			plan.OrganizationRoles = plan.PlannedOrganizationRoles

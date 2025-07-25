@@ -299,6 +299,105 @@ paths:
       security:
       - BearerAuth: []
       x-releaseStage: PRIVATE_BETA
+  /v2/admin/enrollments/{enrollmentRid}/roleAssignments:
+    get:
+      tags:
+      - AdminApiService
+      description: |
+        List all principals who are assigned a role for the given Enrollment.
+      operationId: adminListEnrollmentRoleAssignments
+      parameters:
+      - name: enrollmentRid
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Core.EnrollmentRid"
+      - name: preview
+        in: query
+        description: Enables the use of preview functionality.
+        required: false
+        schema:
+          $ref: "#/components/schemas/Core.PreviewMode"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Admin.ListEnrollmentRoleAssignmentsResponse"
+      security:
+      - BearerAuth: []
+      x-releaseStage: PRIVATE_BETA
+  /v2/admin/enrollments/{enrollmentRid}/roleAssignments/add:
+    post:
+      tags:
+      - AdminApiService
+      description: |
+        Assign roles to principals for the given Enrollment. At most 100 role assignments can be added in a single request.
+      operationId: adminAddEnrollmentRoleAssignments
+      parameters:
+      - name: enrollmentRid
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Core.EnrollmentRid"
+      - name: preview
+        in: query
+        description: Enables the use of preview functionality.
+        required: false
+        schema:
+          $ref: "#/components/schemas/Core.PreviewMode"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Admin.AddEnrollmentRoleAssignmentsRequest"
+            example:
+              roleAssignments:
+              - principalId: f05f8da4-b84c-4fca-9c77-8af0b13d11de
+                roleId: 8bf49052-dc37-4528-8bf0-b551cfb71268
+        required: true
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      x-releaseStage: PRIVATE_BETA
+  /v2/admin/enrollments/{enrollmentRid}/roleAssignments/remove:
+    post:
+      tags:
+      - AdminApiService
+      description: |
+        Remove roles from principals for the given Enrollment. At most 100 role assignments can be removed in a single request.
+      operationId: adminRemoveEnrollmentRoleAssignments
+      parameters:
+      - name: enrollmentRid
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Core.EnrollmentRid"
+      - name: preview
+        in: query
+        description: Enables the use of preview functionality.
+        required: false
+        schema:
+          $ref: "#/components/schemas/Core.PreviewMode"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Admin.RemoveEnrollmentRoleAssignmentsRequest"
+            example:
+              roleAssignments:
+              - principalId: f05f8da4-b84c-4fca-9c77-8af0b13d11de
+                roleId: 8bf49052-dc37-4528-8bf0-b551cfb71268
+        required: true
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      x-releaseStage: PRIVATE_BETA
   /v2/admin/groups:
     get:
       tags:
@@ -4562,6 +4661,193 @@ paths:
       security:
       - BearerAuth: []
       x-releaseStage: PUBLIC_BETA
+  /v2/datasets/{datasetRid}/getSchema:
+    get:
+      tags:
+      - DatasetsApiService
+      description: |
+        Gets a dataset's schema. If no `endTransactionRid` is provided, the latest committed version will be used.
+      operationId: datasetsGetDatasetSchema
+      parameters:
+      - name: datasetRid
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Datasets.DatasetRid"
+      - name: branchName
+        in: query
+        required: false
+        schema:
+          $ref: "#/components/schemas/Datasets.BranchName"
+      - name: endTransactionRid
+        in: query
+        description: |
+          The Resource Identifier (RID) of the end Transaction. If a user does not provide a value, the RID of the latest committed transaction will be used.
+        required: false
+        schema:
+          $ref: "#/components/schemas/Datasets.TransactionRid"
+      - name: versionId
+        in: query
+        description: |
+          The schema version that should be used. If none is provided, the latest version will be used.
+        required: false
+        schema:
+          $ref: "#/components/schemas/Core.VersionId"
+      - name: preview
+        in: query
+        description: Enables the use of preview functionality.
+        required: false
+        schema:
+          $ref: "#/components/schemas/Core.PreviewMode"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Datasets.GetDatasetSchemaResponse"
+              example:
+                branchName: master
+                endTransactionRid: ri.foundry.main.transaction.0a0207cb-26b7-415b-bc80-66a3aa3933f4
+                schema:
+                  fieldSchemaList:
+                  - customMetadata:
+                      description: Primary key
+                    name: id
+                    nullable: false
+                    type: long
+                  - name: event_time
+                    nullable: false
+                    type: timestamp
+                  - name: price
+                    nullable: true
+                    precision: 10
+                    scale: 2
+                    type: decimal
+                  - arraySubtype:
+                      nullable: false
+                      type: string
+                    name: tags
+                    nullable: true
+                    type: array
+                  - name: metrics
+                    nullable: true
+                    subSchemas:
+                    - name: temperature
+                      nullable: true
+                      type: double
+                    - name: humidity
+                      nullable: true
+                      type: double
+                    type: struct
+                versionId: 0000000d-2acf-537c-a228-3a9fe3cdc523
+      security:
+      - BearerAuth: []
+      x-releaseStage: PUBLIC_BETA
+  /v2/datasets/{datasetRid}/putSchema:
+    put:
+      tags:
+      - DatasetsApiService
+      description: |
+        Adds a schema on an existing dataset using a PUT request.
+      operationId: datasetsPutDatasetSchema
+      parameters:
+      - name: datasetRid
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Datasets.DatasetRid"
+      - name: preview
+        in: query
+        description: Enables the use of preview functionality.
+        required: false
+        schema:
+          $ref: "#/components/schemas/Core.PreviewMode"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Datasets.PutDatasetSchemaRequest"
+            example:
+              branchName: master
+              endTransactionRid: ri.foundry.main.transaction.0a0207cb-26b7-415b-bc80-66a3aa3933f4
+              schema:
+                fieldSchemaList:
+                - customMetadata:
+                    description: Primary key
+                  name: id
+                  nullable: false
+                  type: long
+                - name: event_time
+                  nullable: false
+                  type: timestamp
+                - name: price
+                  nullable: true
+                  precision: 10
+                  scale: 2
+                  type: decimal
+                - arraySubtype:
+                    nullable: false
+                    type: string
+                  name: tags
+                  nullable: true
+                  type: array
+                - name: metrics
+                  nullable: true
+                  subSchemas:
+                  - name: temperature
+                    nullable: true
+                    type: double
+                  - name: humidity
+                    nullable: true
+                    type: double
+                  type: struct
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Datasets.GetDatasetSchemaResponse"
+              example:
+                branchName: master
+                endTransactionRid: ri.foundry.main.transaction.0a0207cb-26b7-415b-bc80-66a3aa3933f4
+                schema:
+                  fieldSchemaList:
+                  - customMetadata:
+                      description: Primary key
+                    name: id
+                    nullable: false
+                    type: long
+                  - name: event_time
+                    nullable: false
+                    type: timestamp
+                  - name: price
+                    nullable: true
+                    precision: 10
+                    scale: 2
+                    type: decimal
+                  - arraySubtype:
+                      nullable: false
+                      type: string
+                    name: tags
+                    nullable: true
+                    type: array
+                  - name: metrics
+                    nullable: true
+                    subSchemas:
+                    - name: temperature
+                      nullable: true
+                      type: double
+                    - name: humidity
+                      nullable: true
+                      type: double
+                    type: struct
+                versionId: 0000000d-2acf-537c-a228-3a9fe3cdc523
+      security:
+      - BearerAuth: []
+      x-releaseStage: PUBLIC_BETA
   /v2/datasets/{datasetRid}/readTable:
     get:
       tags:
@@ -8725,20 +9011,20 @@ paths:
         schema:
           $ref: "#/components/schemas/Ontologies.ObjectTypeApiName"
         example: employee
-      - name: artifactRepository
+      - name: sdkPackageRid
         in: query
         description: |
-          The repository associated with a marketplace installation.
+          The package rid of the generated SDK.
         required: false
         schema:
-          $ref: "#/components/schemas/Ontologies.ArtifactRepositoryRid"
-      - name: packageName
+          $ref: "#/components/schemas/Ontologies.SdkPackageRid"
+      - name: sdkVersion
         in: query
         description: |
-          The package name of the generated SDK.
+          The version of the generated SDK.
         required: false
         schema:
-          $ref: "#/components/schemas/Ontologies.SdkPackageName"
+          $ref: "#/components/schemas/Ontologies.SdkVersion"
       - name: branch
         in: query
         description: |
@@ -10976,6 +11262,76 @@ paths:
       security:
       - BearerAuth: []
       x-releaseStage: PUBLIC_BETA
+  /v2/orchestration/schedules/getBatch:
+    post:
+      tags:
+      - OrchestrationApiService
+      description: "Fetch multiple schedules in a single request. Schedules not found\
+        \ or inaccessible to the user will be \nomitted from the response.\n\n\nThe\
+        \ maximum batch size for this endpoint is 1000."
+      operationId: orchestrationGetSchedulesBatch
+      parameters:
+      - name: preview
+        in: query
+        description: Enables the use of preview functionality.
+        required: false
+        schema:
+          $ref: "#/components/schemas/Core.PreviewMode"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              maxItems: 1000
+              minItems: 1
+              type: array
+              items:
+                $ref: "#/components/schemas/Orchestration.GetSchedulesBatchRequestElement"
+            example:
+            - scheduleRid: ri.scheduler.main.schedule.5ad5c340-59f3-4a60-9fc6-161bb984f871
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Orchestration.GetSchedulesBatchResponse"
+              example:
+                data:
+                  ri.scheduler.main.schedule.5ad5c340-59f3-4a60-9fc6-161bb984f871:
+                    action:
+                      abortOnFailure: false
+                      branchName: master
+                      fallbackBranches: []
+                      forceBuild: false
+                      notificationsEnabled: false
+                      retryBackoffDuration:
+                        unit: SECONDS
+                        value: 30
+                      retryCount: 1
+                      target:
+                        targetRids:
+                        - ri.foundry.main.dataset.b737e24d-6b19-43aa-93d5-da9fc4073f6e
+                        - ri.foundry.main.dataset.d2452a94-a755-4778-8bfc-a315ab52fc43
+                        type: manual
+                    createdBy: f05f8da4-b84c-4fca-9c77-8af0b13d11de
+                    createdTime: 2024-09-25T17:29:35.974Z
+                    currentVersionRid: ri.scheduler.main.schedule-version.4d1eb55f-6c13-411c-a911-5d84e08d8017
+                    description: Run all the transforms at midnight
+                    displayName: My Daily Schedule
+                    paused: false
+                    rid: ri.scheduler.main.schedule.5ad5c340-59f3-4a60-9fc6-161bb984f871
+                    scopeMode:
+                      type: user
+                    trigger:
+                      cronExpression: 0 0 * * *
+                      timeZone: UTC
+                      type: time
+                    updatedBy: f05f8da4-b84c-4fca-9c77-8af0b13d11de
+                    updatedTime: 2024-09-25T17:29:35.974Z
+      security:
+      - BearerAuth: []
+      x-releaseStage: PUBLIC_BETA
   /v2/orchestration/schedules/{scheduleRid}:
     get:
       tags:
@@ -12503,6 +12859,40 @@ paths:
       x-releaseStage: PRIVATE_BETA
 components:
   schemas:
+    Admin.AddEnrollmentRoleAssignmentsPermissionDenied:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - PERMISSION_DENIED
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          required:
+          - enrollmentRid
+          type: object
+          properties:
+            enrollmentRid:
+              $ref: "#/components/schemas/Core.EnrollmentRid"
+      description: Could not add the EnrollmentRoleAssignment.
+    Admin.AddEnrollmentRoleAssignmentsRequest:
+      type: object
+      properties:
+        roleAssignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Core.RoleAssignmentUpdate"
+      example:
+        roleAssignments:
+        - principalId: f05f8da4-b84c-4fca-9c77-8af0b13d11de
+          roleId: 8bf49052-dc37-4528-8bf0-b551cfb71268
     Admin.AddGroupMembersPermissionDenied:
       required:
       - errorName
@@ -13033,6 +13423,41 @@ components:
             enrollmentRid:
               $ref: "#/components/schemas/Core.EnrollmentRid"
       description: The given Enrollment could not be found.
+    Admin.EnrollmentRoleAssignment:
+      required:
+      - principalId
+      - principalType
+      - roleId
+      type: object
+      properties:
+        principalId:
+          $ref: "#/components/schemas/Core.PrincipalId"
+        principalType:
+          $ref: "#/components/schemas/Core.PrincipalType"
+        roleId:
+          $ref: "#/components/schemas/Core.RoleId"
+      example:
+        principalId: f05f8da4-b84c-4fca-9c77-8af0b13d11de
+        principalType: USER
+        roleId: 8bf49052-dc37-4528-8bf0-b551cfb71268
+    Admin.EnrollmentRoleNotFound:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - NOT_FOUND
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          type: object
+      description: One of the provided role IDs was not found.
     Admin.GetCurrentEnrollmentPermissionDenied:
       required:
       - errorName
@@ -13746,6 +14171,45 @@ components:
             organizationRid:
               $ref: "#/components/schemas/Core.OrganizationRid"
       description: Could not listAvailableRoles the Organization.
+    Admin.ListEnrollmentRoleAssignmentsPermissionDenied:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - PERMISSION_DENIED
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          required:
+          - enrollmentRid
+          type: object
+          properties:
+            enrollmentRid:
+              $ref: "#/components/schemas/Core.EnrollmentRid"
+      description: The provided token does not have permission to list assigned roles
+        for this enrollment.
+    Admin.ListEnrollmentRoleAssignmentsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Admin.EnrollmentRoleAssignment"
+        nextPageToken:
+          $ref: "#/components/schemas/Core.PageToken"
+      example:
+        data:
+        - principalId: f05f8da4-b84c-4fca-9c77-8af0b13d11de
+          principalType: USER
+          roleId: 8bf49052-dc37-4528-8bf0-b551cfb71268
+        nextPageToken: v1.QnVpbGQgdGhlIEZ1dHVyZTogaHR0cHM6Ly93d3cucGFsYW50aXIuY29tL2NhcmVlcnMvP2xldmVyLXNvdXJjZSU1YiU1ZD1BUElEb2NzI29wZW4tcG9zaXRpb25z
     Admin.ListGroupMembersResponse:
       type: object
       properties:
@@ -14503,6 +14967,40 @@ components:
       description: |
         A value that uniquely identifies a User or Group in an external authentication provider. This value is determined by the external authentication provider and must be unique per Realm.
       example: 2838c8f3-d76a-4e99-acf1-1dee537e4c48
+    Admin.RemoveEnrollmentRoleAssignmentsPermissionDenied:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - PERMISSION_DENIED
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          required:
+          - enrollmentRid
+          type: object
+          properties:
+            enrollmentRid:
+              $ref: "#/components/schemas/Core.EnrollmentRid"
+      description: Could not remove the EnrollmentRoleAssignment.
+    Admin.RemoveEnrollmentRoleAssignmentsRequest:
+      type: object
+      properties:
+        roleAssignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Core.RoleAssignmentUpdate"
+      example:
+        roleAssignments:
+        - principalId: f05f8da4-b84c-4fca-9c77-8af0b13d11de
+          roleId: 8bf49052-dc37-4528-8bf0-b551cfb71268
     Admin.RemoveGroupMembersPermissionDenied:
       required:
       - errorName
@@ -21033,6 +21531,89 @@ components:
     Core.CustomMetadata:
       type: object
       additionalProperties: {}
+    Core.DatasetFieldSchema:
+      required:
+      - name
+      - nullable
+      - type
+      type: object
+      properties:
+        arraySubtype:
+          $ref: "#/components/schemas/Core.DatasetFieldSchema"
+        customMetadata:
+          $ref: "#/components/schemas/Core.CustomMetadata"
+        mapKeyType:
+          $ref: "#/components/schemas/Core.DatasetFieldSchema"
+        mapValueType:
+          $ref: "#/components/schemas/Core.DatasetFieldSchema"
+        name:
+          $ref: "#/components/schemas/Core.FieldName"
+        nullable:
+          type: boolean
+          description: |
+            Indicates whether values of this field may be null.
+        precision:
+          type: integer
+          description: |
+            Only used with {@link FieldDataType#DECIMAL}.
+        scale:
+          type: integer
+          description: |
+            Only used with {@link FieldDataType#DECIMAL}.
+        subSchemas:
+          type: array
+          description: |
+            Only used with {@link FieldDataType#STRUCT}.
+          items:
+            $ref: "#/components/schemas/Core.DatasetFieldSchema"
+        type:
+          type: string
+        userDefinedTypeClass:
+          type: string
+          description: |
+            Canonical classname of the user-defined type for this field. This should be a subclass of Spark's `UserDefinedType`.
+      description: |
+        A field in a Foundry dataset.
+    Core.DatasetSchema:
+      type: object
+      properties:
+        fieldSchemaList:
+          type: array
+          items:
+            $ref: "#/components/schemas/Core.DatasetFieldSchema"
+      description: |
+        The schema for a Foundry dataset. Files uploaded to this dataset must match this schema.
+      example:
+        fieldSchemaList:
+        - customMetadata:
+            description: Primary key
+          name: id
+          nullable: false
+          type: long
+        - name: event_time
+          nullable: false
+          type: timestamp
+        - name: price
+          nullable: true
+          precision: 10
+          scale: 2
+          type: decimal
+        - arraySubtype:
+            nullable: false
+            type: string
+          name: tags
+          nullable: true
+          type: array
+        - name: metrics
+          nullable: true
+          subSchemas:
+          - name: temperature
+            nullable: true
+            type: double
+          - name: humidity
+            nullable: true
+            type: double
+          type: struct
     Core.DateType:
       required:
       - type
@@ -21433,7 +22014,8 @@ components:
     Core.IncludeComputeUsage:
       type: boolean
       description: |
-        Indicates whether the response should include compute usage details for the request.
+        Indicates whether the response should include compute usage details for the request. This feature is currently
+        only available for OSDK applications.
         Note: Enabling this flag may slow down query performance and is not recommended for use in production.
     Core.IntegerType:
       required:
@@ -22236,6 +22818,12 @@ components:
           type: string
       description: Represents a fixed size vector of floats. These can be used for
         vector similarity searches.
+    Core.VersionId:
+      type: string
+      description: |
+        The version identifier of a dataset schema.
+      format: uuid
+      example: 0000000d-2acf-537c-a228-3a9fe3cdc523
     Core.ZoneId:
       type: string
       description: A string representation of a java.time.ZoneId
@@ -23013,6 +23601,37 @@ components:
       description: |
         The Resource Identifier (RID) of a Dataset.
       example: ri.foundry.main.dataset.c26f11c8-cdb3-4f44-9f5d-9816ea1c82da
+    Datasets.DatasetViewNotFound:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - NOT_FOUND
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          required:
+          - branch
+          - datasetRid
+          type: object
+          properties:
+            branch:
+              $ref: "#/components/schemas/Datasets.BranchName"
+            datasetRid:
+              $ref: "#/components/schemas/Datasets.DatasetRid"
+      description: "The requested dataset view could not be found. A dataset view\
+        \ represents the effective file contents of a dataset \nfor a branch at a\
+        \ point in time, calculated from transactions (SNAPSHOT, APPEND, UPDATE, DELETE).\
+        \ The view may not \nexist if the dataset has no transactions, contains no\
+        \ files, the branch is not valid, or the client token does not have access\
+        \ to it.\n"
     Datasets.DeleteBranchPermissionDenied:
       required:
       - errorName
@@ -23262,6 +23881,80 @@ components:
             datasetRid:
               $ref: "#/components/schemas/Datasets.DatasetRid"
       description: Could not getSchedules the Dataset.
+    Datasets.GetDatasetSchemaPermissionDenied:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - PERMISSION_DENIED
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          required:
+          - datasetRid
+          type: object
+          properties:
+            datasetRid:
+              $ref: "#/components/schemas/Datasets.DatasetRid"
+      description: Could not getSchema the Dataset.
+    Datasets.GetDatasetSchemaResponse:
+      required:
+      - branchName
+      - endTransactionRid
+      - schema
+      - versionId
+      type: object
+      properties:
+        branchName:
+          $ref: "#/components/schemas/Datasets.BranchName"
+        endTransactionRid:
+          $ref: "#/components/schemas/Datasets.TransactionRid"
+        schema:
+          $ref: "#/components/schemas/Core.DatasetSchema"
+        versionId:
+          $ref: "#/components/schemas/Core.VersionId"
+      example:
+        branchName: master
+        endTransactionRid: ri.foundry.main.transaction.0a0207cb-26b7-415b-bc80-66a3aa3933f4
+        schema:
+          fieldSchemaList:
+          - customMetadata:
+              description: Primary key
+            name: id
+            nullable: false
+            type: long
+          - name: event_time
+            nullable: false
+            type: timestamp
+          - name: price
+            nullable: true
+            precision: 10
+            scale: 2
+            type: decimal
+          - arraySubtype:
+              nullable: false
+              type: string
+            name: tags
+            nullable: true
+            type: array
+          - name: metrics
+            nullable: true
+            subSchemas:
+            - name: temperature
+              nullable: true
+              type: double
+            - name: humidity
+              nullable: true
+              type: double
+            type: struct
+        versionId: 0000000d-2acf-537c-a228-3a9fe3cdc523
     Datasets.GetFileContentPermissionDenied:
       required:
       - errorName
@@ -23288,6 +23981,26 @@ components:
             filePath:
               $ref: "#/components/schemas/Core.FilePath"
       description: Could not content the File.
+    Datasets.InputBackingDatasetNotInOutputViewProject:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - INVALID_ARGUMENT
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          type: object
+      description: "One or more backing datasets do not live in the same project as\
+        \ the view. Either move the input datasets to \nthe same project as the view\
+        \ or add them as project references.\n"
     Datasets.InvalidBranchName:
       required:
       - errorName
@@ -23513,6 +24226,74 @@ components:
         type:
           type: string
       description: Primary key values are unique within the dataset – no conflicts.
+    Datasets.PutDatasetSchemaPermissionDenied:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - PERMISSION_DENIED
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          required:
+          - datasetRid
+          type: object
+          properties:
+            datasetRid:
+              $ref: "#/components/schemas/Datasets.DatasetRid"
+      description: Could not putSchema the Dataset.
+    Datasets.PutDatasetSchemaRequest:
+      required:
+      - schema
+      type: object
+      properties:
+        branchName:
+          $ref: "#/components/schemas/Datasets.BranchName"
+        endTransactionRid:
+          $ref: "#/components/schemas/Datasets.TransactionRid"
+        schema:
+          $ref: "#/components/schemas/Core.DatasetSchema"
+      example:
+        branchName: master
+        endTransactionRid: ri.foundry.main.transaction.0a0207cb-26b7-415b-bc80-66a3aa3933f4
+        schema:
+          fieldSchemaList:
+          - customMetadata:
+              description: Primary key
+            name: id
+            nullable: false
+            type: long
+          - name: event_time
+            nullable: false
+            type: timestamp
+          - name: price
+            nullable: true
+            precision: 10
+            scale: 2
+            type: decimal
+          - arraySubtype:
+              nullable: false
+              type: string
+            name: tags
+            nullable: true
+            type: array
+          - name: metrics
+            nullable: true
+            subSchemas:
+            - name: temperature
+              nullable: true
+              type: double
+            - name: humidity
+              nullable: true
+              type: double
+            type: struct
     Datasets.PutSchemaPermissionDenied:
       required:
       - errorName
@@ -25945,6 +26726,7 @@ components:
       - LOGIC_FLOWS_CONNECTED_FLOW
       - MACHINERY_DOCUMENT
       - MAGRITTE_AGENT
+      - MAGRITTE_DRIVER
       - MAGRITTE_SOURCE
       - MARKETPLACE_BLOCK_SET_INSTALLATION
       - MARKETPLACE_BLOCK_SET_REPO
@@ -28056,6 +28838,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Ontologies.AggregationGroupByV2"
+        includeComputeUsage:
+          $ref: "#/components/schemas/Core.IncludeComputeUsage"
         objectSet:
           $ref: "#/components/schemas/Ontologies.ObjectSet"
     Ontologies.AggregateObjectsRequest:
@@ -28126,6 +28910,8 @@ components:
       properties:
         accuracy:
           $ref: "#/components/schemas/Ontologies.AggregationAccuracy"
+        computeUsage:
+          $ref: "#/components/schemas/Core.ComputeSeconds"
         data:
           type: array
           items:
@@ -33324,6 +34110,16 @@ components:
       description: Either an ontology rid or an ontology api name.
     Ontologies.OntologyInterface:
       type: string
+    Ontologies.OntologyInterfaceObjectSetType:
+      required:
+      - interfaceTypeApiName
+      - type
+      type: object
+      properties:
+        interfaceTypeApiName:
+          $ref: "#/components/schemas/Ontologies.InterfaceTypeApiName"
+        type:
+          type: string
     Ontologies.OntologyInterfaceObjectType:
       required:
       - type
@@ -33331,8 +34127,6 @@ components:
       properties:
         interfaceTypeApiName:
           $ref: "#/components/schemas/Ontologies.InterfaceTypeApiName"
-        interfaceTypeRid:
-          $ref: "#/components/schemas/Ontologies.InterfaceTypeRid"
         type:
           type: string
     Ontologies.OntologyMapType:
@@ -34563,6 +35357,7 @@ components:
           float: "#/components/schemas/Core.FloatType"
           integer: "#/components/schemas/Core.IntegerType"
           interfaceObject: "#/components/schemas/Ontologies.OntologyInterfaceObjectType"
+          interfaceObjectSet: "#/components/schemas/Ontologies.OntologyInterfaceObjectSetType"
           long: "#/components/schemas/Core.LongType"
           "null": "#/components/schemas/Core.NullType"
           object: "#/components/schemas/Ontologies.OntologyObjectType"
@@ -34595,6 +35390,7 @@ components:
       - $ref: "#/components/schemas/Ontologies.QueryArrayType"
       - $ref: "#/components/schemas/Ontologies.OntologyObjectSetType"
       - $ref: "#/components/schemas/Ontologies.TwoDimensionalAggregation"
+      - $ref: "#/components/schemas/Ontologies.OntologyInterfaceObjectSetType"
       - $ref: "#/components/schemas/Ontologies.OntologyObjectType"
       - $ref: "#/components/schemas/Core.TimestampType"
     Ontologies.QueryEncounteredUserFacingError:
@@ -37402,6 +38198,55 @@ components:
             jobStatus: WAITING
             rid: ri.foundry.main.job.aaf94076-d773-4732-a1df-3b638eb50448
             startedTime: 2003-05-06T12:34:56.789Z
+    Orchestration.GetSchedulesBatchRequestElement:
+      required:
+      - scheduleRid
+      type: object
+      properties:
+        scheduleRid:
+          $ref: "#/components/schemas/Core.ScheduleRid"
+      example:
+        scheduleRid: ri.scheduler.main.schedule.5ad5c340-59f3-4a60-9fc6-161bb984f871
+    Orchestration.GetSchedulesBatchResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/Orchestration.Schedule"
+      example:
+        data:
+          ri.scheduler.main.schedule.5ad5c340-59f3-4a60-9fc6-161bb984f871:
+            action:
+              abortOnFailure: false
+              branchName: master
+              fallbackBranches: []
+              forceBuild: false
+              notificationsEnabled: false
+              retryBackoffDuration:
+                unit: SECONDS
+                value: 30
+              retryCount: 1
+              target:
+                targetRids:
+                - ri.foundry.main.dataset.b737e24d-6b19-43aa-93d5-da9fc4073f6e
+                - ri.foundry.main.dataset.d2452a94-a755-4778-8bfc-a315ab52fc43
+                type: manual
+            createdBy: f05f8da4-b84c-4fca-9c77-8af0b13d11de
+            createdTime: 2024-09-25T17:29:35.974Z
+            currentVersionRid: ri.scheduler.main.schedule-version.4d1eb55f-6c13-411c-a911-5d84e08d8017
+            description: Run all the transforms at midnight
+            displayName: My Daily Schedule
+            paused: false
+            rid: ri.scheduler.main.schedule.5ad5c340-59f3-4a60-9fc6-161bb984f871
+            scopeMode:
+              type: user
+            trigger:
+              cronExpression: 0 0 * * *
+              timeZone: UTC
+              type: time
+            updatedBy: f05f8da4-b84c-4fca-9c77-8af0b13d11de
+            updatedTime: 2024-09-25T17:29:35.974Z
     Orchestration.InvalidAndTrigger:
       required:
       - errorName

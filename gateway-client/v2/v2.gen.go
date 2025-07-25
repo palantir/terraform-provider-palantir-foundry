@@ -267,6 +267,7 @@ const (
 	LOGICFLOWSCONNECTEDFLOW           FilesystemResourceType = "LOGIC_FLOWS_CONNECTED_FLOW"
 	MACHINERYDOCUMENT                 FilesystemResourceType = "MACHINERY_DOCUMENT"
 	MAGRITTEAGENT                     FilesystemResourceType = "MAGRITTE_AGENT"
+	MAGRITTEDRIVER                    FilesystemResourceType = "MAGRITTE_DRIVER"
 	MAGRITTESOURCE                    FilesystemResourceType = "MAGRITTE_SOURCE"
 	MARKETPLACEBLOCKSETINSTALLATION   FilesystemResourceType = "MARKETPLACE_BLOCK_SET_INSTALLATION"
 	MARKETPLACEBLOCKSETREPO           FilesystemResourceType = "MARKETPLACE_BLOCK_SET_REPO"
@@ -568,6 +569,11 @@ const (
 	MODULE  WidgetsScriptType = "MODULE"
 )
 
+// AdminAddEnrollmentRoleAssignmentsRequest defines model for Admin.AddEnrollmentRoleAssignmentsRequest.
+type AdminAddEnrollmentRoleAssignmentsRequest struct {
+	RoleAssignments *[]CoreRoleAssignmentUpdate `json:"roleAssignments,omitempty"`
+}
+
 // AdminAddGroupMembersRequest defines model for Admin.AddGroupMembersRequest.
 type AdminAddGroupMembersRequest struct {
 	Expiration   *AdminGroupMembershipExpiration `json:"expiration,omitempty"`
@@ -685,6 +691,18 @@ type AdminEnrollment struct {
 
 // AdminEnrollmentName defines model for Admin.EnrollmentName.
 type AdminEnrollmentName = string
+
+// AdminEnrollmentRoleAssignment defines model for Admin.EnrollmentRoleAssignment.
+type AdminEnrollmentRoleAssignment struct {
+	// PrincipalID The ID of a Foundry Group or User.
+	PrincipalID   CorePrincipalID   `json:"principalId"`
+	PrincipalType CorePrincipalType `json:"principalType"`
+
+	// RoleID The unique ID for a Role. Roles are sets of permissions that grant different levels of access to resources.
+	// The default roles in Foundry are: Owner, Editor, Viewer, and Discoverer. See more about
+	// [roles](/docs/foundry/security/projects-and-roles#roles) in the user documentation.
+	RoleID CoreRoleID `json:"roleId"`
+}
 
 // AdminGetGroupsBatchRequestElement defines model for Admin.GetGroupsBatchRequestElement.
 type AdminGetGroupsBatchRequestElement struct {
@@ -820,6 +838,16 @@ type AdminListAuthenticationProvidersResponse struct {
 // AdminListAvailableOrganizationRolesResponse defines model for Admin.ListAvailableOrganizationRolesResponse.
 type AdminListAvailableOrganizationRolesResponse struct {
 	Data *[]CoreRole `json:"data,omitempty"`
+}
+
+// AdminListEnrollmentRoleAssignmentsResponse defines model for Admin.ListEnrollmentRoleAssignmentsResponse.
+type AdminListEnrollmentRoleAssignmentsResponse struct {
+	Data *[]AdminEnrollmentRoleAssignment `json:"data,omitempty"`
+
+	// NextPageToken The page token indicates where to start paging. This should be omitted from the first page's request.
+	// To fetch the next page, clients should take the value from the `nextPageToken` field of the previous response
+	// and use it to populate the `pageToken` field of the next request.
+	NextPageToken *CorePageToken `json:"nextPageToken,omitempty"`
 }
 
 // AdminListGroupMembersResponse defines model for Admin.ListGroupMembersResponse.
@@ -1071,6 +1099,11 @@ type AdminPrincipalFilterType string
 
 // AdminProviderID A value that uniquely identifies a User or Group in an external authentication provider. This value is determined by the external authentication provider and must be unique per Realm.
 type AdminProviderID = string
+
+// AdminRemoveEnrollmentRoleAssignmentsRequest defines model for Admin.RemoveEnrollmentRoleAssignmentsRequest.
+type AdminRemoveEnrollmentRoleAssignmentsRequest struct {
+	RoleAssignments *[]CoreRoleAssignmentUpdate `json:"roleAssignments,omitempty"`
+}
 
 // AdminRemoveGroupMembersRequest defines model for Admin.RemoveGroupMembersRequest.
 type AdminRemoveGroupMembersRequest struct {
@@ -3358,6 +3391,41 @@ type CoreCreatedTime = time.Time
 // CoreCustomMetadata defines model for Core.CustomMetadata.
 type CoreCustomMetadata map[string]interface{}
 
+// CoreDatasetFieldSchema A field in a Foundry dataset.
+type CoreDatasetFieldSchema struct {
+	// ArraySubtype A field in a Foundry dataset.
+	ArraySubtype   *CoreDatasetFieldSchema `json:"arraySubtype,omitempty"`
+	CustomMetadata *CoreCustomMetadata     `json:"customMetadata,omitempty"`
+
+	// MapKeyType A field in a Foundry dataset.
+	MapKeyType *CoreDatasetFieldSchema `json:"mapKeyType,omitempty"`
+
+	// MapValueType A field in a Foundry dataset.
+	MapValueType *CoreDatasetFieldSchema `json:"mapValueType,omitempty"`
+	Name         CoreFieldName           `json:"name"`
+
+	// Nullable Indicates whether values of this field may be null.
+	Nullable bool `json:"nullable"`
+
+	// Precision Only used with {@link FieldDataType#DECIMAL}.
+	Precision *int `json:"precision,omitempty"`
+
+	// Scale Only used with {@link FieldDataType#DECIMAL}.
+	Scale *int `json:"scale,omitempty"`
+
+	// SubSchemas Only used with {@link FieldDataType#STRUCT}.
+	SubSchemas *[]CoreDatasetFieldSchema `json:"subSchemas,omitempty"`
+	Type       string                    `json:"type"`
+
+	// UserDefinedTypeClass Canonical classname of the user-defined type for this field. This should be a subclass of Spark's `UserDefinedType`.
+	UserDefinedTypeClass *string `json:"userDefinedTypeClass,omitempty"`
+}
+
+// CoreDatasetSchema The schema for a Foundry dataset. Files uploaded to this dataset must match this schema.
+type CoreDatasetSchema struct {
+	FieldSchemaList *[]CoreDatasetFieldSchema `json:"fieldSchemaList,omitempty"`
+}
+
 // CoreDateType defines model for Core.DateType.
 type CoreDateType struct {
 	Type string `json:"type"`
@@ -3489,7 +3557,8 @@ type CoreGeotimeSeriesReferenceType struct {
 	Type string `json:"type"`
 }
 
-// CoreIncludeComputeUsage Indicates whether the response should include compute usage details for the request.
+// CoreIncludeComputeUsage Indicates whether the response should include compute usage details for the request. This feature is currently
+// only available for OSDK applications.
 // Note: Enabling this flag may slow down query performance and is not recommended for use in production.
 type CoreIncludeComputeUsage = bool
 
@@ -3788,6 +3857,9 @@ type CoreVectorType struct {
 	Type               string                          `json:"type"`
 }
 
+// CoreVersionID The version identifier of a dataset schema.
+type CoreVersionID = openapi_types.UUID
+
 // CoreZoneID A string representation of a java.time.ZoneId
 type CoreZoneID = string
 
@@ -3978,6 +4050,21 @@ type DatasetsFile struct {
 // DatasetsFileUpdatedTime defines model for Datasets.FileUpdatedTime.
 type DatasetsFileUpdatedTime = time.Time
 
+// DatasetsGetDatasetSchemaResponse defines model for Datasets.GetDatasetSchemaResponse.
+type DatasetsGetDatasetSchemaResponse struct {
+	// BranchName The name of a Branch.
+	BranchName DatasetsBranchName `json:"branchName"`
+
+	// EndTransactionRid The Resource Identifier (RID) of a Transaction.
+	EndTransactionRid DatasetsTransactionRid `json:"endTransactionRid"`
+
+	// Schema The schema for a Foundry dataset. Files uploaded to this dataset must match this schema.
+	Schema CoreDatasetSchema `json:"schema"`
+
+	// VersionID The version identifier of a dataset schema.
+	VersionID CoreVersionID `json:"versionId"`
+}
+
 // DatasetsListBranchesResponse defines model for Datasets.ListBranchesResponse.
 type DatasetsListBranchesResponse struct {
 	Data *[]DatasetsBranch `json:"data,omitempty"`
@@ -4032,6 +4119,18 @@ type DatasetsPrimaryKeyResolutionStrategy struct {
 // DatasetsPrimaryKeyResolutionUnique Primary key values are unique within the dataset – no conflicts.
 type DatasetsPrimaryKeyResolutionUnique struct {
 	Type string `json:"type"`
+}
+
+// DatasetsPutDatasetSchemaRequest defines model for Datasets.PutDatasetSchemaRequest.
+type DatasetsPutDatasetSchemaRequest struct {
+	// BranchName The name of a Branch.
+	BranchName *DatasetsBranchName `json:"branchName,omitempty"`
+
+	// EndTransactionRid The Resource Identifier (RID) of a Transaction.
+	EndTransactionRid *DatasetsTransactionRid `json:"endTransactionRid,omitempty"`
+
+	// Schema The schema for a Foundry dataset. Files uploaded to this dataset must match this schema.
+	Schema CoreDatasetSchema `json:"schema"`
 }
 
 // DatasetsRemoveBackingDatasetsRequest defines model for Datasets.RemoveBackingDatasetsRequest.
@@ -5257,6 +5356,11 @@ type OntologiesAggregateObjectSetRequestV2 struct {
 	Aggregation *[]OntologiesAggregationV2            `json:"aggregation,omitempty"`
 	GroupBy     *[]OntologiesAggregationGroupByV2     `json:"groupBy,omitempty"`
 
+	// IncludeComputeUsage Indicates whether the response should include compute usage details for the request. This feature is currently
+	// only available for OSDK applications.
+	// Note: Enabling this flag may slow down query performance and is not recommended for use in production.
+	IncludeComputeUsage *CoreIncludeComputeUsage `json:"includeComputeUsage,omitempty"`
+
 	// ObjectSet Represents the definition of an `ObjectSet` in the `Ontology`.
 	ObjectSet OntologiesObjectSet `json:"objectSet"`
 }
@@ -5277,7 +5381,10 @@ type OntologiesAggregateObjectsResponseItemV2 struct {
 
 // OntologiesAggregateObjectsResponseV2 defines model for Ontologies.AggregateObjectsResponseV2.
 type OntologiesAggregateObjectsResponseV2 struct {
-	Accuracy      OntologiesAggregationAccuracy               `json:"accuracy"`
+	Accuracy OntologiesAggregationAccuracy `json:"accuracy"`
+
+	// ComputeUsage A measurement of compute usage expressed in [compute-seconds](/docs/foundry/resource-management/usage-types#compute-second). For more information, please refer to the [Usage types](/docs/foundry/resource-management/usage-types) documentation.
+	ComputeUsage  *CoreComputeSeconds                         `json:"computeUsage,omitempty"`
 	Data          *[]OntologiesAggregateObjectsResponseItemV2 `json:"data,omitempty"`
 	ExcludedItems *int                                        `json:"excludedItems,omitempty"`
 }
@@ -5478,9 +5585,6 @@ type OntologiesArraySizeConstraint struct {
 	Lte  *interface{} `json:"lte,omitempty"`
 	Type string       `json:"type"`
 }
-
-// OntologiesArtifactRepositoryRid defines model for Ontologies.ArtifactRepositoryRid.
-type OntologiesArtifactRepositoryRid = string
 
 // OntologiesAsyncActionOperation defines model for Ontologies.AsyncActionOperation.
 type OntologiesAsyncActionOperation struct {
@@ -6767,7 +6871,8 @@ type OntologiesLoadObjectSetRequestV2 struct {
 	// Setting this to true may improve performance of this endpoint for object types in OSV2.
 	ExcludeRid *bool `json:"excludeRid,omitempty"`
 
-	// IncludeComputeUsage Indicates whether the response should include compute usage details for the request.
+	// IncludeComputeUsage Indicates whether the response should include compute usage details for the request. This feature is currently
+	// only available for OSDK applications.
 	// Note: Enabling this flag may slow down query performance and is not recommended for use in production.
 	IncludeComputeUsage *CoreIncludeComputeUsage `json:"includeComputeUsage,omitempty"`
 
@@ -7507,15 +7612,20 @@ type OntologiesOntologyFullMetadata struct {
 // OntologiesOntologyIdentifier Either an ontology rid or an ontology api name.
 type OntologiesOntologyIdentifier = string
 
+// OntologiesOntologyInterfaceObjectSetType defines model for Ontologies.OntologyInterfaceObjectSetType.
+type OntologiesOntologyInterfaceObjectSetType struct {
+	// InterfaceTypeAPIName The name of the interface type in the API in UpperCamelCase format. To find the API name for your interface
+	// type, use the `List interface types` endpoint or check the **Ontology Manager**.
+	InterfaceTypeAPIName OntologiesInterfaceTypeAPIName `json:"interfaceTypeApiName"`
+	Type                 string                         `json:"type"`
+}
+
 // OntologiesOntologyInterfaceObjectType defines model for Ontologies.OntologyInterfaceObjectType.
 type OntologiesOntologyInterfaceObjectType struct {
 	// InterfaceTypeAPIName The name of the interface type in the API in UpperCamelCase format. To find the API name for your interface
 	// type, use the `List interface types` endpoint or check the **Ontology Manager**.
 	InterfaceTypeAPIName *OntologiesInterfaceTypeAPIName `json:"interfaceTypeApiName,omitempty"`
-
-	// InterfaceTypeRid The unique resource identifier of an interface, useful for interacting with other Foundry APIs.
-	InterfaceTypeRid *OntologiesInterfaceTypeRid `json:"interfaceTypeRid,omitempty"`
-	Type             string                      `json:"type"`
+	Type                 string                          `json:"type"`
 }
 
 // OntologiesOntologyMapType defines model for Ontologies.OntologyMapType.
@@ -7927,9 +8037,6 @@ type OntologiesRollingAggregateWindowPoints struct {
 	Count int    `json:"count"`
 	Type  string `json:"type"`
 }
-
-// OntologiesSdkPackageName defines model for Ontologies.SdkPackageName.
-type OntologiesSdkPackageName = string
 
 // OntologiesSdkPackageRid defines model for Ontologies.SdkPackageRid.
 type OntologiesSdkPackageRid = string
@@ -8866,6 +8973,17 @@ type OrchestrationGetJobsBatchRequestElement struct {
 // OrchestrationGetJobsBatchResponse defines model for Orchestration.GetJobsBatchResponse.
 type OrchestrationGetJobsBatchResponse struct {
 	Data *map[string]OrchestrationJob `json:"data,omitempty"`
+}
+
+// OrchestrationGetSchedulesBatchRequestElement defines model for Orchestration.GetSchedulesBatchRequestElement.
+type OrchestrationGetSchedulesBatchRequestElement struct {
+	// ScheduleRid The RID of a Schedule.
+	ScheduleRid CoreScheduleRid `json:"scheduleRid"`
+}
+
+// OrchestrationGetSchedulesBatchResponse defines model for Orchestration.GetSchedulesBatchResponse.
+type OrchestrationGetSchedulesBatchResponse struct {
+	Data *map[string]OrchestrationSchedule `json:"data,omitempty"`
 }
 
 // OrchestrationJob defines model for Orchestration.Job.
@@ -9877,6 +9995,24 @@ type AdminListHostsParams struct {
 	Preview *CorePreviewMode `form:"preview,omitempty" json:"preview,omitempty"`
 }
 
+// AdminListEnrollmentRoleAssignmentsParams defines parameters for AdminListEnrollmentRoleAssignments.
+type AdminListEnrollmentRoleAssignmentsParams struct {
+	// Preview Enables the use of preview functionality.
+	Preview *CorePreviewMode `form:"preview,omitempty" json:"preview,omitempty"`
+}
+
+// AdminAddEnrollmentRoleAssignmentsParams defines parameters for AdminAddEnrollmentRoleAssignments.
+type AdminAddEnrollmentRoleAssignmentsParams struct {
+	// Preview Enables the use of preview functionality.
+	Preview *CorePreviewMode `form:"preview,omitempty" json:"preview,omitempty"`
+}
+
+// AdminRemoveEnrollmentRoleAssignmentsParams defines parameters for AdminRemoveEnrollmentRoleAssignments.
+type AdminRemoveEnrollmentRoleAssignmentsParams struct {
+	// Preview Enables the use of preview functionality.
+	Preview *CorePreviewMode `form:"preview,omitempty" json:"preview,omitempty"`
+}
+
 // AdminListGroupsParams defines parameters for AdminListGroups.
 type AdminListGroupsParams struct {
 	// PageSize The page size to use for the endpoint.
@@ -10522,6 +10658,26 @@ type DatasetsGetDatasetSchedulesParams struct {
 	PageSize   *CorePageSize       `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 	PageToken  *CorePageToken      `form:"pageToken,omitempty" json:"pageToken,omitempty"`
 
+	// Preview Enables the use of preview functionality.
+	Preview *CorePreviewMode `form:"preview,omitempty" json:"preview,omitempty"`
+}
+
+// DatasetsGetDatasetSchemaParams defines parameters for DatasetsGetDatasetSchema.
+type DatasetsGetDatasetSchemaParams struct {
+	BranchName *DatasetsBranchName `form:"branchName,omitempty" json:"branchName,omitempty"`
+
+	// EndTransactionRid The Resource Identifier (RID) of the end Transaction. If a user does not provide a value, the RID of the latest committed transaction will be used.
+	EndTransactionRid *DatasetsTransactionRid `form:"endTransactionRid,omitempty" json:"endTransactionRid,omitempty"`
+
+	// VersionID The schema version that should be used. If none is provided, the latest version will be used.
+	VersionID *CoreVersionID `form:"versionId,omitempty" json:"versionId,omitempty"`
+
+	// Preview Enables the use of preview functionality.
+	Preview *CorePreviewMode `form:"preview,omitempty" json:"preview,omitempty"`
+}
+
+// DatasetsPutDatasetSchemaParams defines parameters for DatasetsPutDatasetSchema.
+type DatasetsPutDatasetSchemaParams struct {
 	// Preview Enables the use of preview functionality.
 	Preview *CorePreviewMode `form:"preview,omitempty" json:"preview,omitempty"`
 }
@@ -11187,11 +11343,11 @@ type OntologiesListObjectsV2Params struct {
 
 // OntologiesAggregateObjectsV2Params defines parameters for OntologiesAggregateObjectsV2.
 type OntologiesAggregateObjectsV2Params struct {
-	// ArtifactRepository The repository associated with a marketplace installation.
-	ArtifactRepository *OntologiesArtifactRepositoryRid `form:"artifactRepository,omitempty" json:"artifactRepository,omitempty"`
+	// SdkPackageRid The package rid of the generated SDK.
+	SdkPackageRid *OntologiesSdkPackageRid `form:"sdkPackageRid,omitempty" json:"sdkPackageRid,omitempty"`
 
-	// PackageName The package name of the generated SDK.
-	PackageName *OntologiesSdkPackageName `form:"packageName,omitempty" json:"packageName,omitempty"`
+	// SdkVersion The version of the generated SDK.
+	SdkVersion *OntologiesSdkVersion `form:"sdkVersion,omitempty" json:"sdkVersion,omitempty"`
 
 	// Branch The Foundry branch to aggregate objects from. If not specified, the default branch will be used.
 	Branch *CoreFoundryBranch `form:"branch,omitempty" json:"branch,omitempty"`
@@ -11481,6 +11637,15 @@ type OrchestrationCreateScheduleParams struct {
 	Preview *CorePreviewMode `form:"preview,omitempty" json:"preview,omitempty"`
 }
 
+// OrchestrationGetSchedulesBatchJSONBody defines parameters for OrchestrationGetSchedulesBatch.
+type OrchestrationGetSchedulesBatchJSONBody = []OrchestrationGetSchedulesBatchRequestElement
+
+// OrchestrationGetSchedulesBatchParams defines parameters for OrchestrationGetSchedulesBatch.
+type OrchestrationGetSchedulesBatchParams struct {
+	// Preview Enables the use of preview functionality.
+	Preview *CorePreviewMode `form:"preview,omitempty" json:"preview,omitempty"`
+}
+
 // OrchestrationGetScheduleParams defines parameters for OrchestrationGetSchedule.
 type OrchestrationGetScheduleParams struct {
 	// Preview Enables the use of preview functionality.
@@ -11687,6 +11852,12 @@ type AdminPreregisterGroupJSONRequestBody = AdminPreregisterGroupRequest
 // AdminPreregisterUserJSONRequestBody defines body for AdminPreregisterUser for application/json ContentType.
 type AdminPreregisterUserJSONRequestBody = AdminPreregisterUserRequest
 
+// AdminAddEnrollmentRoleAssignmentsJSONRequestBody defines body for AdminAddEnrollmentRoleAssignments for application/json ContentType.
+type AdminAddEnrollmentRoleAssignmentsJSONRequestBody = AdminAddEnrollmentRoleAssignmentsRequest
+
+// AdminRemoveEnrollmentRoleAssignmentsJSONRequestBody defines body for AdminRemoveEnrollmentRoleAssignments for application/json ContentType.
+type AdminRemoveEnrollmentRoleAssignmentsJSONRequestBody = AdminRemoveEnrollmentRoleAssignmentsRequest
+
 // AdminCreateGroupJSONRequestBody defines body for AdminCreateGroup for application/json ContentType.
 type AdminCreateGroupJSONRequestBody = AdminCreateGroupRequest
 
@@ -11813,6 +11984,9 @@ type DatasetsReplaceBackingDatasetsJSONRequestBody = DatasetsReplaceBackingDatas
 // DatasetsCreateBranchJSONRequestBody defines body for DatasetsCreateBranch for application/json ContentType.
 type DatasetsCreateBranchJSONRequestBody = DatasetsCreateBranchRequest
 
+// DatasetsPutDatasetSchemaJSONRequestBody defines body for DatasetsPutDatasetSchema for application/json ContentType.
+type DatasetsPutDatasetSchemaJSONRequestBody = DatasetsPutDatasetSchemaRequest
+
 // DatasetsCreateTransactionJSONRequestBody defines body for DatasetsCreateTransaction for application/json ContentType.
 type DatasetsCreateTransactionJSONRequestBody = DatasetsCreateTransactionRequest
 
@@ -11920,6 +12094,9 @@ type OrchestrationGetJobsBatchJSONRequestBody = OrchestrationGetJobsBatchJSONBod
 
 // OrchestrationCreateScheduleJSONRequestBody defines body for OrchestrationCreateSchedule for application/json ContentType.
 type OrchestrationCreateScheduleJSONRequestBody = OrchestrationCreateScheduleRequest
+
+// OrchestrationGetSchedulesBatchJSONRequestBody defines body for OrchestrationGetSchedulesBatch for application/json ContentType.
+type OrchestrationGetSchedulesBatchJSONRequestBody = OrchestrationGetSchedulesBatchJSONBody
 
 // OrchestrationReplaceScheduleJSONRequestBody defines body for OrchestrationReplaceSchedule for application/json ContentType.
 type OrchestrationReplaceScheduleJSONRequestBody = OrchestrationReplaceScheduleRequest
@@ -24680,6 +24857,34 @@ func (t *OntologiesQueryDataType) MergeOntologiesTwoDimensionalAggregation(v Ont
 	return err
 }
 
+// AsOntologiesOntologyInterfaceObjectSetType returns the union data inside the OntologiesQueryDataType as a OntologiesOntologyInterfaceObjectSetType
+func (t OntologiesQueryDataType) AsOntologiesOntologyInterfaceObjectSetType() (OntologiesOntologyInterfaceObjectSetType, error) {
+	var body OntologiesOntologyInterfaceObjectSetType
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromOntologiesOntologyInterfaceObjectSetType overwrites any union data inside the OntologiesQueryDataType as the provided OntologiesOntologyInterfaceObjectSetType
+func (t *OntologiesQueryDataType) FromOntologiesOntologyInterfaceObjectSetType(v OntologiesOntologyInterfaceObjectSetType) error {
+	v.Type = "interfaceObjectSet"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeOntologiesOntologyInterfaceObjectSetType performs a merge with any union data inside the OntologiesQueryDataType, using the provided OntologiesOntologyInterfaceObjectSetType
+func (t *OntologiesQueryDataType) MergeOntologiesOntologyInterfaceObjectSetType(v OntologiesOntologyInterfaceObjectSetType) error {
+	v.Type = "interfaceObjectSet"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 // AsOntologiesOntologyObjectType returns the union data inside the OntologiesQueryDataType as a OntologiesOntologyObjectType
 func (t OntologiesQueryDataType) AsOntologiesOntologyObjectType() (OntologiesOntologyObjectType, error) {
 	var body OntologiesOntologyObjectType
@@ -24768,6 +24973,8 @@ func (t OntologiesQueryDataType) ValueByDiscriminator() (interface{}, error) {
 		return t.AsCoreIntegerType()
 	case "interfaceObject":
 		return t.AsOntologiesOntologyInterfaceObjectType()
+	case "interfaceObjectSet":
+		return t.AsOntologiesOntologyInterfaceObjectSetType()
 	case "long":
 		return t.AsCoreLongType()
 	case "null":
@@ -28515,6 +28722,19 @@ type ClientInterface interface {
 	// AdminListHosts request
 	AdminListHosts(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminListHostsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// AdminListEnrollmentRoleAssignments request
+	AdminListEnrollmentRoleAssignments(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminListEnrollmentRoleAssignmentsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AdminAddEnrollmentRoleAssignmentsWithBody request with any body
+	AdminAddEnrollmentRoleAssignmentsWithBody(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminAddEnrollmentRoleAssignmentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	AdminAddEnrollmentRoleAssignments(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminAddEnrollmentRoleAssignmentsParams, body AdminAddEnrollmentRoleAssignmentsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AdminRemoveEnrollmentRoleAssignmentsWithBody request with any body
+	AdminRemoveEnrollmentRoleAssignmentsWithBody(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminRemoveEnrollmentRoleAssignmentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	AdminRemoveEnrollmentRoleAssignments(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminRemoveEnrollmentRoleAssignmentsParams, body AdminRemoveEnrollmentRoleAssignmentsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// AdminListGroups request
 	AdminListGroups(ctx context.Context, params *AdminListGroupsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -28892,6 +29112,14 @@ type ClientInterface interface {
 
 	// DatasetsGetDatasetSchedules request
 	DatasetsGetDatasetSchedules(ctx context.Context, datasetRid DatasetsDatasetRid, params *DatasetsGetDatasetSchedulesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DatasetsGetDatasetSchema request
+	DatasetsGetDatasetSchema(ctx context.Context, datasetRid DatasetsDatasetRid, params *DatasetsGetDatasetSchemaParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DatasetsPutDatasetSchemaWithBody request with any body
+	DatasetsPutDatasetSchemaWithBody(ctx context.Context, datasetRid DatasetsDatasetRid, params *DatasetsPutDatasetSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	DatasetsPutDatasetSchema(ctx context.Context, datasetRid DatasetsDatasetRid, params *DatasetsPutDatasetSchemaParams, body DatasetsPutDatasetSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DatasetsReadTableDataset request
 	DatasetsReadTableDataset(ctx context.Context, datasetRid DatasetsDatasetRid, params *DatasetsReadTableDatasetParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -29304,6 +29532,11 @@ type ClientInterface interface {
 
 	OrchestrationCreateSchedule(ctx context.Context, params *OrchestrationCreateScheduleParams, body OrchestrationCreateScheduleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// OrchestrationGetSchedulesBatchWithBody request with any body
+	OrchestrationGetSchedulesBatchWithBody(ctx context.Context, params *OrchestrationGetSchedulesBatchParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	OrchestrationGetSchedulesBatch(ctx context.Context, params *OrchestrationGetSchedulesBatchParams, body OrchestrationGetSchedulesBatchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// OrchestrationDeleteSchedule request
 	OrchestrationDeleteSchedule(ctx context.Context, scheduleRid CoreScheduleRid, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -29533,6 +29766,66 @@ func (c *Client) AdminPreregisterUser(ctx context.Context, enrollmentRid CoreEnr
 
 func (c *Client) AdminListHosts(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminListHostsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewAdminListHostsRequest(c.Server, enrollmentRid, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) AdminListEnrollmentRoleAssignments(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminListEnrollmentRoleAssignmentsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAdminListEnrollmentRoleAssignmentsRequest(c.Server, enrollmentRid, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) AdminAddEnrollmentRoleAssignmentsWithBody(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminAddEnrollmentRoleAssignmentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAdminAddEnrollmentRoleAssignmentsRequestWithBody(c.Server, enrollmentRid, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) AdminAddEnrollmentRoleAssignments(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminAddEnrollmentRoleAssignmentsParams, body AdminAddEnrollmentRoleAssignmentsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAdminAddEnrollmentRoleAssignmentsRequest(c.Server, enrollmentRid, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) AdminRemoveEnrollmentRoleAssignmentsWithBody(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminRemoveEnrollmentRoleAssignmentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAdminRemoveEnrollmentRoleAssignmentsRequestWithBody(c.Server, enrollmentRid, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) AdminRemoveEnrollmentRoleAssignments(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminRemoveEnrollmentRoleAssignmentsParams, body AdminRemoveEnrollmentRoleAssignmentsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAdminRemoveEnrollmentRoleAssignmentsRequest(c.Server, enrollmentRid, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -31213,6 +31506,42 @@ func (c *Client) DatasetsUploadFileWithBody(ctx context.Context, datasetRid Data
 
 func (c *Client) DatasetsGetDatasetSchedules(ctx context.Context, datasetRid DatasetsDatasetRid, params *DatasetsGetDatasetSchedulesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDatasetsGetDatasetSchedulesRequest(c.Server, datasetRid, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DatasetsGetDatasetSchema(ctx context.Context, datasetRid DatasetsDatasetRid, params *DatasetsGetDatasetSchemaParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDatasetsGetDatasetSchemaRequest(c.Server, datasetRid, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DatasetsPutDatasetSchemaWithBody(ctx context.Context, datasetRid DatasetsDatasetRid, params *DatasetsPutDatasetSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDatasetsPutDatasetSchemaRequestWithBody(c.Server, datasetRid, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DatasetsPutDatasetSchema(ctx context.Context, datasetRid DatasetsDatasetRid, params *DatasetsPutDatasetSchemaParams, body DatasetsPutDatasetSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDatasetsPutDatasetSchemaRequest(c.Server, datasetRid, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -33011,6 +33340,30 @@ func (c *Client) OrchestrationCreateSchedule(ctx context.Context, params *Orches
 	return c.Client.Do(req)
 }
 
+func (c *Client) OrchestrationGetSchedulesBatchWithBody(ctx context.Context, params *OrchestrationGetSchedulesBatchParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewOrchestrationGetSchedulesBatchRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) OrchestrationGetSchedulesBatch(ctx context.Context, params *OrchestrationGetSchedulesBatchParams, body OrchestrationGetSchedulesBatchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewOrchestrationGetSchedulesBatchRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) OrchestrationDeleteSchedule(ctx context.Context, scheduleRid CoreScheduleRid, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewOrchestrationDeleteScheduleRequest(c.Server, scheduleRid)
 	if err != nil {
@@ -34023,6 +34376,200 @@ func NewAdminListHostsRequest(server string, enrollmentRid CoreEnrollmentRid, pa
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewAdminListEnrollmentRoleAssignmentsRequest generates requests for AdminListEnrollmentRoleAssignments
+func NewAdminListEnrollmentRoleAssignmentsRequest(server string, enrollmentRid CoreEnrollmentRid, params *AdminListEnrollmentRoleAssignmentsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "enrollmentRid", runtime.ParamLocationPath, enrollmentRid)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v2/admin/enrollments/%s/roleAssignments", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Preview != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "preview", runtime.ParamLocationQuery, *params.Preview); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewAdminAddEnrollmentRoleAssignmentsRequest calls the generic AdminAddEnrollmentRoleAssignments builder with application/json body
+func NewAdminAddEnrollmentRoleAssignmentsRequest(server string, enrollmentRid CoreEnrollmentRid, params *AdminAddEnrollmentRoleAssignmentsParams, body AdminAddEnrollmentRoleAssignmentsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewAdminAddEnrollmentRoleAssignmentsRequestWithBody(server, enrollmentRid, params, "application/json", bodyReader)
+}
+
+// NewAdminAddEnrollmentRoleAssignmentsRequestWithBody generates requests for AdminAddEnrollmentRoleAssignments with any type of body
+func NewAdminAddEnrollmentRoleAssignmentsRequestWithBody(server string, enrollmentRid CoreEnrollmentRid, params *AdminAddEnrollmentRoleAssignmentsParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "enrollmentRid", runtime.ParamLocationPath, enrollmentRid)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v2/admin/enrollments/%s/roleAssignments/add", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Preview != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "preview", runtime.ParamLocationQuery, *params.Preview); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewAdminRemoveEnrollmentRoleAssignmentsRequest calls the generic AdminRemoveEnrollmentRoleAssignments builder with application/json body
+func NewAdminRemoveEnrollmentRoleAssignmentsRequest(server string, enrollmentRid CoreEnrollmentRid, params *AdminRemoveEnrollmentRoleAssignmentsParams, body AdminRemoveEnrollmentRoleAssignmentsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewAdminRemoveEnrollmentRoleAssignmentsRequestWithBody(server, enrollmentRid, params, "application/json", bodyReader)
+}
+
+// NewAdminRemoveEnrollmentRoleAssignmentsRequestWithBody generates requests for AdminRemoveEnrollmentRoleAssignments with any type of body
+func NewAdminRemoveEnrollmentRoleAssignmentsRequestWithBody(server string, enrollmentRid CoreEnrollmentRid, params *AdminRemoveEnrollmentRoleAssignmentsParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "enrollmentRid", runtime.ParamLocationPath, enrollmentRid)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v2/admin/enrollments/%s/roleAssignments/remove", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Preview != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "preview", runtime.ParamLocationQuery, *params.Preview); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -40359,6 +40906,179 @@ func NewDatasetsGetDatasetSchedulesRequest(server string, datasetRid DatasetsDat
 	return req, nil
 }
 
+// NewDatasetsGetDatasetSchemaRequest generates requests for DatasetsGetDatasetSchema
+func NewDatasetsGetDatasetSchemaRequest(server string, datasetRid DatasetsDatasetRid, params *DatasetsGetDatasetSchemaParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "datasetRid", runtime.ParamLocationPath, datasetRid)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v2/datasets/%s/getSchema", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.BranchName != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "branchName", runtime.ParamLocationQuery, *params.BranchName); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.EndTransactionRid != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "endTransactionRid", runtime.ParamLocationQuery, *params.EndTransactionRid); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.VersionID != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "versionId", runtime.ParamLocationQuery, *params.VersionID); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Preview != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "preview", runtime.ParamLocationQuery, *params.Preview); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDatasetsPutDatasetSchemaRequest calls the generic DatasetsPutDatasetSchema builder with application/json body
+func NewDatasetsPutDatasetSchemaRequest(server string, datasetRid DatasetsDatasetRid, params *DatasetsPutDatasetSchemaParams, body DatasetsPutDatasetSchemaJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDatasetsPutDatasetSchemaRequestWithBody(server, datasetRid, params, "application/json", bodyReader)
+}
+
+// NewDatasetsPutDatasetSchemaRequestWithBody generates requests for DatasetsPutDatasetSchema with any type of body
+func NewDatasetsPutDatasetSchemaRequestWithBody(server string, datasetRid DatasetsDatasetRid, params *DatasetsPutDatasetSchemaParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "datasetRid", runtime.ParamLocationPath, datasetRid)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v2/datasets/%s/putSchema", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Preview != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "preview", runtime.ParamLocationQuery, *params.Preview); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewDatasetsReadTableDatasetRequest generates requests for DatasetsReadTableDataset
 func NewDatasetsReadTableDatasetRequest(server string, datasetRid DatasetsDatasetRid, params *DatasetsReadTableDatasetParams) (*http.Request, error) {
 	var err error
@@ -46434,9 +47154,9 @@ func NewOntologiesAggregateObjectsV2RequestWithBody(server string, ontology Onto
 	if params != nil {
 		queryValues := queryURL.Query()
 
-		if params.ArtifactRepository != nil {
+		if params.SdkPackageRid != nil {
 
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "artifactRepository", runtime.ParamLocationQuery, *params.ArtifactRepository); err != nil {
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sdkPackageRid", runtime.ParamLocationQuery, *params.SdkPackageRid); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -46450,9 +47170,9 @@ func NewOntologiesAggregateObjectsV2RequestWithBody(server string, ontology Onto
 
 		}
 
-		if params.PackageName != nil {
+		if params.SdkVersion != nil {
 
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "packageName", runtime.ParamLocationQuery, *params.PackageName); err != nil {
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sdkVersion", runtime.ParamLocationQuery, *params.SdkVersion); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -49202,6 +49922,68 @@ func NewOrchestrationCreateScheduleRequestWithBody(server string, params *Orches
 	return req, nil
 }
 
+// NewOrchestrationGetSchedulesBatchRequest calls the generic OrchestrationGetSchedulesBatch builder with application/json body
+func NewOrchestrationGetSchedulesBatchRequest(server string, params *OrchestrationGetSchedulesBatchParams, body OrchestrationGetSchedulesBatchJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewOrchestrationGetSchedulesBatchRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewOrchestrationGetSchedulesBatchRequestWithBody generates requests for OrchestrationGetSchedulesBatch with any type of body
+func NewOrchestrationGetSchedulesBatchRequestWithBody(server string, params *OrchestrationGetSchedulesBatchParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v2/orchestration/schedules/getBatch")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Preview != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "preview", runtime.ParamLocationQuery, *params.Preview); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewOrchestrationDeleteScheduleRequest generates requests for OrchestrationDeleteSchedule
 func NewOrchestrationDeleteScheduleRequest(server string, scheduleRid CoreScheduleRid) (*http.Request, error) {
 	var err error
@@ -51396,6 +52178,19 @@ type ClientWithResponsesInterface interface {
 	// AdminListHostsWithResponse request
 	AdminListHostsWithResponse(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminListHostsParams, reqEditors ...RequestEditorFn) (*AdminListHostsHttpResp, error)
 
+	// AdminListEnrollmentRoleAssignmentsWithResponse request
+	AdminListEnrollmentRoleAssignmentsWithResponse(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminListEnrollmentRoleAssignmentsParams, reqEditors ...RequestEditorFn) (*AdminListEnrollmentRoleAssignmentsHttpResp, error)
+
+	// AdminAddEnrollmentRoleAssignmentsWithBodyWithResponse request with any body
+	AdminAddEnrollmentRoleAssignmentsWithBodyWithResponse(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminAddEnrollmentRoleAssignmentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AdminAddEnrollmentRoleAssignmentsHttpResp, error)
+
+	AdminAddEnrollmentRoleAssignmentsWithResponse(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminAddEnrollmentRoleAssignmentsParams, body AdminAddEnrollmentRoleAssignmentsJSONRequestBody, reqEditors ...RequestEditorFn) (*AdminAddEnrollmentRoleAssignmentsHttpResp, error)
+
+	// AdminRemoveEnrollmentRoleAssignmentsWithBodyWithResponse request with any body
+	AdminRemoveEnrollmentRoleAssignmentsWithBodyWithResponse(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminRemoveEnrollmentRoleAssignmentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AdminRemoveEnrollmentRoleAssignmentsHttpResp, error)
+
+	AdminRemoveEnrollmentRoleAssignmentsWithResponse(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminRemoveEnrollmentRoleAssignmentsParams, body AdminRemoveEnrollmentRoleAssignmentsJSONRequestBody, reqEditors ...RequestEditorFn) (*AdminRemoveEnrollmentRoleAssignmentsHttpResp, error)
+
 	// AdminListGroupsWithResponse request
 	AdminListGroupsWithResponse(ctx context.Context, params *AdminListGroupsParams, reqEditors ...RequestEditorFn) (*AdminListGroupsHttpResp, error)
 
@@ -51773,6 +52568,14 @@ type ClientWithResponsesInterface interface {
 
 	// DatasetsGetDatasetSchedulesWithResponse request
 	DatasetsGetDatasetSchedulesWithResponse(ctx context.Context, datasetRid DatasetsDatasetRid, params *DatasetsGetDatasetSchedulesParams, reqEditors ...RequestEditorFn) (*DatasetsGetDatasetSchedulesHttpResp, error)
+
+	// DatasetsGetDatasetSchemaWithResponse request
+	DatasetsGetDatasetSchemaWithResponse(ctx context.Context, datasetRid DatasetsDatasetRid, params *DatasetsGetDatasetSchemaParams, reqEditors ...RequestEditorFn) (*DatasetsGetDatasetSchemaHttpResp, error)
+
+	// DatasetsPutDatasetSchemaWithBodyWithResponse request with any body
+	DatasetsPutDatasetSchemaWithBodyWithResponse(ctx context.Context, datasetRid DatasetsDatasetRid, params *DatasetsPutDatasetSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DatasetsPutDatasetSchemaHttpResp, error)
+
+	DatasetsPutDatasetSchemaWithResponse(ctx context.Context, datasetRid DatasetsDatasetRid, params *DatasetsPutDatasetSchemaParams, body DatasetsPutDatasetSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*DatasetsPutDatasetSchemaHttpResp, error)
 
 	// DatasetsReadTableDatasetWithResponse request
 	DatasetsReadTableDatasetWithResponse(ctx context.Context, datasetRid DatasetsDatasetRid, params *DatasetsReadTableDatasetParams, reqEditors ...RequestEditorFn) (*DatasetsReadTableDatasetHttpResp, error)
@@ -52185,6 +52988,11 @@ type ClientWithResponsesInterface interface {
 
 	OrchestrationCreateScheduleWithResponse(ctx context.Context, params *OrchestrationCreateScheduleParams, body OrchestrationCreateScheduleJSONRequestBody, reqEditors ...RequestEditorFn) (*OrchestrationCreateScheduleHttpResp, error)
 
+	// OrchestrationGetSchedulesBatchWithBodyWithResponse request with any body
+	OrchestrationGetSchedulesBatchWithBodyWithResponse(ctx context.Context, params *OrchestrationGetSchedulesBatchParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*OrchestrationGetSchedulesBatchHttpResp, error)
+
+	OrchestrationGetSchedulesBatchWithResponse(ctx context.Context, params *OrchestrationGetSchedulesBatchParams, body OrchestrationGetSchedulesBatchJSONRequestBody, reqEditors ...RequestEditorFn) (*OrchestrationGetSchedulesBatchHttpResp, error)
+
 	// OrchestrationDeleteScheduleWithResponse request
 	OrchestrationDeleteScheduleWithResponse(ctx context.Context, scheduleRid CoreScheduleRid, reqEditors ...RequestEditorFn) (*OrchestrationDeleteScheduleHttpResp, error)
 
@@ -52464,6 +53272,70 @@ func (r AdminListHostsHttpResp) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r AdminListHostsHttpResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type AdminListEnrollmentRoleAssignmentsHttpResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *AdminListEnrollmentRoleAssignmentsResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r AdminListEnrollmentRoleAssignmentsHttpResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r AdminListEnrollmentRoleAssignmentsHttpResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type AdminAddEnrollmentRoleAssignmentsHttpResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r AdminAddEnrollmentRoleAssignmentsHttpResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r AdminAddEnrollmentRoleAssignmentsHttpResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type AdminRemoveEnrollmentRoleAssignmentsHttpResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r AdminRemoveEnrollmentRoleAssignmentsHttpResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r AdminRemoveEnrollmentRoleAssignmentsHttpResp) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -54598,6 +55470,50 @@ func (r DatasetsGetDatasetSchedulesHttpResp) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r DatasetsGetDatasetSchedulesHttpResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DatasetsGetDatasetSchemaHttpResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DatasetsGetDatasetSchemaResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r DatasetsGetDatasetSchemaHttpResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DatasetsGetDatasetSchemaHttpResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DatasetsPutDatasetSchemaHttpResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DatasetsGetDatasetSchemaResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r DatasetsPutDatasetSchemaHttpResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DatasetsPutDatasetSchemaHttpResp) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -57066,6 +57982,28 @@ func (r OrchestrationCreateScheduleHttpResp) StatusCode() int {
 	return 0
 }
 
+type OrchestrationGetSchedulesBatchHttpResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *OrchestrationGetSchedulesBatchResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r OrchestrationGetSchedulesBatchHttpResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r OrchestrationGetSchedulesBatchHttpResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type OrchestrationDeleteScheduleHttpResp struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -57972,6 +58910,49 @@ func (c *ClientWithResponses) AdminListHostsWithResponse(ctx context.Context, en
 		return nil, err
 	}
 	return ParseAdminListHostsHttpResp(rsp)
+}
+
+// AdminListEnrollmentRoleAssignmentsWithResponse request returning *AdminListEnrollmentRoleAssignmentsHttpResp
+func (c *ClientWithResponses) AdminListEnrollmentRoleAssignmentsWithResponse(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminListEnrollmentRoleAssignmentsParams, reqEditors ...RequestEditorFn) (*AdminListEnrollmentRoleAssignmentsHttpResp, error) {
+	rsp, err := c.AdminListEnrollmentRoleAssignments(ctx, enrollmentRid, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAdminListEnrollmentRoleAssignmentsHttpResp(rsp)
+}
+
+// AdminAddEnrollmentRoleAssignmentsWithBodyWithResponse request with arbitrary body returning *AdminAddEnrollmentRoleAssignmentsHttpResp
+func (c *ClientWithResponses) AdminAddEnrollmentRoleAssignmentsWithBodyWithResponse(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminAddEnrollmentRoleAssignmentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AdminAddEnrollmentRoleAssignmentsHttpResp, error) {
+	rsp, err := c.AdminAddEnrollmentRoleAssignmentsWithBody(ctx, enrollmentRid, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAdminAddEnrollmentRoleAssignmentsHttpResp(rsp)
+}
+
+func (c *ClientWithResponses) AdminAddEnrollmentRoleAssignmentsWithResponse(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminAddEnrollmentRoleAssignmentsParams, body AdminAddEnrollmentRoleAssignmentsJSONRequestBody, reqEditors ...RequestEditorFn) (*AdminAddEnrollmentRoleAssignmentsHttpResp, error) {
+	rsp, err := c.AdminAddEnrollmentRoleAssignments(ctx, enrollmentRid, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAdminAddEnrollmentRoleAssignmentsHttpResp(rsp)
+}
+
+// AdminRemoveEnrollmentRoleAssignmentsWithBodyWithResponse request with arbitrary body returning *AdminRemoveEnrollmentRoleAssignmentsHttpResp
+func (c *ClientWithResponses) AdminRemoveEnrollmentRoleAssignmentsWithBodyWithResponse(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminRemoveEnrollmentRoleAssignmentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AdminRemoveEnrollmentRoleAssignmentsHttpResp, error) {
+	rsp, err := c.AdminRemoveEnrollmentRoleAssignmentsWithBody(ctx, enrollmentRid, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAdminRemoveEnrollmentRoleAssignmentsHttpResp(rsp)
+}
+
+func (c *ClientWithResponses) AdminRemoveEnrollmentRoleAssignmentsWithResponse(ctx context.Context, enrollmentRid CoreEnrollmentRid, params *AdminRemoveEnrollmentRoleAssignmentsParams, body AdminRemoveEnrollmentRoleAssignmentsJSONRequestBody, reqEditors ...RequestEditorFn) (*AdminRemoveEnrollmentRoleAssignmentsHttpResp, error) {
+	rsp, err := c.AdminRemoveEnrollmentRoleAssignments(ctx, enrollmentRid, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAdminRemoveEnrollmentRoleAssignmentsHttpResp(rsp)
 }
 
 // AdminListGroupsWithResponse request returning *AdminListGroupsHttpResp
@@ -59190,6 +60171,32 @@ func (c *ClientWithResponses) DatasetsGetDatasetSchedulesWithResponse(ctx contex
 		return nil, err
 	}
 	return ParseDatasetsGetDatasetSchedulesHttpResp(rsp)
+}
+
+// DatasetsGetDatasetSchemaWithResponse request returning *DatasetsGetDatasetSchemaHttpResp
+func (c *ClientWithResponses) DatasetsGetDatasetSchemaWithResponse(ctx context.Context, datasetRid DatasetsDatasetRid, params *DatasetsGetDatasetSchemaParams, reqEditors ...RequestEditorFn) (*DatasetsGetDatasetSchemaHttpResp, error) {
+	rsp, err := c.DatasetsGetDatasetSchema(ctx, datasetRid, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDatasetsGetDatasetSchemaHttpResp(rsp)
+}
+
+// DatasetsPutDatasetSchemaWithBodyWithResponse request with arbitrary body returning *DatasetsPutDatasetSchemaHttpResp
+func (c *ClientWithResponses) DatasetsPutDatasetSchemaWithBodyWithResponse(ctx context.Context, datasetRid DatasetsDatasetRid, params *DatasetsPutDatasetSchemaParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DatasetsPutDatasetSchemaHttpResp, error) {
+	rsp, err := c.DatasetsPutDatasetSchemaWithBody(ctx, datasetRid, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDatasetsPutDatasetSchemaHttpResp(rsp)
+}
+
+func (c *ClientWithResponses) DatasetsPutDatasetSchemaWithResponse(ctx context.Context, datasetRid DatasetsDatasetRid, params *DatasetsPutDatasetSchemaParams, body DatasetsPutDatasetSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*DatasetsPutDatasetSchemaHttpResp, error) {
+	rsp, err := c.DatasetsPutDatasetSchema(ctx, datasetRid, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDatasetsPutDatasetSchemaHttpResp(rsp)
 }
 
 // DatasetsReadTableDatasetWithResponse request returning *DatasetsReadTableDatasetHttpResp
@@ -60497,6 +61504,23 @@ func (c *ClientWithResponses) OrchestrationCreateScheduleWithResponse(ctx contex
 	return ParseOrchestrationCreateScheduleHttpResp(rsp)
 }
 
+// OrchestrationGetSchedulesBatchWithBodyWithResponse request with arbitrary body returning *OrchestrationGetSchedulesBatchHttpResp
+func (c *ClientWithResponses) OrchestrationGetSchedulesBatchWithBodyWithResponse(ctx context.Context, params *OrchestrationGetSchedulesBatchParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*OrchestrationGetSchedulesBatchHttpResp, error) {
+	rsp, err := c.OrchestrationGetSchedulesBatchWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseOrchestrationGetSchedulesBatchHttpResp(rsp)
+}
+
+func (c *ClientWithResponses) OrchestrationGetSchedulesBatchWithResponse(ctx context.Context, params *OrchestrationGetSchedulesBatchParams, body OrchestrationGetSchedulesBatchJSONRequestBody, reqEditors ...RequestEditorFn) (*OrchestrationGetSchedulesBatchHttpResp, error) {
+	rsp, err := c.OrchestrationGetSchedulesBatch(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseOrchestrationGetSchedulesBatchHttpResp(rsp)
+}
+
 // OrchestrationDeleteScheduleWithResponse request returning *OrchestrationDeleteScheduleHttpResp
 func (c *ClientWithResponses) OrchestrationDeleteScheduleWithResponse(ctx context.Context, scheduleRid CoreScheduleRid, reqEditors ...RequestEditorFn) (*OrchestrationDeleteScheduleHttpResp, error) {
 	rsp, err := c.OrchestrationDeleteSchedule(ctx, scheduleRid, reqEditors...)
@@ -61080,6 +62104,64 @@ func ParseAdminListHostsHttpResp(rsp *http.Response) (*AdminListHostsHttpResp, e
 		}
 		response.JSON200 = &dest
 
+	}
+
+	return response, nil
+}
+
+// ParseAdminListEnrollmentRoleAssignmentsHttpResp parses an HTTP response from a AdminListEnrollmentRoleAssignmentsWithResponse call
+func ParseAdminListEnrollmentRoleAssignmentsHttpResp(rsp *http.Response) (*AdminListEnrollmentRoleAssignmentsHttpResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &AdminListEnrollmentRoleAssignmentsHttpResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AdminListEnrollmentRoleAssignmentsResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseAdminAddEnrollmentRoleAssignmentsHttpResp parses an HTTP response from a AdminAddEnrollmentRoleAssignmentsWithResponse call
+func ParseAdminAddEnrollmentRoleAssignmentsHttpResp(rsp *http.Response) (*AdminAddEnrollmentRoleAssignmentsHttpResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &AdminAddEnrollmentRoleAssignmentsHttpResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseAdminRemoveEnrollmentRoleAssignmentsHttpResp parses an HTTP response from a AdminRemoveEnrollmentRoleAssignmentsWithResponse call
+func ParseAdminRemoveEnrollmentRoleAssignmentsHttpResp(rsp *http.Response) (*AdminRemoveEnrollmentRoleAssignmentsHttpResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &AdminRemoveEnrollmentRoleAssignmentsHttpResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
 	}
 
 	return response, nil
@@ -63403,6 +64485,58 @@ func ParseDatasetsGetDatasetSchedulesHttpResp(rsp *http.Response) (*DatasetsGetD
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest DatasetsListSchedulesResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDatasetsGetDatasetSchemaHttpResp parses an HTTP response from a DatasetsGetDatasetSchemaWithResponse call
+func ParseDatasetsGetDatasetSchemaHttpResp(rsp *http.Response) (*DatasetsGetDatasetSchemaHttpResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DatasetsGetDatasetSchemaHttpResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DatasetsGetDatasetSchemaResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDatasetsPutDatasetSchemaHttpResp parses an HTTP response from a DatasetsPutDatasetSchemaWithResponse call
+func ParseDatasetsPutDatasetSchemaHttpResp(rsp *http.Response) (*DatasetsPutDatasetSchemaHttpResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DatasetsPutDatasetSchemaHttpResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DatasetsGetDatasetSchemaResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -66101,6 +67235,32 @@ func ParseOrchestrationCreateScheduleHttpResp(rsp *http.Response) (*Orchestratio
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest OrchestrationSchedule
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseOrchestrationGetSchedulesBatchHttpResp parses an HTTP response from a OrchestrationGetSchedulesBatchWithResponse call
+func ParseOrchestrationGetSchedulesBatchHttpResp(rsp *http.Response) (*OrchestrationGetSchedulesBatchHttpResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &OrchestrationGetSchedulesBatchHttpResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest OrchestrationGetSchedulesBatchResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
