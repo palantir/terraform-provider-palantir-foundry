@@ -151,17 +151,14 @@ func (r *organizationResource) Create(ctx context.Context, req resource.CreateRe
 
 	err := r.CreateOrganization(ctx, resp, &plan)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating the organization resource",
-			"Error creating the organization resource itself. Since this is the primary resource, nothing has been provisioned and we can safely return")
+		resp.Diagnostics.AddError("Error creating the organization resource", "Error creating the organization resource itself. Since this is the primary resource, nothing has been provisioned and we can safely return")
 		return
 	}
 
 	err = r.CreateOrganizationMembers(ctx, resp, &plan)
 	if err != nil {
-		resp.Diagnostics.AddWarning("Error creating the organization members",
-			err.Error())
-		resp.Diagnostics.AddWarning("Please fix your plan if needed and re-apply.",
-			"We are throwing a warning here to ensure previous changes are not lost. Please fix your plan if needed and re-apply.")
+		resp.Diagnostics.AddWarning("Error creating the organization members", err.Error())
+		resp.Diagnostics.AddWarning("Please fix your plan if needed and re-apply.", "We are throwing a warning here to ensure previous changes are not lost. Please fix your plan if needed and re-apply.")
 	}
 
 	diags = resp.State.Set(ctx, plan)
@@ -181,7 +178,7 @@ func (r *organizationResource) CreateOrganization(ctx context.Context, resp *res
 
 	var adminPrincipalIDs []v2.CorePrincipalID
 	for _, role := range plannedRoles {
-		if role.RoleID == constants.OrganizationAdministratorRID {
+		if role.RoleID == constants.OrganizationAdministratorRoleID {
 			adminCorePrincipalID := role.PrincipalID
 			adminPrincipalIDs = append(adminPrincipalIDs, adminCorePrincipalID)
 		}
@@ -661,7 +658,7 @@ func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan
 
 	hasAdmin := false
 	for _, role := range newOrganizationRoles {
-		if role.RoleID == constants.OrganizationAdministratorRID {
+		if role.RoleID == constants.OrganizationAdministratorRoleID {
 			hasAdmin = true
 			break
 		}

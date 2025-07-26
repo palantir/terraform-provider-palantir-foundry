@@ -242,7 +242,7 @@ func (r *enrollmentResource) UpdateEnrollmentRoles(ctx context.Context, plan *en
 
 	hasAdmin := false
 	for _, role := range newEnrollmentRoles {
-		if role.RoleID == constants.EnrollmentAdministratorRid {
+		if role.RoleID == constants.EnrollmentAdministratorRoleID {
 			hasAdmin = true
 			break
 		}

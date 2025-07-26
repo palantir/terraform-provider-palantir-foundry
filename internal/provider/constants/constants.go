@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	PreviewMode                  = true
-	PageSize                     = v2.CorePageSize(10000)
-	OrganizationAdministratorRID = "organization:administrator"
-	EnrollmentAdministratorRid   = "enrollment:administrator"
+	PreviewMode                     = true
+	PageSize                        = v2.CorePageSize(10000)
+	OrganizationAdministratorRoleID = "organization:administrator"
+	EnrollmentAdministratorRoleID   = "enrollment:administrator"
 )

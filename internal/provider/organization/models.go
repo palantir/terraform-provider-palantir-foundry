@@ -23,7 +23,7 @@ type organizationResourceModel struct {
 	RID                        types.String `tfsdk:"rid"`
 	Name                       types.String `tfsdk:"name"`
 	MarkingID                  types.String `tfsdk:"marking_id"`
-	EnrollmentRID              types.String `tfsdk:"enrollment_id"`
+	EnrollmentRID              types.String `tfsdk:"enrollment_rid"`
 	Description                types.String `tfsdk:"description"`
 	HostName                   types.String `tfsdk:"host_name"`
 	PlannedOrganizationMembers types.Set    `tfsdk:"planned_organization_members"`
