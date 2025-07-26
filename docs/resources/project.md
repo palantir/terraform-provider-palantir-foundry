@@ -3,6 +3,7 @@
 # template basis poached from https://github.com/hashicorp/terraform-plugin-docs/blob/main/internal/provider/template.go#L246
 page_title: "Palantir Foundry Project"
 subcategory: ""
+
 description: |-
   Manages a Foundry Project.
 
@@ -53,7 +54,7 @@ resource "foundry_project" "example-project" {
 - `display_name` (String) Display name of the organization.
 - `planned_markings` (Set of String) Planned set of markings applied to this project.
 - `planned_organizations` (Set of String) planned list of organizations associated to this project
-- `planned_role_resources` (Set of Object) Planned set of role resources for this project (see [below for nested schema](#nestedatt--planned_role_resources))
+- `planned_resource_roles` (Set of Object) Planned set of resource roles for this project (see [below for nested schema](#nestedatt--planned_resource_roles))
 - `space_rid` (String) Rid of the space this project belongs to.
 
 ### Optional
@@ -64,20 +65,20 @@ resource "foundry_project" "example-project" {
 
 - `markings` (Set of String) Actual set of markings applied to this project, computed after successful addition/removal of markings.
 - `organizations` (Set of String) Actual list of organizations associated to this project, computed after successful addition/removal of organizations
+- `resource_roles` (Set of Object) Actual set of resource roles for this project, computed after successful addition/removal of role resources (see [below for nested schema](#nestedatt--resource_roles))
 - `rid` (String) Identifier of the project.
-- `role_resources` (Set of Object) Actual set of role resources for this project, computed after successful addition/removal of role resources (see [below for nested schema](#nestedatt--role_resources))
 - `trash_status` (String) Current trash status of the project.
 
-<a id="nestedatt--planned_role_resources"></a>
-### Nested Schema for `planned_role_resources`
+<a id="nestedatt--planned_resource_roles"></a>
+### Nested Schema for `planned_resource_roles`
 
 Required:
 
-- `resource_role_principal` (Object) (see [below for nested schema](#nestedobjatt--planned_role_resources--resource_role_principal))
+- `resource_role_principal` (Object) (see [below for nested schema](#nestedobjatt--planned_resource_roles--resource_role_principal))
 - `role_id` (String)
 
-<a id="nestedobjatt--planned_role_resources--resource_role_principal"></a>
-### Nested Schema for `planned_role_resources.resource_role_principal`
+<a id="nestedobjatt--planned_resource_roles--resource_role_principal"></a>
+### Nested Schema for `planned_resource_roles.resource_role_principal`
 
 Required:
 
@@ -87,16 +88,16 @@ Required:
 
 
 
-<a id="nestedatt--role_resources"></a>
-### Nested Schema for `role_resources`
+<a id="nestedatt--resource_roles"></a>
+### Nested Schema for `resource_roles`
 
 Read-Only:
 
-- `resource_role_principal` (Object) (see [below for nested schema](#nestedobjatt--role_resources--resource_role_principal))
+- `resource_role_principal` (Object) (see [below for nested schema](#nestedobjatt--resource_roles--resource_role_principal))
 - `role_id` (String)
 
-<a id="nestedobjatt--role_resources--resource_role_principal"></a>
-### Nested Schema for `role_resources.resource_role_principal`
+<a id="nestedobjatt--resource_roles--resource_role_principal"></a>
+### Nested Schema for `resource_roles.resource_role_principal`
 
 Read-Only:
 

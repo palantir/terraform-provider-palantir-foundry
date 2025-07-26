@@ -8,13 +8,12 @@ description: |-
 
   The following operations are currently supported:
 
+    - Create an organization
     - Update an organization
     - Delete an organization
     - Import an organization
     - Add or remove an organization's members
     - Add or remove an organization's roles
-
-    Note: the provider does not currently support creating an organization.
 
 ---
 # Foundry Organization

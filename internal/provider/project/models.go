@@ -25,8 +25,8 @@ type projectResourceModel struct {
 	Description          types.String `tfsdk:"description"`
 	Organizations        types.Set    `tfsdk:"organizations"`
 	PlannedOrganizations types.Set    `tfsdk:"planned_organizations"`
-	RoleResources        types.Set    `tfsdk:"role_resources"`
-	PlannedRoleResources types.Set    `tfsdk:"planned_role_resources"`
+	RoleResources        types.Set    `tfsdk:"resource_roles"`
+	PlannedRoleResources types.Set    `tfsdk:"planned_resource_roles"`
 	Markings             types.Set    `tfsdk:"markings"`
 	PlannedMarkings      types.Set    `tfsdk:"planned_markings"`
 	TrashStatus          types.String `tfsdk:"trash_status"`
@@ -43,7 +43,6 @@ type responseBody struct {
 
 type listOrganizationsResponseBody struct {
 	Data []string `json:"data"`
-	//next page token whenever i get to it
 }
 
 type ResourceRolesResponse struct {
@@ -59,7 +58,6 @@ type ResourceRolesResponse struct {
 
 type listMarkingsResponseBody struct {
 	Data []string `json:"data"`
-	//next page token whenever i get to it
 }
 
 type RoleResource struct {
