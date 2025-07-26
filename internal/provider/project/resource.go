@@ -107,8 +107,8 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: "Actual list of organizations associated to this project, computed after successful addition/removal of organizations",
 				Computed:    true,
 			},
-			"planned_role_resources": schema.SetAttribute{
-				Description: "Planned set of role resources for this project",
+			"planned_resource_roles": schema.SetAttribute{
+				Description: "Planned set of resource roles for this project",
 				Required:    true,
 				ElementType: types.ObjectType{
 					AttrTypes: map[string]attr.Type{
@@ -123,8 +123,8 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 					},
 				},
 			},
-			"role_resources": schema.SetAttribute{
-				Description: "Actual set of role resources for this project, computed after successful addition/removal of role resources",
+			"resource_roles": schema.SetAttribute{
+				Description: "Actual set of resource roles for this project, computed after successful addition/removal of role resources",
 				Computed:    true,
 				ElementType: types.ObjectType{
 					AttrTypes: map[string]attr.Type{

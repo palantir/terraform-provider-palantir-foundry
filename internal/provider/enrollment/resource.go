@@ -240,6 +240,18 @@ func (r *enrollmentResource) UpdateEnrollmentRoles(ctx context.Context, plan *en
 		return fmt.Errorf("failed to convert enrollment roles to Go slice")
 	}
 
+	hasAdmin := false
+	for _, role := range newEnrollmentRoles {
+		if role.RoleID == constants.EnrollmentAdministratorRoleID {
+			hasAdmin = true
+			break
+		}
+	}
+	if !hasAdmin {
+		state.PlannedEnrollmentRoles = plan.PlannedEnrollmentRoles
+		return fmt.Errorf("the enrollment must have at least one administrator")
+	}
+
 	previewMode := constants.PreviewMode
 
 	if !slices.Equal(oldEnrollmentRoles, newEnrollmentRoles) {

@@ -92,6 +92,10 @@ func (r *organizationResource) Schema(_ context.Context, _ resource.SchemaReques
 				Description: "Marking id of the organization",
 				Computed:    true,
 			},
+			"enrollment_rid": schema.StringAttribute{
+				Description: "The RID of the enrollment this organization belongs to. This field is immutable after creation.",
+				Required:    true,
+			},
 			"description": schema.StringAttribute{
 				Description: "Description of the organization.",
 				Optional:    true,
@@ -135,13 +139,154 @@ func (r *organizationResource) Schema(_ context.Context, _ resource.SchemaReques
 }
 
 // Create creates a new resource and sets the initial Terraform state.
-// TODO: implement Create
 func (r *organizationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	// Retrieve values from plan
-	tflog.Error(ctx, "Organizations cannot be created")
-	resp.Diagnostics.AddError("Organizations cannot be created",
-		"Foundry terraform provider currently does not support creating organizations")
-	return
+	var plan organizationResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
+
+	err := r.CreateOrganization(ctx, resp, &plan)
+	if err != nil {
+		resp.Diagnostics.AddError("Error creating the organization resource", "Error creating the organization resource itself. Since this is the primary resource, nothing has been provisioned and we can safely return")
+		return
+	}
+
+	err = r.CreateOrganizationMembers(ctx, resp, &plan)
+	if err != nil {
+		resp.Diagnostics.AddWarning("Error creating the organization members", err.Error())
+		resp.Diagnostics.AddWarning("Please fix your plan if needed and re-apply.", "We are throwing a warning here to ensure previous changes are not lost. Please fix your plan if needed and re-apply.")
+	}
+
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+}
+
+func (r *organizationResource) CreateOrganization(ctx context.Context, resp *resource.CreateResponse, plan *organizationResourceModel) error {
+	var plannedRoles []organizationRolesRequestBodyEntry
+	diags := plan.PlannedOrganizationRoles.ElementsAs(ctx, &plannedRoles, false)
+	if diags.HasError() {
+		// handle error
+		return fmt.Errorf("failed to convert org roles to Go slice")
+	}
+
+	var adminPrincipalIDs []v2.CorePrincipalID
+	for _, role := range plannedRoles {
+		if role.RoleID == constants.OrganizationAdministratorRoleID {
+			adminCorePrincipalID := role.PrincipalID
+			adminPrincipalIDs = append(adminPrincipalIDs, adminCorePrincipalID)
+		}
+	}
+
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return fmt.Errorf("failed to convert roles to Go slice")
+	}
+
+	previewMode := true
+	adminCreateOrganizationParams := v2.AdminCreateOrganizationParams{Preview: &previewMode}
+	description := plan.Description.ValueString()
+	host := plan.HostName.ValueString()
+
+	httpResp, err := r.client.AdminCreateOrganization(ctx,
+		&adminCreateOrganizationParams,
+		v2.AdminCreateOrganizationJSONRequestBody{
+			Name:           plan.Name.ValueString(),
+			Description:    &description,
+			Administrators: &adminPrincipalIDs,
+			EnrollmentRid:  plan.EnrollmentRID.ValueString(),
+			Host:           &host,
+		})
+
+	if err != nil {
+		resp.Diagnostics.AddError("AdminCreateOrganization request failed", err.Error())
+		return fmt.Errorf("AdminCreateOrganization request failed: %w", err)
+	}
+	// Check the response status code
+	if httpResp.StatusCode != http.StatusOK {
+		returnString, err := providerError.FormatHTTPError(httpResp)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to format error logging from AdminCreateOrganization response", err.Error())
+			return fmt.Errorf("failed to format error logging from AdminCreateOrganization response: %w", err)
+		}
+		resp.Diagnostics.AddError("Response from AdminCreateOrganization was unsuccessful: ", returnString)
+		return fmt.Errorf("response from AdminCreateOrganization was unsuccessful: %s", returnString)
+	}
+
+	//if success - take id from the response and update the state
+	var httpResponseBody responseBody
+
+	bodyBytes, err := helper.ExtractBodyFromResponse(httpResp)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to parse response from AdminCreateOrganization", err.Error())
+		return fmt.Errorf("failed to parse response from AdminCreateOrganization: %w", err)
+	}
+	if err := json.Unmarshal(bodyBytes, &httpResponseBody); err != nil {
+		resp.Diagnostics.AddError("Error decoding response",
+			fmt.Sprintf("... details ... %s", err))
+		return fmt.Errorf("error decoding response: %w", err)
+	}
+
+	//CREATE - do not save state if id is not saved
+	if httpResponseBody.RID == "" {
+		tflog.Error(ctx, "RID was not populated in response, "+
+			"so Terraform best practice is NOT to update state as resource likely was not properly created")
+		resp.Diagnostics.AddError("ID returned as empty",
+			"ID was not populated in response, "+
+				"so Terraform best practice is NOT to update state as resource likely was not properly created")
+		return fmt.Errorf("ID returned as empty: %s", httpResponseBody.RID)
+	}
+
+	//set computed values
+	plan.RID = types.StringValue(httpResponseBody.RID)
+	plan.MarkingID = types.StringValue(httpResponseBody.MarkingID)
+	plan.OrganizationRoles = plan.PlannedOrganizationRoles
+	return nil
+}
+
+func (r *organizationResource) CreateOrganizationMembers(ctx context.Context, resp *resource.CreateResponse, plan *organizationResourceModel) error {
+	var plannedOrganizationMembers []v2.CorePrincipalID
+	diags := plan.PlannedOrganizationMembers.ElementsAs(ctx, &plannedOrganizationMembers, false)
+	if diags.HasError() {
+		return fmt.Errorf("failed to convert planned group members to Go slice")
+	}
+
+	markingUUID, err := uuid.Parse(plan.MarkingID.ValueString())
+	if err != nil {
+		return fmt.Errorf("failed to parse marking UUID: %w", err)
+	}
+	previewMode := constants.PreviewMode
+
+	adminAddMarkingRoleAssignmentsParams := v2.AdminAddMarkingMembersParams{Preview: &previewMode}
+	httpResp, err := r.client.AdminAddMarkingMembers(ctx, markingUUID, &adminAddMarkingRoleAssignmentsParams, v2.AdminAddMarkingMembersJSONRequestBody{
+		PrincipalIds: &plannedOrganizationMembers,
+	})
+
+	if err != nil {
+		return fmt.Errorf("AdminAddMarkingMembers request failed: %w", err)
+	}
+
+	// Check the response status code
+	if httpResp.StatusCode != http.StatusNoContent {
+		returnString, err := providerError.FormatHTTPError(httpResp)
+		if err != nil {
+			return fmt.Errorf("failed to format error logging from AdminAddMarkingMembers response: %w", err)
+		}
+		plan.OrganizationMembers, diags = types.SetValueFrom(ctx, types.StringType, make([]string, 0))
+		if diags.HasError() {
+			resp.Diagnostics.Append(diags...)
+			return fmt.Errorf("failed to initialize organization members in plan")
+		}
+		return errors.New(returnString)
+	}
+	plan.OrganizationMembers = plan.PlannedOrganizationMembers
+	return nil
 }
 
 // Read refreshes the Terraform state with the latest data.
@@ -509,6 +654,18 @@ func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan
 	diags = plan.PlannedOrganizationRoles.ElementsAs(ctx, &newOrganizationRoles, false)
 	if diags.HasError() {
 		return fmt.Errorf("failed to convert org roles to Go slice")
+	}
+
+	hasAdmin := false
+	for _, role := range newOrganizationRoles {
+		if role.RoleID == constants.OrganizationAdministratorRoleID {
+			hasAdmin = true
+			break
+		}
+	}
+	if !hasAdmin {
+		state.PlannedOrganizationRoles = plan.PlannedOrganizationRoles
+		return fmt.Errorf("the organization must have at least one administrator")
 	}
 
 	previewMode := constants.PreviewMode

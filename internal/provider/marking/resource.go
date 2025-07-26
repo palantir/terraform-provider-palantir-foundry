@@ -433,8 +433,8 @@ func (r *markingResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	if err := r.UpdateMarkingMembers(ctx, resp, &plan, &state); err != nil {
-		resp.Diagnostics.AddError("Error updating marking members", err.Error())
+	if err := r.UpdateMarking(ctx, resp, &plan, &state); err != nil {
+		resp.Diagnostics.AddError("Error updating marking", err.Error())
 		return
 	}
 
