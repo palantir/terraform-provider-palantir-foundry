@@ -23,7 +23,7 @@ resource "foundry_group" "example-group" {
   name        = "Example group name"
   description = "An example group in Foundry"
   organizations = ["example-organization-rid", "second-example-organization-rid"]
-  planned_group_members = ["example-user-id", "example-group-id"]
+  group_members = ["example-user-id", "example-group-id"]
 }
 ```
 
@@ -32,16 +32,15 @@ resource "foundry_group" "example-group" {
 
 ### Required
 
-- `name` (String) Name of the group.
-- `organizations` (List of String) RIDs of the Organizations whose members can see this group. At least one Organization RID must be listed.
-- `planned_group_members` (Set of String) Planned list of the PrincipalIds of the members (users or groups) in this group
+- `name` (String) Name of the Group.
+- `organizations` (List of String) List of the RIDs of the Organizations whose members can see this Group. At least one Organization RID must be listed.
 
 ### Optional
 
-- `description` (String) Description of the group.
+- `description` (String) Description of the Group.
+- `group_members` (Set of String) List of the IDs of the members (Users or Groups) of this Group.
 
 ### Read-Only
 
-- `group_members` (Set of String) Actual list of the PrincipalIds of the members (users or groups) in this group, computed after successful addition/removal of group members.
-- `id` (String) Identifier of the group.
-- `realm` (String) Realm of the group.
+- `id` (String) ID of the Group.
+- `realm` (String) Realm of the Group.

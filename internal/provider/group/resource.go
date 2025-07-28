@@ -80,35 +80,30 @@ func (r *groupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 		Description: "Manages a Foundry Group.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "Identifier of the group.",
+				Description: "ID of the Group.",
 				Computed:    true,
 			},
 			"name": schema.StringAttribute{
-				Description: "Name of the group.",
+				Description: "Name of the Group.",
 				Required:    true,
 			},
 			"description": schema.StringAttribute{
-				Description: "Description of the group.",
+				Description: "Description of the Group.",
 				Optional:    true,
 			},
 			"organizations": schema.ListAttribute{
 				ElementType: types.StringType,
-				Description: "RIDs of the Organizations whose members can see this group. At least one Organization RID must be listed.",
+				Description: "List of the RIDs of the Organizations whose members can see this Group. At least one Organization RID must be listed.",
 				Required:    true,
 			},
 			"realm": schema.StringAttribute{
-				Description: "Realm of the group.",
+				Description: "Realm of the Group.",
 				Computed:    true,
-			},
-			"planned_group_members": schema.SetAttribute{
-				ElementType: types.StringType,
-				Description: "Planned list of the PrincipalIds of the members (users or groups) in this group",
-				Required:    true,
 			},
 			"group_members": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "Actual list of the PrincipalIds of the members (users or groups) in this group, computed after successful addition/removal of group members.",
-				Computed:    true,
+				Description: "List of the IDs of the members (Users or Groups) of this Group.",
+				Optional:    true,
 			},
 		},
 	}
@@ -126,17 +121,15 @@ func (r *groupResource) Create(ctx context.Context, req resource.CreateRequest, 
 
 	err := r.CreateGroup(ctx, resp, &plan)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating the group resource",
-			"Error creating the group resource itself. Since this is the primary resource, nothing has been provisioned and we can safely return")
+		resp.Diagnostics.AddError("Error creating the Group. Please fix your plan if needed and re-apply.", err.Error())
 		return
 	}
 
-	err = r.CreateGroupMembers(ctx, resp, &plan)
-	if err != nil {
-		resp.Diagnostics.AddWarning("Error creating the group members",
-			err.Error())
-		resp.Diagnostics.AddWarning("Please fix your plan if needed and re-apply.",
-			"We are throwing a warning here to ensure previous changes are not lost. Please fix your plan if needed and re-apply.")
+	if !plan.GroupMembers.IsNull() {
+		err = r.CreateGroupMembers(ctx, resp, &plan)
+		if err != nil {
+			resp.Diagnostics.AddError("Error creating the Group members. Please fix your plan if needed and re-apply.", err.Error())
+		}
 	}
 
 	diags = resp.State.Set(ctx, plan)
@@ -151,7 +144,7 @@ func (r *groupResource) CreateGroup(ctx context.Context, resp *resource.CreateRe
 	diags := plan.Organizations.ElementsAs(context.Background(), &organizationsGoSlice, false)
 	if diags.HasError() {
 		resp.Diagnostics.Append(diags...)
-		return fmt.Errorf("failed to convert organizations to Go slice")
+		return fmt.Errorf("error converting fields from Go to Terraform")
 	}
 
 	description := plan.Description.ValueString()
@@ -212,9 +205,9 @@ func (r *groupResource) CreateGroup(ctx context.Context, resp *resource.CreateRe
 
 func (r *groupResource) CreateGroupMembers(ctx context.Context, resp *resource.CreateResponse, plan *groupResourceModel) error {
 	var plannedGroupMembers []v2.CorePrincipalID
-	diags := plan.PlannedGroupMembers.ElementsAs(ctx, &plannedGroupMembers, false)
+	diags := plan.GroupMembers.ElementsAs(ctx, &plannedGroupMembers, false)
 	if diags.HasError() {
-		return fmt.Errorf("failed to convert planned group members to Go slice")
+		return fmt.Errorf("failed to convert group members to Go slice")
 	}
 
 	httpResp, err := r.client.AdminAddGroupMembers(ctx, plan.ID.ValueString(), v2.AdminAddGroupMembersJSONRequestBody{
@@ -238,7 +231,6 @@ func (r *groupResource) CreateGroupMembers(ctx context.Context, resp *resource.C
 		}
 		return errors.New(returnString)
 	}
-	plan.GroupMembers = plan.PlannedGroupMembers
 	return nil
 }
 
@@ -350,11 +342,9 @@ func (r *groupResource) ReadGroupMembers(ctx context.Context, resp *resource.Rea
 	for _, groupMember := range httpGroupMembersResponseBody.Data {
 		groupMemberIds = append(groupMemberIds, groupMember.PrincipalID)
 	}
-
-	state.GroupMembers, _ = types.SetValueFrom(ctx, types.StringType, groupMemberIds)
-
-	//bit hacky but we need to update the planned group members as well in state to keep state = plan
-	state.PlannedGroupMembers = state.GroupMembers
+	if len(groupMemberIds) != 0 {
+		state.GroupMembers, _ = types.SetValueFrom(ctx, types.StringType, groupMemberIds)
+	}
 	return nil
 }
 
@@ -377,7 +367,7 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
-	err := r.UpdateGroupMembers(ctx, resp, &plan, &state)
+	err := r.UpdateGroupMembers(ctx, &plan, &state)
 	if err != nil {
 		resp.Diagnostics.AddWarning("Error updating the group members",
 			err.Error())
@@ -392,18 +382,23 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	}
 }
 
-func (r *groupResource) UpdateGroupMembers(ctx context.Context, resp *resource.UpdateResponse, plan *groupResourceModel, state *groupResourceModel) error {
+func (r *groupResource) UpdateGroupMembers(ctx context.Context, plan *groupResourceModel, state *groupResourceModel) error {
 	var oldGroupMembers []string
 	var newGroupMembers []string
 
-	diags := state.GroupMembers.ElementsAs(ctx, &oldGroupMembers, false)
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert group members to Go slice")
+	if !state.GroupMembers.IsNull() {
+		diags := state.GroupMembers.ElementsAs(ctx, &oldGroupMembers, false)
+		if diags.HasError() {
+			return fmt.Errorf("failed to convert group members to Go slice")
+		}
 	}
 
-	diags = plan.PlannedGroupMembers.ElementsAs(ctx, &newGroupMembers, false)
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert planned group members to Go slice")
+	//only initialize if not null, otherwise ElementsAs will throw error instead of just handling as empty slice
+	if !plan.GroupMembers.IsNull() {
+		diags := plan.GroupMembers.ElementsAs(ctx, &newGroupMembers, false)
+		if diags.HasError() {
+			return fmt.Errorf("failed to convert group members to Go slice")
+		}
 	}
 
 	if !slices.Equal(oldGroupMembers, newGroupMembers) {
@@ -425,13 +420,8 @@ func (r *groupResource) UpdateGroupMembers(ctx context.Context, resp *resource.U
 				if err != nil {
 					return fmt.Errorf("failed to format error logging from AdminAddGroupMembers response: %w", err)
 				}
-				if plan.GroupMembers.IsUnknown() {
-					plan.GroupMembers = state.GroupMembers
-				}
-				state.PlannedGroupMembers = plan.PlannedGroupMembers
 				return errors.New(returnString)
 			}
-			plan.GroupMembers = plan.PlannedGroupMembers
 		}
 		if len(membersToRemove) != 0 {
 			//create body
@@ -449,17 +439,12 @@ func (r *groupResource) UpdateGroupMembers(ctx context.Context, resp *resource.U
 				if err != nil {
 					return fmt.Errorf("failed to format error logging from AdminRemoveGroupMembers response: %w", err)
 				}
-				if plan.GroupMembers.IsUnknown() {
-					plan.GroupMembers = state.GroupMembers
-				}
-				state.PlannedGroupMembers = plan.PlannedGroupMembers
 				return errors.New(returnString)
 			}
-			plan.GroupMembers = plan.PlannedGroupMembers
 		}
+		//if there was a change (and no error thrown), update state to equal plan
 		state.GroupMembers = plan.GroupMembers
 	}
-	state.PlannedGroupMembers = plan.PlannedGroupMembers
 	return nil
 }
 

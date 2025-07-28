@@ -19,9 +19,8 @@ import (
 )
 
 type enrollmentResourceModel struct {
-	RID                    types.String `tfsdk:"rid"`
-	PlannedEnrollmentRoles types.Set    `tfsdk:"planned_enrollment_roles"`
-	EnrollmentRoles        types.Set    `tfsdk:"enrollment_roles"`
+	RID             types.String `tfsdk:"rid"`
+	EnrollmentRoles types.Set    `tfsdk:"enrollment_roles"`
 }
 
 type enrollmentRolesRequestBodyEntry struct {

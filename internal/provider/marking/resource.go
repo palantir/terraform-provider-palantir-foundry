@@ -82,7 +82,7 @@ func (r *markingResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 		Description: "Manages a Foundry marking.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "Identifier of the marking.",
+				Description: "ID of the Marking.",
 				Computed:    true,
 			},
 			"name": schema.StringAttribute{
@@ -90,36 +90,21 @@ func (r *markingResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Required:    true,
 			},
 			"category_id": schema.StringAttribute{
-				Description: "The ID of a marking category. For user-created categories, this will be a UUID. Markings associated with Organizations are placed in a category with ID \"Organization\". This field is immutable after creation.",
+				Description: "The ID of a Marking Category. For user-created Categories, this will be a UUID. Markings associated with Organizations are placed in a category with ID \"Organization\". This field is immutable after creation.",
 				Required:    true,
 			},
 			"description": schema.StringAttribute{
 				Description: "Description of the marking.",
 				Optional:    true,
 			},
-			"planned_marking_members": schema.SetAttribute{
-				ElementType: types.StringType,
-				Description: "Planned list of the PrincipalIds of the members (users or groups) in this marking",
-				Required:    true,
-			},
 			"marking_members": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "Actual list of the PrincipalIds of the members (users or groups) in this marking, computed after successful addition/removal of marking members",
-				Computed:    true,
-			},
-			"planned_marking_roles": schema.SetAttribute{
-				Description: "Planned list of roles assigned to this marking. At least one ADMIN role must be provided.",
-				Required:    true,
-				ElementType: types.ObjectType{
-					AttrTypes: map[string]attr.Type{
-						"role":         types.StringType,
-						"principal_id": types.StringType,
-					},
-				},
+				Description: "List of the IDs of the members (Users or Groups) of this Marking.",
+				Optional:    true,
 			},
 			"marking_roles": schema.SetAttribute{
-				Description: "Actual list of roles assigned to this marking, computed after successful addition/removal of marking roles.",
-				Computed:    true,
+				Description: "List of role assignments for this Marking.",
+				Optional:    true,
 				ElementType: types.ObjectType{
 					AttrTypes: map[string]attr.Type{
 						"role":         types.StringType,
@@ -144,8 +129,7 @@ func (r *markingResource) Create(ctx context.Context, req resource.CreateRequest
 
 	err := r.CreateMarking(ctx, resp, &plan)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating the group resource",
-			"Error creating the group resource itself. Since this is the primary resource, nothing has been provisioned and we can safely return")
+		resp.Diagnostics.AddError("Error creating the Marking. Please fix your plan if needed and re-apply", err.Error())
 		return
 	}
 
@@ -158,7 +142,7 @@ func (r *markingResource) Create(ctx context.Context, req resource.CreateRequest
 
 func (r *markingResource) CreateMarking(ctx context.Context, resp *resource.CreateResponse, plan *markingResourceModel) error {
 	var initialRoleAssignments []RolesRequestBodyEntry
-	diags := plan.PlannedMarkingRoles.ElementsAs(context.Background(), &initialRoleAssignments, false)
+	diags := plan.MarkingRoles.ElementsAs(context.Background(), &initialRoleAssignments, false)
 	if diags.HasError() {
 		resp.Diagnostics.Append(diags...)
 		return fmt.Errorf("failed to convert roles to Go slice")
@@ -173,9 +157,9 @@ func (r *markingResource) CreateMarking(ctx context.Context, resp *resource.Crea
 	}
 
 	var initialMembers []string
-	plan.PlannedMarkingMembers.ElementsAs(context.Background(), &initialMembers, false)
+	plan.MarkingMembers.ElementsAs(context.Background(), &initialMembers, false)
 
-	previewMode := true
+	previewMode := constants.PreviewMode
 	adminCreateMarkingParams := v2.AdminCreateMarkingParams{Preview: &previewMode}
 	description := plan.Description.ValueString()
 
@@ -231,8 +215,6 @@ func (r *markingResource) CreateMarking(ctx context.Context, resp *resource.Crea
 
 	//Set computed values
 	plan.ID = types.StringValue(httpResponseBody.ID)
-	plan.MarkingMembers = plan.PlannedMarkingMembers
-	plan.MarkingRoles = plan.PlannedMarkingRoles
 	return nil
 }
 
@@ -253,21 +235,18 @@ func (r *markingResource) Read(ctx context.Context, req resource.ReadRequest, re
 
 	err = r.ReadMarking(ctx, resp, &state, markingUUID)
 	if err != nil {
-		resp.Diagnostics.AddError("Error reading the marking resource",
-			"Error reading the marking resource itself. Since this is the primary resource, nothing has been changed and we can safely return")
+		resp.Diagnostics.AddError("Error reading the Marking", err.Error())
 		return
 	}
 
 	err = r.ReadMarkingMembers(ctx, &state, markingUUID)
 	if err != nil {
-		resp.Diagnostics.AddWarning("Error reading the marking members",
-			err.Error())
+		resp.Diagnostics.AddError("Error reading the Marking members", err.Error())
 	}
 
 	err = r.ReadMarkingRoles(ctx, &state, markingUUID)
 	if err != nil {
-		resp.Diagnostics.AddWarning("Error reading the marking members",
-			err.Error())
+		resp.Diagnostics.AddWarning("Error reading the Marking roles", err.Error())
 	}
 
 	// Set refreshed state
@@ -279,7 +258,7 @@ func (r *markingResource) Read(ctx context.Context, req resource.ReadRequest, re
 }
 
 func (r *markingResource) ReadMarking(ctx context.Context, resp *resource.ReadResponse, state *markingResourceModel, markingUUID uuid.UUID) error {
-	previewMode := true
+	previewMode := constants.PreviewMode
 	adminGetMarkingParams := v2.AdminGetMarkingParams{Preview: &previewMode}
 
 	httpResp, err := r.client.AdminGetMarking(ctx, markingUUID, &adminGetMarkingParams)
@@ -358,9 +337,9 @@ func (r *markingResource) ReadMarkingMembers(ctx context.Context, state *marking
 		markingMembersIds = append(markingMembersIds, markingMember.PrincipalID)
 	}
 
-	state.MarkingMembers, _ = types.SetValueFrom(ctx, types.StringType, markingMembersIds)
-	//bit hacky but we need to update the planned group members as well in state to keep state = plan
-	state.PlannedMarkingMembers = state.MarkingMembers
+	if len(markingMembersIds) != 0 {
+		state.MarkingMembers, _ = types.SetValueFrom(ctx, types.StringType, markingMembersIds)
+	}
 	return nil
 }
 
@@ -412,9 +391,9 @@ func (r *markingResource) ReadMarkingRoles(ctx context.Context, state *markingRe
 		roleAssignments = append(roleAssignments, roleAssignment)
 	}
 
-	state.MarkingRoles, _ = types.SetValueFrom(ctx, roleAssignmentType, roleAssignments)
-
-	state.PlannedMarkingRoles = state.MarkingRoles
+	if len(roleAssignments) != 0 {
+		state.MarkingRoles, _ = types.SetValueFrom(ctx, roleAssignmentType, roleAssignments)
+	}
 	return nil
 }
 
@@ -434,20 +413,16 @@ func (r *markingResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	if err := r.UpdateMarking(ctx, resp, &plan, &state); err != nil {
-		resp.Diagnostics.AddError("Error updating marking", err.Error())
+		resp.Diagnostics.AddError("Error updating marking. Please fix your plan if needed and re-apply", err.Error())
 		return
 	}
 
-	if err := r.UpdateMarkingMembers(ctx, resp, &plan, &state); err != nil {
-		resp.Diagnostics.AddWarning("Error updating marking members", err.Error())
-		resp.Diagnostics.AddWarning("Please fix your plan if needed and re-apply.",
-			"We are throwing a warning here to ensure previous changes are not lost. Please fix your plan if needed and re-apply.")
+	if err := r.UpdateMarkingMembers(ctx, &plan, &state); err != nil {
+		resp.Diagnostics.AddError("Error updating marking members. Please fix your plan if needed and re-apply", err.Error())
 	}
 
-	if err := r.UpdateMarkingRoles(ctx, resp, &plan, &state); err != nil {
-		resp.Diagnostics.AddWarning("Error updating marking roles", err.Error())
-		resp.Diagnostics.AddWarning("Please fix your plan if needed and re-apply.",
-			"We are throwing a warning here to ensure previous changes are not lost. Please fix your plan if needed and re-apply.")
+	if err := r.UpdateMarkingRoles(ctx, &plan, &state); err != nil {
+		resp.Diagnostics.AddError("Error updating marking roles. Please fix your plan if needed and re-apply", err.Error())
 	}
 
 	diags = resp.State.Set(ctx, state)
@@ -461,7 +436,7 @@ func (r *markingResource) UpdateMarking(ctx context.Context, resp *resource.Upda
 	if plan.CategoryID != state.CategoryID {
 		return fmt.Errorf("you may not change the category ID of a marking once it has been created. Please revert your plan to the existing category ID and re-apply")
 	}
-	previewMode := true
+	previewMode := constants.PreviewMode
 	adminReplaceMarkingParams := v2.AdminReplaceMarkingParams{Preview: &previewMode}
 	description := plan.Description.ValueString()
 	markingUUID, err := uuid.Parse(state.ID.ValueString())
@@ -513,20 +488,25 @@ func (r *markingResource) UpdateMarking(ctx context.Context, resp *resource.Upda
 	return nil
 }
 
-func (r *markingResource) UpdateMarkingMembers(ctx context.Context, resp *resource.UpdateResponse, plan, state *markingResourceModel) error {
+func (r *markingResource) UpdateMarkingMembers(ctx context.Context, plan, state *markingResourceModel) error {
 	var oldMarkingMembers, newMarkingMembers []string
 
-	diags := state.MarkingMembers.ElementsAs(ctx, &oldMarkingMembers, false)
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert marking members to Go slice")
+	//only initialize if not null, otherwise ElementsAs will throw error instead of just handling as empty slice
+	if !state.MarkingMembers.IsNull() {
+		diags := state.MarkingMembers.ElementsAs(ctx, &oldMarkingMembers, false)
+		if diags.HasError() {
+			return fmt.Errorf("failed to convert marking members to Go slice")
+		}
 	}
 
-	diags = plan.PlannedMarkingMembers.ElementsAs(ctx, &newMarkingMembers, false)
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert planned marking members to Go slice")
+	if !plan.MarkingMembers.IsNull() {
+		diags := plan.MarkingMembers.ElementsAs(ctx, &newMarkingMembers, false)
+		if diags.HasError() {
+			return fmt.Errorf("failed to convert planned marking members to Go slice")
+		}
 	}
 
-	previewMode := true
+	previewMode := constants.PreviewMode
 
 	if !slices.Equal(oldMarkingMembers, newMarkingMembers) {
 		membersToAdd, membersToRemove := helper.FindStringSliceDiff(oldMarkingMembers, newMarkingMembers)
@@ -547,13 +527,8 @@ func (r *markingResource) UpdateMarkingMembers(ctx context.Context, resp *resour
 				if err != nil {
 					return fmt.Errorf("failed to format error logging from AdminAddMarkingMembersParams response: %w", err)
 				}
-				if plan.MarkingMembers.IsUnknown() {
-					plan.MarkingMembers = state.MarkingMembers
-				}
-				state.PlannedMarkingMembers = plan.PlannedMarkingMembers
 				return errors.New(returnString)
 			}
-			plan.MarkingMembers = plan.PlannedMarkingMembers
 		}
 		if len(membersToRemove) != 0 {
 			params := v2.AdminRemoveMarkingMembersParams{Preview: &previewMode}
@@ -568,33 +543,33 @@ func (r *markingResource) UpdateMarkingMembers(ctx context.Context, resp *resour
 				if err != nil {
 					return fmt.Errorf("failed to format error logging from AdminAddGroupMembers response: %w", err)
 				}
-				if plan.MarkingMembers.IsUnknown() {
-					plan.MarkingMembers = state.MarkingMembers
-				}
 				return errors.New(returnString)
 			}
-			plan.MarkingMembers = plan.PlannedMarkingMembers
 		}
+		//if there was a change (and no error thrown), update state to equal plan
 		state.MarkingMembers = plan.MarkingMembers
 	}
-	state.PlannedMarkingMembers = plan.PlannedMarkingMembers
 	return nil
 }
 
-func (r *markingResource) UpdateMarkingRoles(ctx context.Context, resp *resource.UpdateResponse, plan, state *markingResourceModel) error {
+func (r *markingResource) UpdateMarkingRoles(ctx context.Context, plan, state *markingResourceModel) error {
 	var oldMarkingRoles, newMarkingRoles []RolesRequestBodyEntry
 
-	diags := state.MarkingRoles.ElementsAs(ctx, &oldMarkingRoles, false)
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert marking roles to Go slice")
+	if !state.MarkingRoles.IsNull() {
+		diags := state.MarkingRoles.ElementsAs(ctx, &oldMarkingRoles, false)
+		if diags.HasError() {
+			return fmt.Errorf("failed to convert marking roles to Go slice")
+		}
 	}
 
-	diags = plan.PlannedMarkingRoles.ElementsAs(ctx, &newMarkingRoles, false)
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert marking roles to Go slice")
+	if !state.MarkingRoles.IsNull() {
+		diags := plan.MarkingRoles.ElementsAs(ctx, &newMarkingRoles, false)
+		if diags.HasError() {
+			return fmt.Errorf("failed to convert marking roles to Go slice")
+		}
 	}
 
-	previewMode := true
+	previewMode := constants.PreviewMode
 	if !slices.Equal(oldMarkingRoles, newMarkingRoles) {
 
 		rolesToAdd, rolesToRemove := FindMarkingRolesDiff(oldMarkingRoles, newMarkingRoles)
@@ -622,13 +597,8 @@ func (r *markingResource) UpdateMarkingRoles(ctx context.Context, resp *resource
 				if err != nil {
 					return fmt.Errorf("failed to format error logging from AdminAddGroupMembers response: %w", err)
 				}
-				if plan.MarkingRoles.IsUnknown() {
-					plan.MarkingRoles = state.MarkingRoles
-				}
-				state.PlannedMarkingMembers = plan.PlannedMarkingMembers
 				return errors.New(returnString)
 			}
-			plan.MarkingRoles = plan.PlannedMarkingRoles
 		}
 		if len(rolesToRemove) != 0 {
 			roleUpdates := make([]v2.AdminMarkingRoleUpdate, len(rolesToRemove))
@@ -650,18 +620,12 @@ func (r *markingResource) UpdateMarkingRoles(ctx context.Context, resp *resource
 				if err != nil {
 					return fmt.Errorf("failed to format error logging from AdminRemoveMarkingRoleAssignments response: %w", err)
 				}
-				if plan.MarkingRoles.IsUnknown() {
-					plan.MarkingRoles = state.MarkingRoles
-				}
-				state.PlannedMarkingMembers = plan.PlannedMarkingMembers
 				return errors.New(returnString)
 			}
-			plan.MarkingRoles = plan.PlannedMarkingRoles
 		}
+		//if there was a change (and no error thrown), update state to equal plan
 		state.MarkingRoles = plan.MarkingRoles
 	}
-
-	state.PlannedMarkingRoles = plan.PlannedMarkingRoles
 	return nil
 }
 

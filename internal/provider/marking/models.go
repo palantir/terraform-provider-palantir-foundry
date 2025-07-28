@@ -20,14 +20,12 @@ import (
 
 // markingsResourceModel maps the resource schema data.
 type markingResourceModel struct {
-	ID                    types.String `tfsdk:"id"`
-	CategoryID            types.String `tfsdk:"category_id"`
-	Name                  types.String `tfsdk:"name"`
-	Description           types.String `tfsdk:"description"`
-	MarkingMembers        types.Set    `tfsdk:"marking_members"`
-	PlannedMarkingMembers types.Set    `tfsdk:"planned_marking_members"`
-	MarkingRoles          types.Set    `tfsdk:"marking_roles"`
-	PlannedMarkingRoles   types.Set    `tfsdk:"planned_marking_roles"`
+	ID             types.String `tfsdk:"id"`
+	CategoryID     types.String `tfsdk:"category_id"`
+	Name           types.String `tfsdk:"name"`
+	Description    types.String `tfsdk:"description"`
+	MarkingMembers types.Set    `tfsdk:"marking_members"`
+	MarkingRoles   types.Set    `tfsdk:"marking_roles"`
 }
 
 // requestBody contains the schema for request body
@@ -41,10 +39,8 @@ type responseBody struct {
 
 type markingMembersResponseBody struct {
 	Data []markingMembersEntry `json:"data"`
-	//next page token whenever i get to it
 }
 
-// this is the same interface as group members, should refactor at some point
 type markingMembersEntry struct {
 	PrincipalID   string `json:"principalId"`
 	PrincipalType string `json:"principalType"`
@@ -57,10 +53,8 @@ type RolesRequestBodyEntry struct {
 
 type markingRolesResponseBody struct {
 	Data []markingRolesEntry `json:"data"`
-	//next page token whenever i get to it
 }
 
-// this is the same interface as group members, should refactor at some point
 type markingRolesEntry struct {
 	PrincipalID   string `json:"principalId"`
 	PrincipalType string `json:"principalType"`

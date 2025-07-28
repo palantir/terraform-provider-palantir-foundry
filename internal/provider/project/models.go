@@ -19,17 +19,14 @@ import (
 )
 
 type projectResourceModel struct {
-	RID                  types.String `tfsdk:"rid"`
-	DisplayName          types.String `tfsdk:"display_name"`
-	SpaceRID             types.String `tfsdk:"space_rid"`
-	Description          types.String `tfsdk:"description"`
-	Organizations        types.Set    `tfsdk:"organizations"`
-	PlannedOrganizations types.Set    `tfsdk:"planned_organizations"`
-	RoleResources        types.Set    `tfsdk:"resource_roles"`
-	PlannedRoleResources types.Set    `tfsdk:"planned_resource_roles"`
-	Markings             types.Set    `tfsdk:"markings"`
-	PlannedMarkings      types.Set    `tfsdk:"planned_markings"`
-	TrashStatus          types.String `tfsdk:"trash_status"`
+	RID           types.String `tfsdk:"rid"`
+	DisplayName   types.String `tfsdk:"display_name"`
+	SpaceRID      types.String `tfsdk:"space_rid"`
+	Description   types.String `tfsdk:"description"`
+	Organizations types.Set    `tfsdk:"organizations"`
+	ResourceRoles types.Set    `tfsdk:"resource_roles"`
+	Markings      types.Set    `tfsdk:"markings"`
+	TrashStatus   types.String `tfsdk:"trash_status"`
 }
 
 // requestBody contains the schema for request body
@@ -60,7 +57,7 @@ type listMarkingsResponseBody struct {
 	Data []string `json:"data"`
 }
 
-type RoleResource struct {
+type ResourceRole struct {
 	ResourceRolePrincipal struct {
 		Type          string `json:"type" tfsdk:"type"`
 		PrincipalID   string `json:"principalId" tfsdk:"principal_id"`
