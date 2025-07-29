@@ -735,7 +735,7 @@ func (r *projectResource) UpdateProjectRoles(ctx context.Context, plan *projectR
 
 	if !slices.Equal(oldResourceRoles, newResourceRoles) {
 		// Determine members to add and remove
-		rolesToAdd, rolesToRemove := DiffRoleResources(oldResourceRoles, newResourceRoles)
+		rolesToAdd, rolesToRemove := DiffResourceRoles(oldResourceRoles, newResourceRoles)
 		if len(rolesToAdd) != 0 {
 			roleUpdates := make([]v2.FilesystemResourceRole, len(rolesToAdd))
 
@@ -1001,7 +1001,7 @@ func (r *projectResource) ImportState(ctx context.Context, req resource.ImportSt
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("rid"), projectID)...)
 }
 
-func DiffRoleResources(oldRoleResources, newRoleResources []ResourceRole) (added, removed []ResourceRole) {
+func DiffResourceRoles(oldResourceRoles, newResourceRoles []ResourceRole) (added, removed []ResourceRole) {
 	oldMap := make(map[string]ResourceRole)
 	newMap := make(map[string]ResourceRole)
 
@@ -1011,10 +1011,10 @@ func DiffRoleResources(oldRoleResources, newRoleResources []ResourceRole) (added
 		return r.RoleID + "|" + p.Type + "|" + p.PrincipalID + "|" + p.PrincipalType
 	}
 
-	for _, r := range oldRoleResources {
+	for _, r := range oldResourceRoles {
 		oldMap[makeKey(r)] = r
 	}
-	for _, r := range newRoleResources {
+	for _, r := range newResourceRoles {
 		newMap[makeKey(r)] = r
 	}
 
