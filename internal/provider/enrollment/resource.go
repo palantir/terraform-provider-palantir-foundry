@@ -85,7 +85,7 @@ func (r *enrollmentResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			},
 			"enrollment_roles": schema.SetAttribute{
 				Description: "List of role assignments for this Enrollment.",
-				Optional:    true,
+				Required:    true,
 				ElementType: types.ObjectType{
 					AttrTypes: map[string]attr.Type{
 						"role_id":      types.StringType,
@@ -218,18 +218,14 @@ func (r *enrollmentResource) UpdateEnrollmentRoles(ctx context.Context, plan *en
 	var oldEnrollmentRoles []enrollmentRolesRequestBodyEntry
 	var newEnrollmentRoles []enrollmentRolesRequestBodyEntry
 
-	if !state.EnrollmentRoles.IsNull() {
-		diags := state.EnrollmentRoles.ElementsAs(ctx, &oldEnrollmentRoles, false)
-		if diags.HasError() {
-			return fmt.Errorf("failed to convert enrollment roles to Go slice")
-		}
+	diags := state.EnrollmentRoles.ElementsAs(ctx, &oldEnrollmentRoles, false)
+	if diags.HasError() {
+		return fmt.Errorf("failed to convert enrollment roles to Go slice")
 	}
 
-	if !plan.EnrollmentRoles.IsNull() {
-		diags := plan.EnrollmentRoles.ElementsAs(ctx, &newEnrollmentRoles, false)
-		if diags.HasError() {
-			return fmt.Errorf("failed to convert enrollment roles to Go slice")
-		}
+	diags = plan.EnrollmentRoles.ElementsAs(ctx, &newEnrollmentRoles, false)
+	if diags.HasError() {
+		return fmt.Errorf("failed to convert enrollment roles to Go slice")
 	}
 
 	hasAdmin := false
