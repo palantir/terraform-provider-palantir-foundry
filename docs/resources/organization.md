@@ -23,8 +23,8 @@ resource "foundry_organization" "example-organization" {
   name         = "Example organization nmae"
   description  = "An example organization in Foundry"
   host_name = "example.palantirfoundry.com"
-  planned_organization_members = ["example-user-id", "example-group-id"]
-  planned_organization_roles = [
+  organization_members = ["example-user-id", "example-group-id"]
+  organization_roles = [
     {
       "role_id" : "organization:example-role",
       "principal_id" : "example-user-id",
@@ -42,36 +42,25 @@ resource "foundry_organization" "example-organization" {
 
 ### Required
 
-- `enrollment_rid` (String) The RID of the enrollment this organization belongs to. This field is immutable after creation.
-- `name` (String) Name of the organization.
-- `planned_organization_members` (Set of String) Planned list of the PrincipalIds of the members (users or groups) in this organization.
-- `planned_organization_roles` (Set of Object) Planned list of roles assigned to principals for this organization (see [below for nested schema](#nestedatt--planned_organization_roles))
+- `enrollment_rid` (String) The RID of the Enrollment this Organization belongs to. This field is immutable after creation.
+- `name` (String) Name of the Organization.
+- `organization_roles` (Set of Object) List of role assignments for this Organization. (see [below for nested schema](#nestedatt--organization_roles))
 
 ### Optional
 
-- `description` (String) Description of the organization.
-- `host_name` (String) The primary host name of the Organization. This should be used when constructing URLs for users of this Organization
+- `description` (String) Description of the Organization.
+- `host_name` (String) The primary host name of the Organization. This should be used when constructing URLs for users of this Organization.
+- `organization_members` (Set of String) List of the IDs of the members that belong to this Organization.
 
 ### Read-Only
 
-- `marking_id` (String) Marking id of the organization
-- `organization_members` (Set of String) Actual list of the PrincipalIds of the members (users or groups) in this organization., computed after successful addition/removal of members
-- `organization_roles` (Set of Object) Actual list of roles assigned to principals for this organization, computed after successful addition/removal of roles (see [below for nested schema](#nestedatt--organization_roles))
-- `rid` (String) Resource identifier of the organization.
-
-<a id="nestedatt--planned_organization_roles"></a>
-### Nested Schema for `planned_organization_roles`
-
-Required:
-
-- `principal_id` (String)
-- `role_id` (String)
-
+- `marking_id` (String) Marking ID of the Organization.
+- `rid` (String) RID of the Organization.
 
 <a id="nestedatt--organization_roles"></a>
 ### Nested Schema for `organization_roles`
 
-Read-Only:
+Required:
 
 - `principal_id` (String)
 - `role_id` (String)

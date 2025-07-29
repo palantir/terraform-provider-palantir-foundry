@@ -1,5 +1,5 @@
 resource "foundry_enrollment" "example-enrollment" {
-  planned_enrollment_roles = [
+  enrollment_roles = [
     {
       "role_id" : "enrollment:example-role",
       "principal_id" : "example-user-id",

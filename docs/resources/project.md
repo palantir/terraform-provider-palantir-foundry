@@ -25,7 +25,7 @@ resource "foundry_project" "example-project" {
   display_name = "Example project name"
   space_rid    = "ri.compass.main.folder.example-space-rid"
   organizations = ["example-organization-rid"]
-  planned_role_resources = [
+  resource_roles = [
     {
       resource_role_principal = {
         principal_id = "example-group-id"
@@ -41,8 +41,16 @@ resource "foundry_project" "example-project" {
         type = "principalWithId"
       }
       role_id: "example-project-role-id"
+    },
+    {
+      resource_role_principal = {
+        principal_id = ""
+        principal_type = ""
+        type = "everyone"
+      }
+      role_id: "example-project-role-id"
     }]
-  planned_markings = ["example-marking-id"]
+  markings = ["example-marking-id"]
 }
 ```
 
@@ -51,47 +59,25 @@ resource "foundry_project" "example-project" {
 
 ### Required
 
-- `display_name` (String) Display name of the organization.
-- `planned_markings` (Set of String) Planned set of markings applied to this project.
-- `planned_organizations` (Set of String) planned list of organizations associated to this project
-- `planned_resource_roles` (Set of Object) Planned set of resource roles for this project (see [below for nested schema](#nestedatt--planned_resource_roles))
-- `space_rid` (String) Rid of the space this project belongs to.
+- `display_name` (String) Display name of the Project.
+- `organizations` (Set of String) List of Organizations applied to this Project.
+- `space_rid` (String) RID of the Space that this Project belongs to.
 
 ### Optional
 
-- `description` (String) Description of the marking.
+- `description` (String) Description of the Project.
+- `markings` (Set of String) List of Markings applied to this Project.
+- `resource_roles` (Set of Object) Set of Role Grants applied to this Project. (see [below for nested schema](#nestedatt--resource_roles))
 
 ### Read-Only
 
-- `markings` (Set of String) Actual set of markings applied to this project, computed after successful addition/removal of markings.
-- `organizations` (Set of String) Actual list of organizations associated to this project, computed after successful addition/removal of organizations
-- `resource_roles` (Set of Object) Actual set of resource roles for this project, computed after successful addition/removal of role resources (see [below for nested schema](#nestedatt--resource_roles))
-- `rid` (String) Identifier of the project.
-- `trash_status` (String) Current trash status of the project.
-
-<a id="nestedatt--planned_resource_roles"></a>
-### Nested Schema for `planned_resource_roles`
-
-Required:
-
-- `resource_role_principal` (Object) (see [below for nested schema](#nestedobjatt--planned_resource_roles--resource_role_principal))
-- `role_id` (String)
-
-<a id="nestedobjatt--planned_resource_roles--resource_role_principal"></a>
-### Nested Schema for `planned_resource_roles.resource_role_principal`
-
-Required:
-
-- `principal_id` (String)
-- `principal_type` (String)
-- `type` (String)
-
-
+- `rid` (String) RID of the Project.
+- `trash_status` (String) Current trash status of the Project.
 
 <a id="nestedatt--resource_roles"></a>
 ### Nested Schema for `resource_roles`
 
-Read-Only:
+Optional:
 
 - `resource_role_principal` (Object) (see [below for nested schema](#nestedobjatt--resource_roles--resource_role_principal))
 - `role_id` (String)
@@ -99,7 +85,7 @@ Read-Only:
 <a id="nestedobjatt--resource_roles--resource_role_principal"></a>
 ### Nested Schema for `resource_roles.resource_role_principal`
 
-Read-Only:
+Optional:
 
 - `principal_id` (String)
 - `principal_type` (String)

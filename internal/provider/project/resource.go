@@ -82,50 +82,29 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 		Description: "Manages a Foundry project.",
 		Attributes: map[string]schema.Attribute{
 			"rid": schema.StringAttribute{
-				Description: "Identifier of the project.",
+				Description: "RID of the Project.",
 				Computed:    true,
 			},
 			"display_name": schema.StringAttribute{
-				Description: "Display name of the organization.",
+				Description: "Display name of the Project.",
 				Required:    true,
 			},
 			"space_rid": schema.StringAttribute{
-				Description: "Rid of the space this project belongs to.",
+				Description: "RID of the Space that this Project belongs to.",
 				Required:    true,
 			},
 			"description": schema.StringAttribute{
-				Description: "Description of the marking.",
+				Description: "Description of the Project.",
 				Optional:    true,
-			},
-			"planned_organizations": schema.SetAttribute{
-				ElementType: types.StringType,
-				Description: "planned list of organizations associated to this project",
-				Required:    true,
 			},
 			"organizations": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "Actual list of organizations associated to this project, computed after successful addition/removal of organizations",
-				Computed:    true,
-			},
-			"planned_resource_roles": schema.SetAttribute{
-				Description: "Planned set of resource roles for this project",
+				Description: "List of Organizations applied to this Project.",
 				Required:    true,
-				ElementType: types.ObjectType{
-					AttrTypes: map[string]attr.Type{
-						"resource_role_principal": types.ObjectType{
-							AttrTypes: map[string]attr.Type{
-								"type":           types.StringType,
-								"principal_id":   types.StringType,
-								"principal_type": types.StringType,
-							},
-						},
-						"role_id": types.StringType,
-					},
-				},
 			},
 			"resource_roles": schema.SetAttribute{
-				Description: "Actual set of resource roles for this project, computed after successful addition/removal of role resources",
-				Computed:    true,
+				Description: "Set of Role Grants applied to this Project.",
+				Optional:    true,
 				ElementType: types.ObjectType{
 					AttrTypes: map[string]attr.Type{
 						"resource_role_principal": types.ObjectType{
@@ -138,19 +117,14 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 						"role_id": types.StringType,
 					},
 				},
-			},
-			"planned_markings": schema.SetAttribute{
-				ElementType: types.StringType,
-				Description: "Planned set of markings applied to this project.",
-				Required:    true,
 			},
 			"markings": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "Actual set of markings applied to this project, computed after successful addition/removal of markings.",
-				Computed:    true,
+				Description: "List of Markings applied to this Project.",
+				Optional:    true,
 			},
 			"trash_status": schema.StringAttribute{
-				Description: "Current trash status of the project.",
+				Description: "Current trash status of the Project.",
 				Computed:    true,
 			},
 		},
@@ -169,17 +143,13 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 
 	err := r.CreateProject(ctx, resp, &plan)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating the project resource",
-			"Error creating the project resource itself. Since this is the primary resource, nothing has been provisioned and we can safely return")
+		resp.Diagnostics.AddError("Error creating the Project. Please fix your plan if needed and re-apply", err.Error())
 		return
 	}
 
 	err = r.CreateProjectMarkings(ctx, resp, &plan)
 	if err != nil {
-		resp.Diagnostics.AddWarning("Error creating the project markings",
-			err.Error())
-		resp.Diagnostics.AddWarning("Please fix your plan if needed and re-apply.",
-			"We are throwing a warning here to ensure previous changes are not lost. Please fix your plan if needed and re-apply.")
+		resp.Diagnostics.AddError("Error creating the Project markings. Please fix your plan if needed and re-apply.", err.Error())
 	}
 
 	diags = resp.State.Set(ctx, plan)
@@ -191,14 +161,14 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 
 func (r *projectResource) CreateProject(ctx context.Context, resp *resource.CreateResponse, plan *projectResourceModel) error {
 	var organizationsGoSlice []v2.CoreOrganizationRid
-	diags := plan.PlannedOrganizations.ElementsAs(context.Background(), &organizationsGoSlice, false)
+	diags := plan.Organizations.ElementsAs(context.Background(), &organizationsGoSlice, false)
 	if diags.HasError() {
 		resp.Diagnostics.Append(diags...)
 		return fmt.Errorf("failed to convert orgs to Go slice")
 	}
 
-	var roleGrants []RoleResource
-	diags = plan.PlannedRoleResources.ElementsAs(ctx, &roleGrants, false)
+	var roleGrants []ResourceRole
+	diags = plan.ResourceRoles.ElementsAs(ctx, &roleGrants, false)
 
 	if diags.HasError() {
 		resp.Diagnostics.Append(diags...)
@@ -215,7 +185,7 @@ func (r *projectResource) CreateProject(ctx context.Context, resp *resource.Crea
 		roleGrantsRequest[roleGrant.RoleID] = append(roleGrantsRequest[roleGrant.RoleID], principal)
 	}
 
-	previewMode := true
+	previewMode := constants.PreviewMode
 	filesystemCreateProjectParams := v2.FilesystemCreateProjectParams{Preview: &previewMode}
 	description := plan.Description.ValueString()
 
@@ -277,7 +247,7 @@ func (r *projectResource) CreateProject(ctx context.Context, resp *resource.Crea
 
 func (r *projectResource) CreateProjectMarkings(ctx context.Context, resp *resource.CreateResponse, plan *projectResourceModel) error {
 	var markingsGoSlice []string
-	diags := plan.PlannedMarkings.ElementsAs(context.Background(), &markingsGoSlice, false)
+	diags := plan.Markings.ElementsAs(context.Background(), &markingsGoSlice, false)
 
 	if diags.HasError() {
 		return fmt.Errorf("failed to convert planned markings to Go slice")
@@ -292,7 +262,7 @@ func (r *projectResource) CreateProjectMarkings(ctx context.Context, resp *resou
 		markingIdsToAdd = append(markingIdsToAdd, markingUUID)
 	}
 
-	previewMode := true
+	previewMode := constants.PreviewMode
 	filesystemAddMarkingParams := v2.FilesystemAddMarkingsParams{Preview: &previewMode}
 
 	httpResp, err := r.client.FilesystemAddMarkings(ctx, plan.RID.ValueString(), &filesystemAddMarkingParams,
@@ -317,8 +287,6 @@ func (r *projectResource) CreateProjectMarkings(ctx context.Context, resp *resou
 		}
 		return errors.New(returnString)
 	}
-	plan.Markings = plan.PlannedMarkings
-
 	return nil
 }
 
@@ -334,27 +302,23 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 
 	err := r.ReadProject(ctx, resp, &state)
 	if err != nil {
-		resp.Diagnostics.AddError("Error reading the project resource",
-			"Error reading the project resource itself. Since this is the primary resource, nothing has been changed and we can safely return")
+		resp.Diagnostics.AddError("Error reading the Project.", err.Error())
 		return
 	}
 
 	err = r.ReadOrganizations(ctx, &state)
 	if err != nil {
-		resp.Diagnostics.AddWarning("Error reading the project organizations",
-			err.Error())
+		resp.Diagnostics.AddError("Error reading the Project's Organizations.", err.Error())
 	}
 
 	err = r.ReadResourceRoles(ctx, &state)
 	if err != nil {
-		resp.Diagnostics.AddWarning("Error reading the resource roles",
-			err.Error())
+		resp.Diagnostics.AddError("Error reading the Project's role assignments.", err.Error())
 	}
 
 	err = r.ReadMarkings(ctx, &state)
 	if err != nil {
-		resp.Diagnostics.AddWarning("Error reading the resource markings",
-			err.Error())
+		resp.Diagnostics.AddError("Error reading the Project's Markings", err.Error())
 	}
 
 	// Set refreshed state
@@ -366,7 +330,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 }
 
 func (r *projectResource) ReadProject(ctx context.Context, resp *resource.ReadResponse, state *projectResourceModel) error {
-	previewMode := true
+	previewMode := constants.PreviewMode
 	filesystemGetProjectParams := v2.FilesystemGetProjectParams{Preview: &previewMode}
 
 	httpResp, err := r.client.FilesystemGetProject(ctx, state.RID.ValueString(), &filesystemGetProjectParams)
@@ -440,11 +404,9 @@ func (r *projectResource) ReadOrganizations(ctx context.Context, state *projectR
 	var httpListOrganizationsResponseBody listOrganizationsResponseBody
 	if err := json.Unmarshal(bodyBytes, &httpListOrganizationsResponseBody); err != nil {
 		return fmt.Errorf("error decoding response: %w", err)
-
 	}
 
 	state.Organizations, _ = types.SetValueFrom(ctx, types.StringType, httpListOrganizationsResponseBody.Data)
-	state.PlannedOrganizations = state.Organizations
 	return nil
 }
 
@@ -472,13 +434,13 @@ func (r *projectResource) ReadResourceRoles(ctx context.Context, state *projectR
 		return fmt.Errorf("failed to parse response from FilesystemListResourceRoles: %w", err)
 	}
 
-	var httpListRoleResources ResourceRolesResponse
-	if err := json.Unmarshal(bodyBytes, &httpListRoleResources); err != nil {
+	var httpListResourceRoles ResourceRolesResponse
+	if err := json.Unmarshal(bodyBytes, &httpListResourceRoles); err != nil {
 		return fmt.Errorf("error decoding response: %w", err)
 	}
 	// Build a slice of attr.Value for the set
-	var roleResourceValues []attr.Value
-	for _, role := range httpListRoleResources.Roles {
+	var resourceRolesValues []attr.Value
+	for _, role := range httpListResourceRoles.Roles {
 		// Build the inner object
 		principalObj, _ := types.ObjectValue(
 			map[string]attr.Type{
@@ -510,11 +472,11 @@ func (r *projectResource) ReadResourceRoles(ctx context.Context, state *projectR
 				"role_id":                 types.StringValue(role.RoleID),
 			},
 		)
-		roleResourceValues = append(roleResourceValues, roleObj)
+		resourceRolesValues = append(resourceRolesValues, roleObj)
 	}
 
 	// Create the set from the slice of attr.Value
-	roleResourcesSet, _ := types.SetValue(
+	resourceRolesSet, _ := types.SetValue(
 		types.ObjectType{
 			AttrTypes: map[string]attr.Type{
 				"resource_role_principal": types.ObjectType{
@@ -527,12 +489,13 @@ func (r *projectResource) ReadResourceRoles(ctx context.Context, state *projectR
 				"role_id": types.StringType,
 			},
 		},
-		roleResourceValues,
+		resourceRolesValues,
 	)
 
 	// Update the state
-	state.RoleResources = roleResourcesSet
-	state.PlannedRoleResources = state.RoleResources
+	if len(resourceRolesValues) > 0 {
+		state.ResourceRoles = resourceRolesSet
+	}
 	return nil
 }
 
@@ -566,13 +529,13 @@ func (r *projectResource) ReadMarkings(ctx context.Context, state *projectResour
 
 	}
 
-	state.Markings, _ = types.SetValueFrom(ctx, types.StringType, httpListMarkingsResponseBody.Data)
-	state.PlannedRoleResources = state.RoleResources
+	if len(httpListMarkingsResponseBody.Data) > 0 {
+		state.Markings, _ = types.SetValueFrom(ctx, types.StringType, httpListMarkingsResponseBody.Data)
+	}
 	return nil
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
-// TODO: add updating project itself to API-GATEWAY and implement here
 func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// Retrieve values from plan
 	var plan projectResourceModel
@@ -592,27 +555,23 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	err := r.UpdateProject(ctx, resp, &plan, &state)
 	if err != nil {
-		resp.Diagnostics.AddError("Error updating the project resource",
-			"Error updating the project resource itself. Since this is the primary resource, nothing has been changed and we can safely return")
+		resp.Diagnostics.AddError("Error updating the Project. Please fix your plan if needed and re-apply", err.Error())
 		return
 	}
 
 	err = r.UpdateProjectMarkings(ctx, &plan, &state)
 	if err != nil {
-		resp.Diagnostics.AddWarning("Error updating the project markings",
-			err.Error())
+		resp.Diagnostics.AddError("Error updating the Project's markings. Please fix your plan if needed and re-apply", err.Error())
 	}
 
 	err = r.UpdateProjectRoles(ctx, &plan, &state)
 	if err != nil {
-		resp.Diagnostics.AddWarning("Error updating the project roles",
-			err.Error())
+		resp.Diagnostics.AddError("Error updating the Project's roles. Please fix your plan if needed and re-apply", err.Error())
 	}
 
 	err = r.UpdateProjectOrganizations(ctx, &plan, &state)
 	if err != nil {
-		resp.Diagnostics.AddWarning("Error updating the project organizations",
-			err.Error())
+		resp.Diagnostics.AddError("Error updating the Project's organizations. Please fix your plan if needed and re-apply", err.Error())
 	}
 
 	diags = resp.State.Set(ctx, state)
@@ -623,7 +582,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 }
 
 func (r *projectResource) UpdateProject(ctx context.Context, resp *resource.UpdateResponse, plan *projectResourceModel, state *projectResourceModel) error {
-	previewMode := true
+	previewMode := constants.PreviewMode
 
 	filesystemReplaceProjectParams := v2.FilesystemReplaceProjectParams{Preview: &previewMode}
 	description := plan.Description.ValueString()
@@ -675,16 +634,20 @@ func (r *projectResource) UpdateProject(ctx context.Context, resp *resource.Upda
 func (r *projectResource) UpdateProjectMarkings(ctx context.Context, plan *projectResourceModel, state *projectResourceModel) error {
 	var oldMarkings []string
 	var newMarkings []string
-	previewMode := true
+	previewMode := constants.PreviewMode
 
-	diags := state.Markings.ElementsAs(ctx, &oldMarkings, false)
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert project markings to Go slice")
+	if !state.Markings.IsNull() {
+		diags := state.Markings.ElementsAs(ctx, &oldMarkings, false)
+		if diags.HasError() {
+			return fmt.Errorf("failed to convert project markings to Go slice")
+		}
 	}
 
-	diags = plan.Markings.ElementsAs(ctx, &newMarkings, false)
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert project markings to Go slice")
+	if !plan.Markings.IsNull() {
+		diags := plan.Markings.ElementsAs(ctx, &newMarkings, false)
+		if diags.HasError() {
+			return fmt.Errorf("failed to convert project markings to Go slice")
+		}
 	}
 
 	if !slices.Equal(oldMarkings, newMarkings) {
@@ -715,13 +678,8 @@ func (r *projectResource) UpdateProjectMarkings(ctx context.Context, plan *proje
 				if err != nil {
 					return fmt.Errorf("failed to format error logging from FilesystemAddMarkings response: %w", err)
 				}
-				if plan.Markings.IsUnknown() {
-					plan.Markings = state.Markings
-				}
-				state.PlannedMarkings = plan.Markings
 				return errors.New(returnString)
 			}
-			plan.Markings = plan.PlannedMarkings
 		}
 		if len(markingsToRemove) != 0 {
 			markingIdsToRemove := make([]v2.CoreMarkingID, len(markingsToRemove))
@@ -748,38 +706,36 @@ func (r *projectResource) UpdateProjectMarkings(ctx context.Context, plan *proje
 				if err != nil {
 					return fmt.Errorf("failed to format error logging from FilesystemRemoveMarkings response: %w", err)
 				}
-				if plan.Markings.IsUnknown() {
-					plan.Markings = state.Markings
-				}
-				state.PlannedMarkings = plan.Markings
 				return errors.New(returnString)
 			}
-			plan.Markings = plan.PlannedMarkings
 		}
 		state.Markings = plan.Markings
 	}
-	state.PlannedMarkings = plan.PlannedMarkings
 	return nil
 }
 
 func (r *projectResource) UpdateProjectRoles(ctx context.Context, plan *projectResourceModel, state *projectResourceModel) error {
-	previewMode := true
-	var oldRoleResources []RoleResource
+	previewMode := constants.PreviewMode
+	var oldResourceRoles []ResourceRole
 
-	diags := state.RoleResources.ElementsAs(ctx, &oldRoleResources, false)
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert project roles to Go slice")
+	if !state.ResourceRoles.IsNull() {
+		diags := state.ResourceRoles.ElementsAs(ctx, &oldResourceRoles, false)
+		if diags.HasError() {
+			return fmt.Errorf("failed to convert project roles to Go slice")
+		}
 	}
 
-	var newRoleResources []RoleResource
-	diags = plan.PlannedRoleResources.ElementsAs(ctx, &newRoleResources, false)
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert project roles to Go slice")
+	var newResourceRoles []ResourceRole
+	if !plan.ResourceRoles.IsNull() {
+		diags := plan.ResourceRoles.ElementsAs(ctx, &newResourceRoles, false)
+		if diags.HasError() {
+			return fmt.Errorf("failed to convert project roles to Go slice")
+		}
 	}
 
-	if !slices.Equal(oldRoleResources, newRoleResources) {
+	if !slices.Equal(oldResourceRoles, newResourceRoles) {
 		// Determine members to add and remove
-		rolesToAdd, rolesToRemove := DiffRoleResources(oldRoleResources, newRoleResources)
+		rolesToAdd, rolesToRemove := DiffResourceRoles(oldResourceRoles, newResourceRoles)
 		if len(rolesToAdd) != 0 {
 			roleUpdates := make([]v2.FilesystemResourceRole, len(rolesToAdd))
 
@@ -829,13 +785,8 @@ func (r *projectResource) UpdateProjectRoles(ctx context.Context, plan *projectR
 				if err != nil {
 					log.Fatal(err)
 				}
-				if plan.RoleResources.IsUnknown() {
-					plan.RoleResources = state.RoleResources
-				}
-				state.PlannedRoleResources = plan.RoleResources
 				return errors.New(returnString)
 			}
-			plan.RoleResources = plan.PlannedRoleResources
 		}
 		if len(rolesToRemove) != 0 {
 			roleUpdates := make([]v2.FilesystemResourceRole, len(rolesToRemove))
@@ -886,21 +837,15 @@ func (r *projectResource) UpdateProjectRoles(ctx context.Context, plan *projectR
 				if err != nil {
 					log.Fatal(err)
 				}
-				if plan.RoleResources.IsUnknown() {
-					plan.RoleResources = state.RoleResources
-				}
-				state.PlannedRoleResources = plan.RoleResources
 				return errors.New(returnString)
 			}
-			plan.RoleResources = plan.PlannedRoleResources
 		}
-		state.RoleResources = plan.RoleResources
+		state.ResourceRoles = plan.ResourceRoles
 	}
-	state.PlannedRoleResources = plan.PlannedRoleResources
 	return nil
 }
 func (r *projectResource) UpdateProjectOrganizations(ctx context.Context, plan *projectResourceModel, state *projectResourceModel) error {
-	previewMode := true
+	previewMode := constants.PreviewMode
 	var oldOrganizations []string
 	var newOrganizations []string
 
@@ -932,13 +877,8 @@ func (r *projectResource) UpdateProjectOrganizations(ctx context.Context, plan *
 				if err != nil {
 					return fmt.Errorf("failed to format error logging from FilesystemAddOrganizations response: %w", err)
 				}
-				if plan.Organizations.IsUnknown() {
-					plan.Organizations = state.Organizations
-				}
-				state.PlannedOrganizations = plan.Organizations
 				return errors.New(returnString)
 			}
-			plan.Organizations = plan.PlannedOrganizations
 		}
 		if len(organizationsToRemove) != 0 {
 			filesystemRemoveOrganizationsParams := v2.FilesystemRemoveOrganizationsParams{Preview: &previewMode}
@@ -956,17 +896,11 @@ func (r *projectResource) UpdateProjectOrganizations(ctx context.Context, plan *
 				if err != nil {
 					return fmt.Errorf("failed to format error logging from FilesystemRemoveOrganizations response: %w", err)
 				}
-				if plan.Organizations.IsUnknown() {
-					plan.Organizations = state.Organizations
-				}
-				state.PlannedOrganizations = plan.Organizations
 				return errors.New(returnString)
 			}
-			plan.Organizations = plan.PlannedOrganizations
 		}
 		state.Organizations = plan.Organizations
 	}
-	state.PlannedOrganizations = plan.PlannedOrganizations
 	return nil
 }
 
@@ -982,8 +916,7 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 	if state.TrashStatus.ValueString() == string(v2.NOTTRASHED) {
 		err := r.DeleteResource(ctx, resp, &state)
 		if err != nil {
-			resp.Diagnostics.AddError("Error deleting the project resource",
-				"Error deleting the project resource")
+			resp.Diagnostics.AddError("Error deleting the Project", err.Error())
 			return
 		}
 	}
@@ -994,18 +927,16 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 	if state.TrashStatus.ValueString() == string(v2.DIRECTLYTRASHED) || state.TrashStatus.ValueString() == string(v2.ANCESTORTRASHED) {
 		err := r.PermanentlyDeleteResource(ctx, resp, &state)
 		if err != nil {
-			resp.Diagnostics.AddError("Error permanently deleting the project resource",
-				"Error permanently deleting the project resource")
+			resp.Diagnostics.AddError("Error permanently deleting the project resource", err.Error())
 		}
 		// we want to return here as we do not want to destroy the resource if the permanent delete fails. since trash_status is a
 		// computed value, we do not need to worry in case it doesn't get persisted in state now as it will on the next read of the resource
 		return
 	}
-
 }
 
 func (r *projectResource) DeleteResource(ctx context.Context, resp *resource.DeleteResponse, state *projectResourceModel) error {
-	previewMode := true
+	previewMode := constants.PreviewMode
 	filesystemDeleteResourceParams := v2.FilesystemDeleteResourceParams{Preview: &previewMode}
 	httpResp, err := r.client.FilesystemDeleteResource(ctx, state.RID.ValueString(), &filesystemDeleteResourceParams)
 
@@ -1029,7 +960,7 @@ func (r *projectResource) DeleteResource(ctx context.Context, resp *resource.Del
 }
 
 func (r *projectResource) PermanentlyDeleteResource(ctx context.Context, resp *resource.DeleteResponse, state *projectResourceModel) error {
-	previewMode := true
+	previewMode := constants.PreviewMode
 	filesystemPermanentlyDeleteResourceParams := v2.FilesystemPermanentlyDeleteResourceParams{Preview: &previewMode}
 	httpResp, err := r.client.FilesystemPermanentlyDeleteResource(ctx, state.RID.ValueString(), &filesystemPermanentlyDeleteResourceParams)
 
@@ -1070,20 +1001,20 @@ func (r *projectResource) ImportState(ctx context.Context, req resource.ImportSt
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("rid"), projectID)...)
 }
 
-func DiffRoleResources(oldRoleResources, newRoleResources []RoleResource) (added, removed []RoleResource) {
-	oldMap := make(map[string]RoleResource)
-	newMap := make(map[string]RoleResource)
+func DiffResourceRoles(oldResourceRoles, newResourceRoles []ResourceRole) (added, removed []ResourceRole) {
+	oldMap := make(map[string]ResourceRole)
+	newMap := make(map[string]ResourceRole)
 
 	// Helper to create a unique key for each RoleResource
-	makeKey := func(r RoleResource) string {
+	makeKey := func(r ResourceRole) string {
 		p := r.ResourceRolePrincipal
 		return r.RoleID + "|" + p.Type + "|" + p.PrincipalID + "|" + p.PrincipalType
 	}
 
-	for _, r := range oldRoleResources {
+	for _, r := range oldResourceRoles {
 		oldMap[makeKey(r)] = r
 	}
-	for _, r := range newRoleResources {
+	for _, r := range newResourceRoles {
 		newMap[makeKey(r)] = r
 	}
 

@@ -23,11 +23,11 @@ description: |-
 resource "foundry_marking" "example-marking" {
   name = "Example marking name"
   category_id="example-marking-category-id"
-  planned_marking_members = ["example-user-id", "example-group-id"]
-  planned_marking_roles = [
+  marking_members = ["example-user-id", "example-group-id"]
+  marking_roles = [
     {
-    role = "ADMINISTER"
-    principal_id="example-user-id"
+      role = "ADMINISTER"
+      principal_id="example-user-id"
     },
     {
       role = "USE"
@@ -42,34 +42,23 @@ resource "foundry_marking" "example-marking" {
 
 ### Required
 
-- `category_id` (String) The ID of a marking category. For user-created categories, this will be a UUID. Markings associated with Organizations are placed in a category with ID "Organization". This field is immutable after creation.
+- `category_id` (String) The ID of a Marking Category. For user-created Categories, this will be a UUID. Markings associated with Organizations are placed in a category with ID "Organization". This field is immutable after creation.
 - `name` (String) Name of the marking.
-- `planned_marking_members` (Set of String) Planned list of the PrincipalIds of the members (users or groups) in this marking
-- `planned_marking_roles` (Set of Object) Planned list of roles assigned to this marking. At least one ADMIN role must be provided. (see [below for nested schema](#nestedatt--planned_marking_roles))
 
 ### Optional
 
 - `description` (String) Description of the marking.
+- `marking_members` (Set of String) List of the IDs of the members (Users or Groups) of this Marking.
+- `marking_roles` (Set of Object) List of role assignments for this Marking. (see [below for nested schema](#nestedatt--marking_roles))
 
 ### Read-Only
 
-- `id` (String) Identifier of the marking.
-- `marking_members` (Set of String) Actual list of the PrincipalIds of the members (users or groups) in this marking, computed after successful addition/removal of marking members
-- `marking_roles` (Set of Object) Actual list of roles assigned to this marking, computed after successful addition/removal of marking roles. (see [below for nested schema](#nestedatt--marking_roles))
-
-<a id="nestedatt--planned_marking_roles"></a>
-### Nested Schema for `planned_marking_roles`
-
-Required:
-
-- `principal_id` (String)
-- `role` (String)
-
+- `id` (String) ID of the Marking.
 
 <a id="nestedatt--marking_roles"></a>
 ### Nested Schema for `marking_roles`
 
-Read-Only:
+Optional:
 
 - `principal_id` (String)
 - `role` (String)

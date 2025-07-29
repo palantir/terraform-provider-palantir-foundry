@@ -18,18 +18,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// markingsResourceModel maps the resource schema data.
 type organizationResourceModel struct {
-	RID                        types.String `tfsdk:"rid"`
-	Name                       types.String `tfsdk:"name"`
-	MarkingID                  types.String `tfsdk:"marking_id"`
-	EnrollmentRID              types.String `tfsdk:"enrollment_rid"`
-	Description                types.String `tfsdk:"description"`
-	HostName                   types.String `tfsdk:"host_name"`
-	PlannedOrganizationMembers types.Set    `tfsdk:"planned_organization_members"`
-	OrganizationMembers        types.Set    `tfsdk:"organization_members"`
-	PlannedOrganizationRoles   types.Set    `tfsdk:"planned_organization_roles"`
-	OrganizationRoles          types.Set    `tfsdk:"organization_roles"`
+	RID                 types.String `tfsdk:"rid"`
+	Name                types.String `tfsdk:"name"`
+	MarkingID           types.String `tfsdk:"marking_id"`
+	EnrollmentRID       types.String `tfsdk:"enrollment_rid"`
+	Description         types.String `tfsdk:"description"`
+	HostName            types.String `tfsdk:"host_name"`
+	OrganizationMembers types.Set    `tfsdk:"organization_members"`
+	OrganizationRoles   types.Set    `tfsdk:"organization_roles"`
 }
 
 // requestBody contains the schema for request body
@@ -43,7 +40,6 @@ type responseBody struct {
 
 type markingMembersResponseBody struct {
 	Data []markingMembersEntry `json:"data"`
-	//next page token whenever i get to it
 }
 
 // this is the same interface as group members, should refactor at some point
@@ -59,10 +55,8 @@ type organizationRolesRequestBodyEntry struct {
 
 type organizationRolesResponseBody struct {
 	Data []organizationRoleEntry `json:"data"`
-	//next page token whenever i get to it
 }
 
-// this is the same interface as group members, should refactor at some point
 type organizationRoleEntry struct {
 	PrincipalID   string `json:"principalId"`
 	PrincipalType string `json:"principalType"`

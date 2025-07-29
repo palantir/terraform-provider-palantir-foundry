@@ -78,55 +78,40 @@ func (r *organizationResource) Metadata(_ context.Context, req resource.Metadata
 // Schema defines the schema for the resource.
 func (r *organizationResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a Foundry organization.",
+		Description: "Manages a Foundry Organization.",
 		Attributes: map[string]schema.Attribute{
 			"rid": schema.StringAttribute{
-				Description: "Resource identifier of the organization.",
+				Description: "RID of the Organization.",
 				Computed:    true,
 			},
 			"name": schema.StringAttribute{
-				Description: "Name of the organization.",
+				Description: "Name of the Organization.",
 				Required:    true,
 			},
 			"marking_id": schema.StringAttribute{
-				Description: "Marking id of the organization",
+				Description: "Marking ID of the Organization.",
 				Computed:    true,
 			},
 			"enrollment_rid": schema.StringAttribute{
-				Description: "The RID of the enrollment this organization belongs to. This field is immutable after creation.",
+				Description: "The RID of the Enrollment this Organization belongs to. This field is immutable after creation.",
 				Required:    true,
 			},
 			"description": schema.StringAttribute{
-				Description: "Description of the organization.",
+				Description: "Description of the Organization.",
 				Optional:    true,
 			},
 			"host_name": schema.StringAttribute{
-				Description: "The primary host name of the Organization. This should be used when constructing URLs for users of this Organization",
+				Description: "The primary host name of the Organization. This should be used when constructing URLs for users of this Organization.",
 				Optional:    true,
-			},
-			"planned_organization_members": schema.SetAttribute{
-				ElementType: types.StringType,
-				Description: "Planned list of the PrincipalIds of the members (users or groups) in this organization.",
-				Required:    true,
 			},
 			"organization_members": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "Actual list of the PrincipalIds of the members (users or groups) in this organization., computed after successful addition/removal of members",
-				Computed:    true,
-			},
-			"planned_organization_roles": schema.SetAttribute{
-				Description: "Planned list of roles assigned to principals for this organization",
-				Required:    true,
-				ElementType: types.ObjectType{
-					AttrTypes: map[string]attr.Type{
-						"role_id":      types.StringType,
-						"principal_id": types.StringType,
-					},
-				},
+				Description: "List of the IDs of the members that belong to this Organization.",
+				Optional:    true,
 			},
 			"organization_roles": schema.SetAttribute{
-				Description: "Actual list of roles assigned to principals for this organization, computed after successful addition/removal of roles",
-				Computed:    true,
+				Description: "List of role assignments for this Organization.",
+				Required:    true,
 				ElementType: types.ObjectType{
 					AttrTypes: map[string]attr.Type{
 						"role_id":      types.StringType,
@@ -149,16 +134,49 @@ func (r *organizationResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	err := r.CreateOrganization(ctx, resp, &plan)
+	// Here, we are parsing out the provided organization roles from the plan. The administrator roles are passed into CreateOrganization so that the organization can be initialized with the administrators. The non-administrator roles are passed into CreateOrganizationNonAdministratorRoles so that they can be added after the organization is created.
+	var allRoles []organizationRolesRequestBodyEntry
+	diags = plan.OrganizationRoles.ElementsAs(ctx, &allRoles, false)
+	if resp.Diagnostics.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
+
+	var adminPrincipalIDs []v2.CorePrincipalID
+	var nonAdminPrincipalIds []v2.CoreRoleAssignmentUpdate
+	for _, role := range allRoles {
+		principalID := role.PrincipalID
+		if role.RoleID == constants.OrganizationAdministratorRoleID {
+			adminPrincipalIDs = append(adminPrincipalIDs, principalID)
+		} else {
+			nonAdminPrincipalIds = append(nonAdminPrincipalIds, v2.CoreRoleAssignmentUpdate{
+				RoleID:      role.RoleID,
+				PrincipalID: role.PrincipalID,
+			})
+		}
+	}
+
+	if len(adminPrincipalIDs) == 0 {
+		resp.Diagnostics.AddError("Error creating the Organization. Please fix your plan if needed and re-apply", "the Organization must have at least one administrator")
+		return
+	}
+
+	err := r.CreateOrganization(ctx, resp, &plan, adminPrincipalIDs)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating the organization resource", "Error creating the organization resource itself. Since this is the primary resource, nothing has been provisioned and we can safely return")
+		resp.Diagnostics.AddError("Error creating the Organization. Please fix your plan if needed and re-apply", err.Error())
 		return
 	}
 
 	err = r.CreateOrganizationMembers(ctx, resp, &plan)
 	if err != nil {
-		resp.Diagnostics.AddWarning("Error creating the organization members", err.Error())
-		resp.Diagnostics.AddWarning("Please fix your plan if needed and re-apply.", "We are throwing a warning here to ensure previous changes are not lost. Please fix your plan if needed and re-apply.")
+		resp.Diagnostics.AddError("Error creating the Organization members. Please fix your plan if needed and re-apply.", err.Error())
+	}
+
+	if len(nonAdminPrincipalIds) > 0 {
+		err = r.CreateOrganizationNonAdministratorRoles(ctx, resp, &plan, nonAdminPrincipalIds)
+		if err != nil {
+			resp.Diagnostics.AddError("Error creating the Organization roles. Please fix your plan if needed and re-apply.", err.Error())
+		}
 	}
 
 	diags = resp.State.Set(ctx, plan)
@@ -168,28 +186,9 @@ func (r *organizationResource) Create(ctx context.Context, req resource.CreateRe
 	}
 }
 
-func (r *organizationResource) CreateOrganization(ctx context.Context, resp *resource.CreateResponse, plan *organizationResourceModel) error {
-	var plannedRoles []organizationRolesRequestBodyEntry
-	diags := plan.PlannedOrganizationRoles.ElementsAs(ctx, &plannedRoles, false)
-	if diags.HasError() {
-		// handle error
-		return fmt.Errorf("failed to convert org roles to Go slice")
-	}
+func (r *organizationResource) CreateOrganization(ctx context.Context, resp *resource.CreateResponse, plan *organizationResourceModel, adminPrincipalIDs []v2.CorePrincipalID) error {
 
-	var adminPrincipalIDs []v2.CorePrincipalID
-	for _, role := range plannedRoles {
-		if role.RoleID == constants.OrganizationAdministratorRoleID {
-			adminCorePrincipalID := role.PrincipalID
-			adminPrincipalIDs = append(adminPrincipalIDs, adminCorePrincipalID)
-		}
-	}
-
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
-		return fmt.Errorf("failed to convert roles to Go slice")
-	}
-
-	previewMode := true
+	previewMode := constants.PreviewMode
 	adminCreateOrganizationParams := v2.AdminCreateOrganizationParams{Preview: &previewMode}
 	description := plan.Description.ValueString()
 	host := plan.HostName.ValueString()
@@ -246,13 +245,12 @@ func (r *organizationResource) CreateOrganization(ctx context.Context, resp *res
 	//set computed values
 	plan.RID = types.StringValue(httpResponseBody.RID)
 	plan.MarkingID = types.StringValue(httpResponseBody.MarkingID)
-	plan.OrganizationRoles = plan.PlannedOrganizationRoles
 	return nil
 }
 
 func (r *organizationResource) CreateOrganizationMembers(ctx context.Context, resp *resource.CreateResponse, plan *organizationResourceModel) error {
 	var plannedOrganizationMembers []v2.CorePrincipalID
-	diags := plan.PlannedOrganizationMembers.ElementsAs(ctx, &plannedOrganizationMembers, false)
+	diags := plan.OrganizationMembers.ElementsAs(ctx, &plannedOrganizationMembers, false)
 	if diags.HasError() {
 		return fmt.Errorf("failed to convert planned group members to Go slice")
 	}
@@ -285,7 +283,29 @@ func (r *organizationResource) CreateOrganizationMembers(ctx context.Context, re
 		}
 		return errors.New(returnString)
 	}
-	plan.OrganizationMembers = plan.PlannedOrganizationMembers
+	return nil
+}
+
+func (r *organizationResource) CreateOrganizationNonAdministratorRoles(ctx context.Context, resp *resource.CreateResponse, plan *organizationResourceModel, nonAdminRoleAssignments []v2.CoreRoleAssignmentUpdate) error {
+	previewMode := constants.PreviewMode
+
+	adminAddOrganizationRoleAssignmentParams := v2.AdminAddOrganizationRoleAssignmentsParams{Preview: &previewMode}
+	httpResp, err := r.client.AdminAddOrganizationRoleAssignments(ctx, plan.RID.ValueString(), &adminAddOrganizationRoleAssignmentParams, v2.AdminAddOrganizationRoleAssignmentsJSONRequestBody{
+		RoleAssignments: &nonAdminRoleAssignments,
+	})
+
+	if err != nil {
+		return fmt.Errorf("AdminAddOrganizationRoleAssignments request failed: %w", err)
+	}
+
+	// Check the response status code
+	if httpResp.StatusCode != http.StatusNoContent {
+		returnString, err := providerError.FormatHTTPError(httpResp)
+		if err != nil {
+			return fmt.Errorf("failed to format error logging from AdminAddOrganizationRoleAssignments response: %w", err)
+		}
+		return errors.New(returnString)
+	}
 	return nil
 }
 
@@ -301,21 +321,18 @@ func (r *organizationResource) Read(ctx context.Context, req resource.ReadReques
 
 	err := r.ReadOrganization(ctx, resp, &state)
 	if err != nil {
-		resp.Diagnostics.AddError("Error reading the organization resource",
-			"Error reading the organization resource itself. Since this is the primary resource, nothing has been changed and we can safely return")
+		resp.Diagnostics.AddError("Error reading the Organization", err.Error())
 		return
 	}
 
 	err = r.ReadOrganizationMembers(ctx, &state)
 	if err != nil {
-		resp.Diagnostics.AddWarning("Error reading the organization members",
-			err.Error())
+		resp.Diagnostics.AddError("Error reading the Organization members", err.Error())
 	}
 
 	err = r.ReadOrganizationRoles(ctx, &state)
 	if err != nil {
-		resp.Diagnostics.AddWarning("Error reading the organization roles",
-			err.Error())
+		resp.Diagnostics.AddError("Error reading the Organization roles", err.Error())
 	}
 
 	// Set refreshed state
@@ -410,8 +427,9 @@ func (r *organizationResource) ReadOrganizationMembers(ctx context.Context, stat
 		markingMembersIds = append(markingMembersIds, markingMember.PrincipalID)
 	}
 
-	state.OrganizationMembers, _ = types.SetValueFrom(ctx, types.StringType, markingMembersIds)
-	state.PlannedOrganizationMembers = state.OrganizationMembers
+	if len(markingMembersIds) != 0 {
+		state.OrganizationMembers, _ = types.SetValueFrom(ctx, types.StringType, markingMembersIds)
+	}
 	return nil
 }
 
@@ -463,9 +481,9 @@ func (r *organizationResource) ReadOrganizationRoles(ctx context.Context, state 
 		roleAssignments = append(roleAssignments, roleAssignment)
 	}
 
-	// Create the set from the list of objects
-	state.OrganizationRoles, _ = types.SetValueFrom(ctx, roleAssignmentType, roleAssignments)
-	state.PlannedOrganizationRoles = state.OrganizationRoles
+	if len(roleAssignments) != 0 {
+		state.OrganizationRoles, _ = types.SetValueFrom(ctx, roleAssignmentType, roleAssignments)
+	}
 	return nil
 }
 
@@ -489,20 +507,18 @@ func (r *organizationResource) Update(ctx context.Context, req resource.UpdateRe
 
 	err := r.UpdateOrganization(ctx, resp, &plan, &state)
 	if err != nil {
-		resp.Diagnostics.AddError("Error updating the organization resource",
-			"Error updating the organization resource itself. Since this is the primary resource, nothing has been changed and we can safely return")
+		resp.Diagnostics.AddError("Error updating the Organization. Please fix your plan if needed and re-apply", err.Error())
 		return
 	}
 
 	err = r.UpdateOrganizationMembers(ctx, &plan, &state)
 	if err != nil {
-		resp.Diagnostics.AddWarning("Error updating the organization members",
-			err.Error())
+		resp.Diagnostics.AddError("Error updating the Organization members. Please fix your plan if needed and re-apply", err.Error())
 	}
 
 	err = r.UpdateOrganizationRoles(ctx, &plan, &state)
 	if err != nil {
-		resp.Diagnostics.AddWarning("Error updating the organization roles",
+		resp.Diagnostics.AddError("Error updating the Organization roles. Please fix your plan if needed and re-apply",
 			err.Error())
 	}
 
@@ -570,14 +586,18 @@ func (r *organizationResource) UpdateOrganizationMembers(ctx context.Context, pl
 	var oldMarkingMembers []string
 	var newMarkingMembers []string
 
-	diags := state.OrganizationMembers.ElementsAs(ctx, &oldMarkingMembers, false)
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert organization members to Go slice")
+	if !state.OrganizationMembers.IsNull() {
+		diags := state.OrganizationMembers.ElementsAs(ctx, &oldMarkingMembers, false)
+		if diags.HasError() {
+			return fmt.Errorf("failed to convert organization members to Go slice")
+		}
 	}
 
-	diags = plan.PlannedOrganizationMembers.ElementsAs(ctx, &newMarkingMembers, false)
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert planned organization members to Go slice")
+	if !plan.OrganizationMembers.IsNull() {
+		diags := plan.OrganizationMembers.ElementsAs(ctx, &newMarkingMembers, false)
+		if diags.HasError() {
+			return fmt.Errorf("failed to convert planned organization members to Go slice")
+		}
 	}
 
 	previewMode := constants.PreviewMode
@@ -604,13 +624,8 @@ func (r *organizationResource) UpdateOrganizationMembers(ctx context.Context, pl
 				if err != nil {
 					return fmt.Errorf("failed to format error logging from AdminAddMarkingMembers response: %w", err)
 				}
-				if plan.OrganizationMembers.IsUnknown() {
-					plan.OrganizationMembers = state.OrganizationMembers
-				}
-				state.PlannedOrganizationMembers = plan.OrganizationMembers
 				return errors.New(returnString)
 			}
-			plan.OrganizationMembers = plan.PlannedOrganizationMembers
 		}
 		if len(membersToRemove) != 0 {
 			adminRemoveMarkingRoleAssignmentsParams := v2.AdminRemoveMarkingMembersParams{Preview: &previewMode}
@@ -628,30 +643,25 @@ func (r *organizationResource) UpdateOrganizationMembers(ctx context.Context, pl
 				if err != nil {
 					return fmt.Errorf("failed to format error logging from AdminRemoveMarkingMembers response: %w", err)
 				}
-				if plan.OrganizationMembers.IsUnknown() {
-					plan.OrganizationMembers = state.OrganizationMembers
-				}
-				state.PlannedOrganizationMembers = plan.OrganizationMembers
 				return errors.New(returnString)
 			}
-			plan.OrganizationMembers = plan.PlannedOrganizationMembers
 		}
 		state.OrganizationMembers = plan.OrganizationMembers
 	}
-	state.PlannedOrganizationMembers = plan.PlannedOrganizationMembers
 	return nil
 }
 
 func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan *organizationResourceModel, state *organizationResourceModel) error {
 
 	var oldOrganizationRoles []organizationRolesRequestBodyEntry
+	var newOrganizationRoles []organizationRolesRequestBodyEntry
+
 	diags := state.OrganizationRoles.ElementsAs(ctx, &oldOrganizationRoles, false)
 	if diags.HasError() {
 		return fmt.Errorf("failed to convert org roles to Go slice")
 	}
 
-	var newOrganizationRoles []organizationRolesRequestBodyEntry
-	diags = plan.PlannedOrganizationRoles.ElementsAs(ctx, &newOrganizationRoles, false)
+	diags = plan.OrganizationRoles.ElementsAs(ctx, &newOrganizationRoles, false)
 	if diags.HasError() {
 		return fmt.Errorf("failed to convert org roles to Go slice")
 	}
@@ -664,8 +674,7 @@ func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan
 		}
 	}
 	if !hasAdmin {
-		state.PlannedOrganizationRoles = plan.PlannedOrganizationRoles
-		return fmt.Errorf("the organization must have at least one administrator")
+		return fmt.Errorf("the Organization must have at least one administrator")
 	}
 
 	previewMode := constants.PreviewMode
@@ -698,13 +707,8 @@ func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan
 				if err != nil {
 					return fmt.Errorf("failed to format error logging from AdminAddOrganizationRoleAssignments response: %w", err)
 				}
-				if plan.OrganizationRoles.IsUnknown() {
-					plan.OrganizationRoles = state.OrganizationRoles
-				}
-				state.PlannedOrganizationRoles = plan.PlannedOrganizationRoles
 				return errors.New(returnString)
 			}
-			plan.OrganizationRoles = plan.PlannedOrganizationRoles
 		}
 		if len(rolesToRemove) != 0 {
 			roleUpdates := make([]v2.CoreRoleAssignmentUpdate, len(rolesToRemove))
@@ -730,17 +734,11 @@ func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan
 				if err != nil {
 					return fmt.Errorf("failed to format error logging from AdminRemoveOrganizationRoleAssignments response: %w", err)
 				}
-				if plan.OrganizationRoles.IsUnknown() {
-					plan.OrganizationRoles = state.OrganizationRoles
-				}
-				state.PlannedOrganizationRoles = plan.PlannedOrganizationRoles
 				return errors.New(returnString)
 			}
-			plan.OrganizationRoles = plan.PlannedOrganizationRoles
 		}
 		state.OrganizationRoles = plan.OrganizationRoles
 	}
-	state.PlannedOrganizationRoles = plan.PlannedOrganizationRoles
 	return nil
 }
 

@@ -80,22 +80,12 @@ func (r *enrollmentResource) Schema(_ context.Context, _ resource.SchemaRequest,
 		Description: "Manages a Foundry Enrollment.",
 		Attributes: map[string]schema.Attribute{
 			"rid": schema.StringAttribute{
-				Description: "Identifier of the Enrollment.",
+				Description: "RID of the Enrollment.",
 				Computed:    true,
-			},
-			"planned_enrollment_roles": schema.SetAttribute{
-				Description: "Planned list of roles assigned to principals for this enrollment",
-				Required:    true,
-				ElementType: types.ObjectType{
-					AttrTypes: map[string]attr.Type{
-						"role_id":      types.StringType,
-						"principal_id": types.StringType,
-					},
-				},
 			},
 			"enrollment_roles": schema.SetAttribute{
-				Description: "Actual list of roles assigned to principals for this enrollment, computed after successful addition/removal of roles",
-				Computed:    true,
+				Description: "List of role assignments for this Enrollment.",
+				Required:    true,
 				ElementType: types.ObjectType{
 					AttrTypes: map[string]attr.Type{
 						"role_id":      types.StringType,
@@ -128,8 +118,7 @@ func (r *enrollmentResource) Read(ctx context.Context, req resource.ReadRequest,
 
 	err := r.ReadEnrollmentRoles(ctx, &state)
 	if err != nil {
-		resp.Diagnostics.AddWarning("Error reading the enrollment roles",
-			err.Error())
+		resp.Diagnostics.AddError("Error reading the Enrollment roles", err.Error())
 	}
 
 	// Set refreshed state
@@ -148,7 +137,6 @@ func (r *enrollmentResource) ReadEnrollmentRoles(ctx context.Context, state *enr
 	if err != nil {
 		return fmt.Errorf("AdminListEnrollmentRoleAssignments request failed: %w", err)
 	}
-
 	// Check the response status code
 	if httpResp.StatusCode != http.StatusOK {
 		returnString, err := providerError.FormatHTTPError(httpResp)
@@ -190,7 +178,6 @@ func (r *enrollmentResource) ReadEnrollmentRoles(ctx context.Context, state *enr
 
 	// Create the set from the list of objects
 	state.EnrollmentRoles, _ = types.SetValueFrom(ctx, roleAssignmentType, roleAssignments)
-	state.PlannedEnrollmentRoles = state.EnrollmentRoles
 	return nil
 }
 
@@ -214,7 +201,7 @@ func (r *enrollmentResource) Update(ctx context.Context, req resource.UpdateRequ
 
 	err := r.UpdateEnrollmentRoles(ctx, &plan, &state)
 	if err != nil {
-		resp.Diagnostics.AddWarning("Error updating the enrollment roles",
+		resp.Diagnostics.AddError("Error updating the Enrollment roles. Please fix your plan if needed and re-apply",
 			err.Error())
 	}
 
@@ -229,13 +216,14 @@ func (r *enrollmentResource) Update(ctx context.Context, req resource.UpdateRequ
 func (r *enrollmentResource) UpdateEnrollmentRoles(ctx context.Context, plan *enrollmentResourceModel, state *enrollmentResourceModel) error {
 
 	var oldEnrollmentRoles []enrollmentRolesRequestBodyEntry
+	var newEnrollmentRoles []enrollmentRolesRequestBodyEntry
+
 	diags := state.EnrollmentRoles.ElementsAs(ctx, &oldEnrollmentRoles, false)
 	if diags.HasError() {
 		return fmt.Errorf("failed to convert enrollment roles to Go slice")
 	}
 
-	var newEnrollmentRoles []enrollmentRolesRequestBodyEntry
-	diags = plan.PlannedEnrollmentRoles.ElementsAs(ctx, &newEnrollmentRoles, false)
+	diags = plan.EnrollmentRoles.ElementsAs(ctx, &newEnrollmentRoles, false)
 	if diags.HasError() {
 		return fmt.Errorf("failed to convert enrollment roles to Go slice")
 	}
@@ -248,8 +236,7 @@ func (r *enrollmentResource) UpdateEnrollmentRoles(ctx context.Context, plan *en
 		}
 	}
 	if !hasAdmin {
-		state.PlannedEnrollmentRoles = plan.PlannedEnrollmentRoles
-		return fmt.Errorf("the enrollment must have at least one administrator")
+		return fmt.Errorf("the Enrollment must have at least one Administrator")
 	}
 
 	previewMode := constants.PreviewMode
@@ -281,13 +268,8 @@ func (r *enrollmentResource) UpdateEnrollmentRoles(ctx context.Context, plan *en
 				if err != nil {
 					return fmt.Errorf("failed to format error logging from AdminAddEnrollmentRoleAssignments response: %w", err)
 				}
-				if plan.EnrollmentRoles.IsUnknown() {
-					plan.EnrollmentRoles = state.EnrollmentRoles
-				}
-				state.PlannedEnrollmentRoles = plan.PlannedEnrollmentRoles
 				return errors.New(returnString)
 			}
-			plan.EnrollmentRoles = plan.PlannedEnrollmentRoles
 		}
 		if len(rolesToRemove) != 0 {
 			roleUpdates := make([]v2.CoreRoleAssignmentUpdate, len(rolesToRemove))
@@ -313,17 +295,12 @@ func (r *enrollmentResource) UpdateEnrollmentRoles(ctx context.Context, plan *en
 				if err != nil {
 					return fmt.Errorf("failed to format error logging from AdminRemoveEnrollmentRoleAssignments response: %w", err)
 				}
-				if plan.EnrollmentRoles.IsUnknown() {
-					plan.EnrollmentRoles = state.EnrollmentRoles
-				}
-				state.PlannedEnrollmentRoles = plan.PlannedEnrollmentRoles
 				return errors.New(returnString)
 			}
-			plan.EnrollmentRoles = plan.PlannedEnrollmentRoles
 		}
+		//if there was a change (and no error thrown), update state to equal plan
 		state.EnrollmentRoles = plan.EnrollmentRoles
 	}
-	state.PlannedEnrollmentRoles = plan.PlannedEnrollmentRoles
 	return nil
 }
 

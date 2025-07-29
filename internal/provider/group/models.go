@@ -19,13 +19,12 @@ import (
 )
 
 type groupResourceModel struct {
-	ID                  types.String `tfsdk:"id"`
-	Name                types.String `tfsdk:"name"`
-	Description         types.String `tfsdk:"description"`
-	Realm               types.String `tfsdk:"realm"`
-	Organizations       types.List   `tfsdk:"organizations"`
-	GroupMembers        types.Set    `tfsdk:"group_members"`
-	PlannedGroupMembers types.Set    `tfsdk:"planned_group_members"`
+	ID            types.String `tfsdk:"id"`
+	Name          types.String `tfsdk:"name"`
+	Description   types.String `tfsdk:"description"`
+	Realm         types.String `tfsdk:"realm"`
+	Organizations types.List   `tfsdk:"organizations"`
+	GroupMembers  types.Set    `tfsdk:"group_members"`
 }
 
 // responseBody contains the schema for response body for groups endpoint
