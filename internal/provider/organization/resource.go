@@ -656,18 +656,14 @@ func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan
 	var oldOrganizationRoles []organizationRolesRequestBodyEntry
 	var newOrganizationRoles []organizationRolesRequestBodyEntry
 
-	if !state.OrganizationRoles.IsNull() {
-		diags := state.OrganizationRoles.ElementsAs(ctx, &oldOrganizationRoles, false)
-		if diags.HasError() {
-			return fmt.Errorf("failed to convert org roles to Go slice")
-		}
+	diags := state.OrganizationRoles.ElementsAs(ctx, &oldOrganizationRoles, false)
+	if diags.HasError() {
+		return fmt.Errorf("failed to convert org roles to Go slice")
 	}
 
-	if !plan.OrganizationRoles.IsNull() {
-		diags := plan.OrganizationRoles.ElementsAs(ctx, &newOrganizationRoles, false)
-		if diags.HasError() {
-			return fmt.Errorf("failed to convert org roles to Go slice")
-		}
+	diags = plan.OrganizationRoles.ElementsAs(ctx, &newOrganizationRoles, false)
+	if diags.HasError() {
+		return fmt.Errorf("failed to convert org roles to Go slice")
 	}
 
 	hasAdmin := false
