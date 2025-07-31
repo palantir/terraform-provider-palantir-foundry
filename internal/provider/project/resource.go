@@ -337,7 +337,6 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 }
 
 func (r *projectResource) ReadProject(ctx context.Context, resp *resource.ReadResponse, state *projectResourceModel) error {
-
 	httpResp, err := r.client.FilesystemGetProject(ctx, state.RID.ValueString())
 
 	if err != nil {

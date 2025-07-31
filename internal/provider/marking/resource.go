@@ -417,16 +417,19 @@ func (r *markingResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	if err := r.UpdateMarking(ctx, resp, &plan, &state); err != nil {
+	err := r.UpdateMarking(ctx, resp, &plan, &state)
+	if err != nil {
 		resp.Diagnostics.AddError("Error updating marking. Please fix your plan if needed and re-apply", err.Error())
 		return
 	}
 
-	if err := r.UpdateMarkingMembers(ctx, &plan, &state); err != nil {
+	err = r.UpdateMarkingMembers(ctx, &plan, &state)
+	if err != nil {
 		resp.Diagnostics.AddError("Error updating marking members. Please fix your plan if needed and re-apply", err.Error())
 	}
 
-	if err := r.UpdateMarkingRoles(ctx, &plan, &state); err != nil {
+	err = r.UpdateMarkingRoles(ctx, &plan, &state)
+	if err != nil {
 		resp.Diagnostics.AddError("Error updating marking roles. Please fix your plan if needed and re-apply", err.Error())
 	}
 
