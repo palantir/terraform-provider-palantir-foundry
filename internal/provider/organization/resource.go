@@ -93,8 +93,8 @@ func (r *organizationResource) Schema(_ context.Context, _ resource.SchemaReques
 				Computed:    true,
 			},
 			"enrollment_rid": schema.StringAttribute{
-				Description: "The RID of the Enrollment this Organization belongs to. This field is immutable after creation.",
-				Required:    true,
+				Description: "The RID of the Enrollment this Organization belongs to. This field required if the resource is created within Terraform, but not necessarily if created outside of Terraform and imported.",
+				Optional:    true,
 			},
 			"description": schema.StringAttribute{
 				Description: "Description of the Organization.",
@@ -535,6 +535,9 @@ func (r *organizationResource) Update(ctx context.Context, req resource.UpdateRe
 }
 
 func (r *organizationResource) UpdateOrganization(ctx context.Context, resp *resource.UpdateResponse, plan *organizationResourceModel, state *organizationResourceModel) error {
+	if state.EnrollmentRID != plan.EnrollmentRID {
+		return fmt.Errorf("you may not change the Enrollment RID of an Organization once it has been created. Please revert your plan to the existing Enrollment RID and re-apply")
+	}
 	previewMode := constants.PreviewMode
 
 	adminReplaceOrganizationParams := v2.AdminReplaceOrganizationParams{Preview: &previewMode}
