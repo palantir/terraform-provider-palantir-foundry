@@ -5445,12 +5445,6 @@ paths:
         schema:
           $ref: "#/components/schemas/Filesystem.ProjectRid"
         example: ri.compass.main.folder.01a79a9d-e293-48db-a585-9ffe221536e8
-      - name: preview
-        in: query
-        description: Enables the use of preview functionality.
-        required: false
-        schema:
-          $ref: "#/components/schemas/Core.PreviewMode"
       responses:
         "200":
           description: OK
@@ -5472,7 +5466,7 @@ paths:
                 updatedTime: 2024-09-25T17:29:35.974Z
       security:
       - BearerAuth: []
-      x-releaseStage: PUBLIC_BETA
+      x-releaseStage: STABLE
     put:
       tags:
       - FilesystemApiService
@@ -6120,6 +6114,171 @@ paths:
       security:
       - BearerAuth: []
       x-releaseStage: PUBLIC_BETA
+    post:
+      tags:
+      - FilesystemApiService
+      description: Creates a new Space.
+      operationId: filesystemCreateSpace
+      parameters:
+      - name: preview
+        in: query
+        description: Enables the use of preview functionality.
+        required: false
+        schema:
+          $ref: "#/components/schemas/Core.PreviewMode"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Filesystem.CreateSpaceRequest"
+            example:
+              defaultRoleSetId: 3181190f-f6b8-4649-90ec-64fa2d847204
+              deletionPolicyOrganizations:
+              - ri.multipass..organization.c30ee6ad-b5e4-4afe-a74f-fe4a289f2faa
+              description: This space is for xyz
+              displayName: My Space
+              enrollmentRid: ri.control-panel.main.customer.466f812b-f974-4478-9d4f-90402cd3def6
+              fileSystemId: hdfs
+              organizations:
+              - ri.multipass..organization.c30ee6ad-b5e4-4afe-a74f-fe4a289f2faa
+              usageAccountRid: ri.resource-policy-manager.global.usage-account.0c91194d-b5e3-4c4f-b96f-7a7f3f50e95c
+        required: true
+      responses:
+        "200":
+          description: The created Space
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Filesystem.Space"
+              example:
+                defaultRoleSetId: 3181190f-f6b8-4649-90ec-64fa2d847204
+                deletionPolicyOrganizations:
+                - ri.multipass..organization.c30ee6ad-b5e4-4afe-a74f-fe4a289f2faa
+                description: This space is for xyz
+                displayName: My Space
+                fileSystemId: hdfs
+                organizations:
+                - ri.multipass..organization.c30ee6ad-b5e4-4afe-a74f-fe4a289f2faa
+                path: /My space-576e4
+                rid: ri.compass.main.folder.c410f510-2937-420e-8ea3-8c9bcb3c1791
+                usageAccountRid: ri.resource-policy-manager.global.usage-account.0c91194d-b5e3-4c4f-b96f-7a7f3f50e95c
+      security:
+      - BearerAuth: []
+      x-releaseStage: PRIVATE_BETA
+  /v2/filesystem/spaces/{spaceRid}:
+    get:
+      tags:
+      - FilesystemApiService
+      description: Get the Space with the specified rid.
+      operationId: filesystemGetSpace
+      parameters:
+      - name: spaceRid
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Filesystem.SpaceRid"
+      - name: preview
+        in: query
+        description: Enables the use of preview functionality.
+        required: false
+        schema:
+          $ref: "#/components/schemas/Core.PreviewMode"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Filesystem.Space"
+              example:
+                defaultRoleSetId: 3181190f-f6b8-4649-90ec-64fa2d847204
+                deletionPolicyOrganizations:
+                - ri.multipass..organization.c30ee6ad-b5e4-4afe-a74f-fe4a289f2faa
+                description: This space is for xyz
+                displayName: My Space
+                fileSystemId: hdfs
+                organizations:
+                - ri.multipass..organization.c30ee6ad-b5e4-4afe-a74f-fe4a289f2faa
+                path: /My space-576e4
+                rid: ri.compass.main.folder.c410f510-2937-420e-8ea3-8c9bcb3c1791
+                usageAccountRid: ri.resource-policy-manager.global.usage-account.0c91194d-b5e3-4c4f-b96f-7a7f3f50e95c
+      security:
+      - BearerAuth: []
+      x-releaseStage: PRIVATE_BETA
+    put:
+      tags:
+      - FilesystemApiService
+      description: Replace the Space with the specified rid.
+      operationId: filesystemReplaceSpace
+      parameters:
+      - name: spaceRid
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Filesystem.SpaceRid"
+      - name: preview
+        in: query
+        description: Enables the use of preview functionality.
+        required: false
+        schema:
+          $ref: "#/components/schemas/Core.PreviewMode"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Filesystem.ReplaceSpaceRequest"
+            example:
+              defaultRoleSetId: 3181190f-f6b8-4649-90ec-64fa2d847204
+              description: This space is for xyz
+              displayName: My Space
+              usageAccountRid: ri.resource-policy-manager.global.usage-account.0c91194d-b5e3-4c4f-b96f-7a7f3f50e95c
+        required: true
+      responses:
+        "200":
+          description: The replaced Space
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Filesystem.Space"
+              example:
+                defaultRoleSetId: 3181190f-f6b8-4649-90ec-64fa2d847204
+                deletionPolicyOrganizations:
+                - ri.multipass..organization.c30ee6ad-b5e4-4afe-a74f-fe4a289f2faa
+                description: This space is for xyz
+                displayName: My Space
+                fileSystemId: hdfs
+                organizations:
+                - ri.multipass..organization.c30ee6ad-b5e4-4afe-a74f-fe4a289f2faa
+                path: /My space-576e4
+                rid: ri.compass.main.folder.c410f510-2937-420e-8ea3-8c9bcb3c1791
+                usageAccountRid: ri.resource-policy-manager.global.usage-account.0c91194d-b5e3-4c4f-b96f-7a7f3f50e95c
+      security:
+      - BearerAuth: []
+      x-releaseStage: PRIVATE_BETA
+    delete:
+      tags:
+      - FilesystemApiService
+      description: |
+        Delete the space. This will only work if the Space is empty, meaning any Projects or Resources have been deleted first.
+      operationId: filesystemDeleteSpace
+      parameters:
+      - name: spaceRid
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Filesystem.SpaceRid"
+      - name: preview
+        in: query
+        description: Enables the use of preview functionality.
+        required: false
+        schema:
+          $ref: "#/components/schemas/Core.PreviewMode"
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      x-releaseStage: PRIVATE_BETA
   /v2/functions/queries/getByRid:
     post:
       tags:
@@ -10745,6 +10904,121 @@ paths:
       security:
       - BearerAuth: []
       x-releaseStage: STABLE
+  /v2/ontologies/{ontology}/valueTypes:
+    get:
+      tags:
+      - OntologiesApiService
+      description: |
+        Lists the latest versions of the value types for the given Ontology.
+      operationId: ontologiesListOntologyValueTypes
+      parameters:
+      - name: ontology
+        in: path
+        description: |
+          The API name of the ontology. To find the API name, use the **List ontologies** endpoint or
+          check the **Ontology Manager**.
+        required: true
+        schema:
+          $ref: "#/components/schemas/Ontologies.OntologyIdentifier"
+        example: palantir
+      - name: preview
+        in: query
+        description: |
+          A boolean flag that, when set to true, enables the use of beta features in preview mode.
+        required: false
+        schema:
+          $ref: "#/components/schemas/Core.PreviewMode"
+      responses:
+        "200":
+          description: Success response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ontologies.ListOntologyValueTypesResponse"
+              example:
+                data:
+                - apiName: validNorthAmericanCountries
+                  constraints:
+                  - enum:
+                      options:
+                      - USA
+                      - Mexico
+                      - Canada
+                    type: enum
+                  description: Options for valid countries in North America
+                  displayName: Valid North American Countries
+                  fieldType: string
+                  rid: ri.type-registry.main.value-type.f5ee06ef-6dfd-4d91-a01e-91bd457c719d
+                  status: ACTIVE
+                - apiName: countyCode
+                  constraints:
+                  - length:
+                      maximumLength: 3
+                      minimumLength: 3
+                    type: length
+                  description: A three letter code for a US County.
+                  displayName: County Code
+                  fieldType: string
+                  rid: ri.type-registry.main.value-type.f5ee06ef-6dfd-4d91-a01e-91bd457c8232
+                  status: ACTIVE
+      security:
+      - BearerAuth: []
+      x-releaseStage: PRIVATE_BETA
+  /v2/ontologies/{ontology}/valueTypes/{valueType}:
+    get:
+      tags:
+      - OntologiesApiService
+      description: |
+        Gets a specific value type with the given API name.
+      operationId: ontologiesGetOntologyValueType
+      parameters:
+      - name: ontology
+        in: path
+        description: |
+          The API name of the ontology. To find the API name, use the **List ontologies** endpoint or
+          check the **Ontology Manager**.
+        required: true
+        schema:
+          $ref: "#/components/schemas/Ontologies.OntologyIdentifier"
+        example: palantir
+      - name: valueType
+        in: path
+        description: |
+          The API name of the value type. To find the API name, use the **List value types** endpoint or
+          check the **Ontology Manager**.
+        required: true
+        schema:
+          $ref: "#/components/schemas/Ontologies.ValueTypeApiName"
+        example: countryCode
+      - name: preview
+        in: query
+        description: |
+          A boolean flag that, when set to true, enables the use of beta features in preview mode.
+        required: false
+        schema:
+          $ref: "#/components/schemas/Core.PreviewMode"
+      responses:
+        "200":
+          description: Success response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ontologies.OntologyValueType"
+              example:
+                apiName: countryInitials
+                constraints:
+                - length:
+                    maximumLength: 3
+                    minimumLength: 3
+                  type: length
+                description: A three letter code for a top-level administrative region
+                displayName: Country Initials
+                fieldType: string
+                rid: ri.type-registry.main.value-type.f5ee06ef-6dfd-4d91-a01e-91bd457c719d
+                status: ACTIVE
+      security:
+      - BearerAuth: []
+      x-releaseStage: PRIVATE_BETA
   /v2/operations/{operationId}:
     get:
       tags:
@@ -21596,6 +21870,14 @@ components:
       properties:
         type:
           type: string
+    Core.BranchMetadata:
+      required:
+      - rid
+      type: object
+      properties:
+        rid:
+          $ref: "#/components/schemas/Core.FoundryBranch"
+      description: Metadata about a Foundry branch.
     Core.BuildRid:
       type: string
       description: The RID of a Build.
@@ -25376,6 +25658,67 @@ components:
           - principalId: f05f8da4-b84c-4fca-9c77-8af0b13d11de
             principalType: GROUP
         spaceRid: ri.compass.main.folder.a86ad5f5-3db5-48e4-9fdd-00aa3e5731ca
+    Filesystem.CreateSpacePermissionDenied:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - PERMISSION_DENIED
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          type: object
+      description: Could not create the Space.
+    Filesystem.CreateSpaceRequest:
+      required:
+      - displayName
+      - enrollmentRid
+      type: object
+      properties:
+        defaultRoleSetId:
+          $ref: "#/components/schemas/Core.RoleSetId"
+        deletionPolicyOrganizations:
+          type: array
+          description: |
+            By default, this Space will use a Last Out deletion policy, meaning that this Space and its projects will be deleted when the last Organization listed here is deleted. Only Organizations in the Space's Enrollment can be included here.
+          items:
+            $ref: "#/components/schemas/Core.OrganizationRid"
+        description:
+          type: string
+          description: The description of the Space.
+          example: This space is for xyz
+        displayName:
+          $ref: "#/components/schemas/Filesystem.ResourceDisplayName"
+        enrollmentRid:
+          $ref: "#/components/schemas/Core.EnrollmentRid"
+        fileSystemId:
+          $ref: "#/components/schemas/Filesystem.FileSystemId"
+        organizations:
+          type: array
+          description: |
+            The list of Organizations that are provisioned access to this Space. In order to access this Space, a user must be a member of at least one of these Organizations.
+          items:
+            $ref: "#/components/schemas/Core.OrganizationRid"
+        usageAccountRid:
+          $ref: "#/components/schemas/Filesystem.UsageAccountRid"
+      example:
+        defaultRoleSetId: 3181190f-f6b8-4649-90ec-64fa2d847204
+        deletionPolicyOrganizations:
+        - ri.multipass..organization.c30ee6ad-b5e4-4afe-a74f-fe4a289f2faa
+        description: This space is for xyz
+        displayName: My Space
+        enrollmentRid: ri.control-panel.main.customer.466f812b-f974-4478-9d4f-90402cd3def6
+        fileSystemId: hdfs
+        organizations:
+        - ri.multipass..organization.c30ee6ad-b5e4-4afe-a74f-fe4a289f2faa
+        usageAccountRid: ri.resource-policy-manager.global.usage-account.0c91194d-b5e3-4c4f-b96f-7a7f3f50e95c
     Filesystem.DefaultRolesNotInSpaceRoleSet:
       required:
       - errorName
@@ -25418,6 +25761,53 @@ components:
             resourceRid:
               $ref: "#/components/schemas/Filesystem.ResourceRid"
       description: Could not delete the Resource.
+    Filesystem.DeleteSpacePermissionDenied:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - PERMISSION_DENIED
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          required:
+          - spaceRid
+          type: object
+          properties:
+            spaceRid:
+              $ref: "#/components/schemas/Filesystem.SpaceRid"
+      description: Could not delete the Space.
+    Filesystem.EnrollmentNotFound:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - NOT_FOUND
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          required:
+          - enrollmentRid
+          type: object
+          properties:
+            enrollmentRid:
+              $ref: "#/components/schemas/Core.EnrollmentRid"
+      description: |
+        An enrollment was not found for the user.
     Filesystem.Everyone:
       required:
       - type
@@ -26003,7 +26393,10 @@ components:
           $ref: "#/components/schemas/Core.PageToken"
       example:
         data:
-        - description: This space is for xyz
+        - defaultRoleSetId: 3181190f-f6b8-4649-90ec-64fa2d847204
+          deletionPolicyOrganizations:
+          - ri.multipass..organization.c30ee6ad-b5e4-4afe-a74f-fe4a289f2faa
+          description: This space is for xyz
           displayName: My Space
           fileSystemId: hdfs
           organizations:
@@ -26607,6 +27000,68 @@ components:
       example:
         description: project description
         displayName: My Important Project
+    Filesystem.ReplaceSpacePermissionDenied:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - PERMISSION_DENIED
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          required:
+          - spaceRid
+          type: object
+          properties:
+            spaceRid:
+              $ref: "#/components/schemas/Filesystem.SpaceRid"
+      description: Could not replace the Space.
+    Filesystem.ReplaceSpaceRequest:
+      required:
+      - displayName
+      type: object
+      properties:
+        defaultRoleSetId:
+          $ref: "#/components/schemas/Core.RoleSetId"
+        description:
+          type: string
+          description: The description of the Space.
+          example: This space is for xyz
+        displayName:
+          $ref: "#/components/schemas/Filesystem.ResourceDisplayName"
+        usageAccountRid:
+          $ref: "#/components/schemas/Filesystem.UsageAccountRid"
+      example:
+        defaultRoleSetId: 3181190f-f6b8-4649-90ec-64fa2d847204
+        description: This space is for xyz
+        displayName: My Space
+        usageAccountRid: ri.resource-policy-manager.global.usage-account.0c91194d-b5e3-4c4f-b96f-7a7f3f50e95c
+    Filesystem.ReservedSpaceCannotBeReplaced:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - INVALID_ARGUMENT
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          type: object
+      description: |
+        The spaceRid provided is for a reserved space in Foundry which cannot be replaced.
     Filesystem.Resource:
       required:
       - createdBy
@@ -26910,13 +27365,48 @@ components:
             resourceRid:
               $ref: "#/components/schemas/Filesystem.ResourceRid"
       description: Could not restore the Resource.
+    Filesystem.RoleSetNotFound:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - NOT_FOUND
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          required:
+          - roleSetRid
+          type: object
+          properties:
+            roleSetRid:
+              $ref: "#/components/schemas/Core.RoleSetId"
+      description: |
+        The role set provided in the request to create or replace a space could not be found.
     Filesystem.Space:
       required:
+      - defaultRoleSetId
       - displayName
+      - fileSystemId
       - path
       - rid
+      - usageAccountRid
       type: object
       properties:
+        defaultRoleSetId:
+          $ref: "#/components/schemas/Core.RoleSetId"
+        deletionPolicyOrganizations:
+          type: array
+          description: |
+            By default, this Space will use a Last Out deletion policy, meaning that this Space and its projects will be deleted when the last Organization listed here is deleted. Only Organizations in the Space's Enrollment can be included here.
+          items:
+            $ref: "#/components/schemas/Core.OrganizationRid"
         description:
           type: string
           description: The description of the Space.
@@ -26927,6 +27417,8 @@ components:
           $ref: "#/components/schemas/Filesystem.FileSystemId"
         organizations:
           type: array
+          description: |
+            The list of Organizations that are provisioned access to this Space. In order to access this Space, a user must be a member of at least one of these Organizations.
           items:
             $ref: "#/components/schemas/Core.OrganizationRid"
         path:
@@ -26936,6 +27428,9 @@ components:
         usageAccountRid:
           $ref: "#/components/schemas/Filesystem.UsageAccountRid"
       example:
+        defaultRoleSetId: 3181190f-f6b8-4649-90ec-64fa2d847204
+        deletionPolicyOrganizations:
+        - ri.multipass..organization.c30ee6ad-b5e4-4afe-a74f-fe4a289f2faa
         description: This space is for xyz
         displayName: My Space
         fileSystemId: hdfs
@@ -26944,6 +27439,86 @@ components:
         path: /My space-576e4
         rid: ri.compass.main.folder.c410f510-2937-420e-8ea3-8c9bcb3c1791
         usageAccountRid: ri.resource-policy-manager.global.usage-account.0c91194d-b5e3-4c4f-b96f-7a7f3f50e95c
+    Filesystem.SpaceInternalError:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - INTERNAL
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          type: object
+      description: An internal error occurred when trying to create or replace the
+        space.
+    Filesystem.SpaceInvalidArgument:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - INVALID_ARGUMENT
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          type: object
+      description: An invalid argument was provided in the request to create or replace
+        a space.
+    Filesystem.SpaceNameInvalid:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - INVALID_ARGUMENT
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          type: object
+      description: |
+        The provided space name is invalid. It may be a reserved name or contain invalid characters.
+    Filesystem.SpaceNotEmpty:
+      required:
+      - errorName
+      - errorCode
+      - parameters
+      properties:
+        errorCode:
+          type: string
+          enum:
+          - INTERNAL
+        errorInstanceId:
+          type: string
+          format: uuid
+        errorName:
+          type: string
+        parameters:
+          required:
+          - spaceRid
+          type: object
+          properties:
+            spaceRid:
+              $ref: "#/components/schemas/Filesystem.SpaceRid"
+      description: The space cannot be deleted because it contains resources.
     Filesystem.SpaceNotFound:
       required:
       - errorName
@@ -26966,7 +27541,7 @@ components:
           properties:
             spaceRid:
               $ref: "#/components/schemas/Filesystem.SpaceRid"
-      description: The referenced space cannot be found.
+      description: The given Space could not be found.
     Filesystem.SpaceRid:
       type: string
       description: The unique resource identifier (RID) of a Space.
@@ -32380,6 +32955,13 @@ components:
           description: The list of Ontologies the user has access to.
           items:
             $ref: "#/components/schemas/Ontologies.OntologyV2"
+    Ontologies.ListOntologyValueTypesResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Ontologies.OntologyValueType"
     Ontologies.ListOutgoingInterfaceLinkTypesResponse:
       type: object
       properties:
@@ -32487,6 +33069,8 @@ components:
           description: |
             A flag to exclude the retrieval of the `$rid` property.
             Setting this to true may improve performance of this endpoint for object types in OSV2.
+        includeComputeUsage:
+          $ref: "#/components/schemas/Core.IncludeComputeUsage"
         objectSet:
           $ref: "#/components/schemas/Ontologies.ObjectSet"
         orderBy:
@@ -32513,6 +33097,8 @@ components:
       - totalCount
       type: object
       properties:
+        computeUsage:
+          $ref: "#/components/schemas/Core.ComputeSeconds"
         data:
           type: array
           description: The list of objects in the current page.
@@ -34299,6 +34885,8 @@ components:
           type: object
           additionalProperties:
             $ref: "#/components/schemas/Ontologies.ActionTypeV2"
+        branch:
+          $ref: "#/components/schemas/Core.BranchMetadata"
         interfaceTypes:
           type: object
           additionalProperties:
@@ -34550,6 +35138,7 @@ components:
       required:
       - apiName
       - displayName
+      - fieldType
       - rid
       - version
       type: object
@@ -34565,7 +35154,7 @@ components:
         displayName:
           $ref: "#/components/schemas/Core.DisplayName"
         fieldType:
-          $ref: "#/components/schemas/Ontologies.ObjectPropertyType"
+          $ref: "#/components/schemas/Ontologies.ValueTypeFieldType"
         rid:
           $ref: "#/components/schemas/Ontologies.ValueTypeRid"
         status:
@@ -37434,6 +38023,15 @@ components:
     Ontologies.ValueTypeApiName:
       type: string
       description: The name of the value type in the API in camelCase format.
+    Ontologies.ValueTypeArrayType:
+      required:
+      - type
+      type: object
+      properties:
+        subType:
+          $ref: "#/components/schemas/Ontologies.ValueTypeFieldType"
+        type:
+          type: string
     Ontologies.ValueTypeConstraint:
       discriminator:
         propertyName: type
@@ -37455,6 +38053,65 @@ components:
       - $ref: "#/components/schemas/Ontologies.RidConstraint"
       - $ref: "#/components/schemas/Ontologies.UuidConstraint"
       - $ref: "#/components/schemas/Ontologies.EnumConstraint"
+    Ontologies.ValueTypeDecimalType:
+      required:
+      - type
+      type: object
+      properties:
+        type:
+          type: string
+    Ontologies.ValueTypeFieldType:
+      discriminator:
+        propertyName: type
+        mapping:
+          array: "#/components/schemas/Ontologies.ValueTypeArrayType"
+          binary: "#/components/schemas/Core.BinaryType"
+          boolean: "#/components/schemas/Core.BooleanType"
+          byte: "#/components/schemas/Core.ByteType"
+          date: "#/components/schemas/Core.DateType"
+          decimal: "#/components/schemas/Ontologies.ValueTypeDecimalType"
+          double: "#/components/schemas/Core.DoubleType"
+          float: "#/components/schemas/Core.FloatType"
+          integer: "#/components/schemas/Core.IntegerType"
+          long: "#/components/schemas/Core.LongType"
+          map: "#/components/schemas/Ontologies.ValueTypeMapType"
+          optional: "#/components/schemas/Ontologies.ValueTypeOptionalType"
+          reference: "#/components/schemas/Ontologies.ValueTypeReferenceType"
+          short: "#/components/schemas/Core.ShortType"
+          string: "#/components/schemas/Core.StringType"
+          struct: "#/components/schemas/Ontologies.ValueTypeStructType"
+          timestamp: "#/components/schemas/Core.TimestampType"
+          union: "#/components/schemas/Ontologies.ValueTypeUnionType"
+      oneOf:
+      - $ref: "#/components/schemas/Core.DateType"
+      - $ref: "#/components/schemas/Ontologies.ValueTypeStructType"
+      - $ref: "#/components/schemas/Core.StringType"
+      - $ref: "#/components/schemas/Core.ByteType"
+      - $ref: "#/components/schemas/Core.DoubleType"
+      - $ref: "#/components/schemas/Ontologies.ValueTypeOptionalType"
+      - $ref: "#/components/schemas/Core.IntegerType"
+      - $ref: "#/components/schemas/Ontologies.ValueTypeUnionType"
+      - $ref: "#/components/schemas/Core.FloatType"
+      - $ref: "#/components/schemas/Core.LongType"
+      - $ref: "#/components/schemas/Ontologies.ValueTypeReferenceType"
+      - $ref: "#/components/schemas/Core.BooleanType"
+      - $ref: "#/components/schemas/Ontologies.ValueTypeArrayType"
+      - $ref: "#/components/schemas/Core.BinaryType"
+      - $ref: "#/components/schemas/Core.ShortType"
+      - $ref: "#/components/schemas/Ontologies.ValueTypeDecimalType"
+      - $ref: "#/components/schemas/Ontologies.ValueTypeMapType"
+      - $ref: "#/components/schemas/Core.TimestampType"
+    Ontologies.ValueTypeMapType:
+      required:
+      - type
+      type: object
+      properties:
+        keyType:
+          $ref: "#/components/schemas/Ontologies.ValueTypeFieldType"
+        type:
+          type: string
+        valueType:
+          $ref: "#/components/schemas/Ontologies.ValueTypeFieldType"
     Ontologies.ValueTypeNotFound:
       required:
       - errorName
@@ -37479,6 +38136,22 @@ components:
               $ref: "#/components/schemas/Ontologies.ValueTypeApiName"
       description: "The value type is not found, or the user does not have access\
         \ to it."
+    Ontologies.ValueTypeOptionalType:
+      required:
+      - type
+      type: object
+      properties:
+        type:
+          type: string
+        wrappedType:
+          $ref: "#/components/schemas/Ontologies.ValueTypeFieldType"
+    Ontologies.ValueTypeReferenceType:
+      required:
+      - type
+      type: object
+      properties:
+        type:
+          type: string
     Ontologies.ValueTypeRid:
       type: string
     Ontologies.ValueTypeStatus:
@@ -37486,6 +38159,35 @@ components:
       enum:
       - ACTIVE
       - DEPRECATED
+    Ontologies.ValueTypeStructField:
+      type: object
+      properties:
+        fieldType:
+          $ref: "#/components/schemas/Ontologies.ValueTypeFieldType"
+        name:
+          $ref: "#/components/schemas/Core.StructFieldName"
+    Ontologies.ValueTypeStructType:
+      required:
+      - type
+      type: object
+      properties:
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/Ontologies.ValueTypeStructField"
+        type:
+          type: string
+    Ontologies.ValueTypeUnionType:
+      required:
+      - type
+      type: object
+      properties:
+        memberTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Ontologies.ValueTypeFieldType"
+        type:
+          type: string
     Ontologies.VersionedQueryTypeApiName:
       type: string
       description: |
