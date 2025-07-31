@@ -325,6 +325,11 @@ func (r *organizationResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
+	if resp.Diagnostics.Warnings().Contains(providerError.ResourceNotFoundWarning(state.RID.ValueString(), "Organization")) {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	err = r.ReadOrganizationMembers(ctx, &state)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading the Organization members", err.Error())
@@ -356,8 +361,8 @@ func (r *organizationResource) ReadOrganization(ctx context.Context, resp *resou
 
 	if httpResp.StatusCode != http.StatusOK {
 		if httpResp.StatusCode == http.StatusNotFound {
-			resp.State.RemoveResource(ctx)
-			return fmt.Errorf("organization not found, removing resource from Terraform state: %w", err)
+			resp.Diagnostics.Append(providerError.ResourceNotFoundWarning(state.RID.ValueString(), "Organization"))
+			return nil
 		}
 		returnString, err := providerError.FormatHTTPError(httpResp)
 		if err != nil {

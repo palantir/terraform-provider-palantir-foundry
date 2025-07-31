@@ -147,9 +147,11 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	err = r.CreateProjectMarkings(ctx, resp, &plan)
-	if err != nil {
-		resp.Diagnostics.AddError("Error creating the Project markings. Please fix your plan if needed and re-apply.", err.Error())
+	if !plan.Markings.IsNull() {
+		err = r.CreateProjectMarkings(ctx, resp, &plan)
+		if err != nil {
+			resp.Diagnostics.AddError("Error creating the Project markings. Please fix your plan if needed and re-apply.", err.Error())
+		}
 	}
 
 	diags = resp.State.Set(ctx, plan)
@@ -306,6 +308,11 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
+	if resp.Diagnostics.Warnings().Contains(providerError.ResourceNotFoundWarning(state.RID.ValueString(), "Project")) {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	err = r.ReadOrganizations(ctx, &state)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading the Project's Organizations.", err.Error())
@@ -330,10 +337,8 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 }
 
 func (r *projectResource) ReadProject(ctx context.Context, resp *resource.ReadResponse, state *projectResourceModel) error {
-	previewMode := constants.PreviewMode
-	filesystemGetProjectParams := v2.FilesystemGetProjectParams{Preview: &previewMode}
 
-	httpResp, err := r.client.FilesystemGetProject(ctx, state.RID.ValueString(), &filesystemGetProjectParams)
+	httpResp, err := r.client.FilesystemGetProject(ctx, state.RID.ValueString())
 
 	if err != nil {
 		resp.Diagnostics.AddError("FilesystemGetProject request failed", err.Error())
@@ -343,8 +348,8 @@ func (r *projectResource) ReadProject(ctx context.Context, resp *resource.ReadRe
 	// Check the response status code
 	if httpResp.StatusCode != http.StatusOK {
 		if httpResp.StatusCode == http.StatusNotFound {
-			resp.State.RemoveResource(ctx)
-			return fmt.Errorf("project not found, removing resource from Terraform state: %w", err)
+			resp.Diagnostics.Append(providerError.ResourceNotFoundWarning(state.RID.ValueString(), "Project"))
+			return nil
 		}
 		returnString, err := providerError.FormatHTTPError(httpResp)
 		if err != nil {
