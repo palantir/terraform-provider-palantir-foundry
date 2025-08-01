@@ -371,7 +371,7 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
-	//TEMPORARY: throw error if Group name, description, or organizations are changed until this is supported
+	//TODO (epanjwani): remove this temporary check preventing updates to a group's name, description or organizations once upstream endpoint is available
 
 	if (plan.Name != state.Name) || (plan.Description != state.Description) || !plan.Organizations.Equal(state.Organizations) {
 		resp.Diagnostics.AddError("Updating a Group's name, description or organizations in currently unsupported in Terraform.", "Updating a Group's name, description or organizations in currently unsupported in Terraform. Please revert the changes in your plan and re-apply")
