@@ -114,7 +114,7 @@ func (r *spaceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 			},
 			"deletion_policy_organizations": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "By default, this Space will use a Last Out deletion policy, meaning that this Space and its projects will be deleted when the last Organization listed here is deleted. Only Organizations in the Space's Enrollment can be included here.",
+				Description: "By default, this Space will use a Last Out deletion policy, meaning that this Space and its projects will be deleted when the last Organization listed here is deleted.",
 				Required:    true,
 			},
 			"default_role_set_id": schema.StringAttribute{

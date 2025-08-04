@@ -34,7 +34,7 @@ resource "foundry_space" "example-space" {
 
 ### Required
 
-- `deletion_policy_organizations` (Set of String) By default, this Space will use a Last Out deletion policy, meaning that this Space and its projects will be deleted when the last Organization listed here is deleted. Only Organizations in the Space's Enrollment can be included here.
+- `deletion_policy_organizations` (Set of String) By default, this Space will use a Last Out deletion policy, meaning that this Space and its projects will be deleted when the last Organization listed here is deleted.
 - `display_name` (String) Display name of the Space.
 - `organizations` (Set of String) List of the RIDs of the Organizations that are provisioned access to this Space. In order to access this Space, a user must be a member of at least one of these Organizations.
 
