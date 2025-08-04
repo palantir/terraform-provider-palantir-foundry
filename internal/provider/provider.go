@@ -32,6 +32,7 @@ import (
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/marking"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/organization"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/project"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/space"
 )
 
 // Ensure the implementation satisfies the expected interfaces
@@ -195,5 +196,6 @@ func (p *FoundryProvider) Resources(_ context.Context) []func() resource.Resourc
 		marking.NewMarkingResource,
 		organization.NewOrganizationResource,
 		project.NewProjectResource,
+		space.NewSpaceResource,
 	}
 }
