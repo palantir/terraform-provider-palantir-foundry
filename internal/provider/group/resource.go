@@ -246,14 +246,18 @@ func (r *groupResource) Read(ctx context.Context, req resource.ReadRequest, resp
 
 	err := r.ReadGroup(ctx, resp, &state)
 	if err != nil {
-		resp.Diagnostics.AddError("Error reading the group resource",
-			"Error reading the group resource itself. Since this is the primary resource, nothing has been changed and we can safely return")
+		resp.Diagnostics.AddError("Error reading the Group resource", err.Error())
 		return
 	}
+
+	if resp.Diagnostics.Warnings().Contains(providerError.ResourceNotFoundWarning(state.ID.ValueString(), "Group")) {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	err = r.ReadGroupMembers(ctx, resp, &state)
 	if err != nil {
-		resp.Diagnostics.AddWarning("Error reading the group members",
-			err.Error())
+		resp.Diagnostics.AddError("Error reading the Group members", err.Error())
 	}
 
 	// Set refreshed state
@@ -274,8 +278,8 @@ func (r *groupResource) ReadGroup(ctx context.Context, resp *resource.ReadRespon
 	// Check the response status code
 	if httpResp.StatusCode != http.StatusOK {
 		if httpResp.StatusCode == http.StatusNotFound {
-			resp.State.RemoveResource(ctx)
-			return fmt.Errorf("group not found, removing resource from Terraform state: %w", err)
+			resp.Diagnostics.Append(providerError.ResourceNotFoundWarning(state.ID.ValueString(), "Group"))
+			return nil
 		}
 		returnString, err := providerError.FormatHTTPError(httpResp)
 		if err != nil {
@@ -367,12 +371,16 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
+	//TODO (epanjwani): remove this temporary check preventing updates to a group's name, description or organizations once upstream endpoint is available
+
+	if (plan.Name != state.Name) || (plan.Description != state.Description) || !plan.Organizations.Equal(state.Organizations) {
+		resp.Diagnostics.AddError("Updating a Group's name, description or organizations in currently unsupported in Terraform.", "Updating a Group's name, description or organizations in currently unsupported in Terraform. Please revert the changes in your plan and re-apply")
+		return
+	}
+
 	err := r.UpdateGroupMembers(ctx, &plan, &state)
 	if err != nil {
-		resp.Diagnostics.AddWarning("Error updating the group members",
-			err.Error())
-		resp.Diagnostics.AddWarning("Please fix your plan if needed and re-apply.",
-			"We are throwing a warning here to ensure previous changes are not lost. Please fix your plan if needed and re-apply.")
+		resp.Diagnostics.AddError("Error updating the Group members. Please fix your plan if needed and re-apply", err.Error())
 	}
 
 	diags = resp.State.Set(ctx, state)

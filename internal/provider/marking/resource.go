@@ -239,6 +239,11 @@ func (r *markingResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
+	if resp.Diagnostics.Warnings().Contains(providerError.ResourceNotFoundWarning(state.ID.ValueString(), "Marking")) {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	err = r.ReadMarkingMembers(ctx, &state, markingUUID)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading the Marking members", err.Error())
@@ -246,7 +251,7 @@ func (r *markingResource) Read(ctx context.Context, req resource.ReadRequest, re
 
 	err = r.ReadMarkingRoles(ctx, &state, markingUUID)
 	if err != nil {
-		resp.Diagnostics.AddWarning("Error reading the Marking roles", err.Error())
+		resp.Diagnostics.AddError("Error reading the Marking roles", err.Error())
 	}
 
 	// Set refreshed state
@@ -270,8 +275,8 @@ func (r *markingResource) ReadMarking(ctx context.Context, resp *resource.ReadRe
 	// Check the response status code
 	if httpResp.StatusCode != http.StatusOK {
 		if httpResp.StatusCode == http.StatusNotFound {
-			resp.State.RemoveResource(ctx)
-			return fmt.Errorf("organization not found, removing resource from Terraform state: %w", err)
+			resp.Diagnostics.Append(providerError.ResourceNotFoundWarning(state.ID.ValueString(), "Marking"))
+			return nil
 		}
 		returnString, err := providerError.FormatHTTPError(httpResp)
 		if err != nil {
@@ -412,16 +417,19 @@ func (r *markingResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	if err := r.UpdateMarking(ctx, resp, &plan, &state); err != nil {
+	err := r.UpdateMarking(ctx, resp, &plan, &state)
+	if err != nil {
 		resp.Diagnostics.AddError("Error updating marking. Please fix your plan if needed and re-apply", err.Error())
 		return
 	}
 
-	if err := r.UpdateMarkingMembers(ctx, &plan, &state); err != nil {
+	err = r.UpdateMarkingMembers(ctx, &plan, &state)
+	if err != nil {
 		resp.Diagnostics.AddError("Error updating marking members. Please fix your plan if needed and re-apply", err.Error())
 	}
 
-	if err := r.UpdateMarkingRoles(ctx, &plan, &state); err != nil {
+	err = r.UpdateMarkingRoles(ctx, &plan, &state)
+	if err != nil {
 		resp.Diagnostics.AddError("Error updating marking roles. Please fix your plan if needed and re-apply", err.Error())
 	}
 

@@ -157,10 +157,10 @@ const (
 
 // Defines values for CoreReleaseStatus.
 const (
-	ACTIVE       CoreReleaseStatus = "ACTIVE"
-	DEPRECATED   CoreReleaseStatus = "DEPRECATED"
-	ENDORSED     CoreReleaseStatus = "ENDORSED"
-	EXPERIMENTAL CoreReleaseStatus = "EXPERIMENTAL"
+	CoreReleaseStatusACTIVE       CoreReleaseStatus = "ACTIVE"
+	CoreReleaseStatusDEPRECATED   CoreReleaseStatus = "DEPRECATED"
+	CoreReleaseStatusENDORSED     CoreReleaseStatus = "ENDORSED"
+	CoreReleaseStatusEXPERIMENTAL CoreReleaseStatus = "EXPERIMENTAL"
 )
 
 // Defines values for CoreRoleContext.
@@ -471,6 +471,12 @@ const (
 const (
 	INVALID OntologiesValidationResult = "INVALID"
 	VALID   OntologiesValidationResult = "VALID"
+)
+
+// Defines values for OntologiesValueTypeStatus.
+const (
+	OntologiesValueTypeStatusACTIVE     OntologiesValueTypeStatus = "ACTIVE"
+	OntologiesValueTypeStatusDEPRECATED OntologiesValueTypeStatus = "DEPRECATED"
 )
 
 // Defines values for OperationsAsyncOperationStatus.
@@ -3359,6 +3365,12 @@ type CoreBooleanType struct {
 	Type string `json:"type"`
 }
 
+// CoreBranchMetadata Metadata about a Foundry branch.
+type CoreBranchMetadata struct {
+	// Rid The Foundry branch identifier, specifically its rid. Different identifier types may be used in the future as values.
+	Rid CoreFoundryBranch `json:"rid"`
+}
+
 // CoreBuildRid The RID of a Build.
 type CoreBuildRid = string
 
@@ -4296,6 +4308,30 @@ type FilesystemCreateProjectRequest struct {
 	SpaceRid FilesystemSpaceRid `json:"spaceRid"`
 }
 
+// FilesystemCreateSpaceRequest defines model for Filesystem.CreateSpaceRequest.
+type FilesystemCreateSpaceRequest struct {
+	DefaultRoleSetID *CoreRoleSetID `json:"defaultRoleSetId,omitempty"`
+
+	// DeletionPolicyOrganizations By default, this Space will use a Last Out deletion policy, meaning that this Space and its projects will be deleted when the last Organization listed here is deleted. Only Organizations in the Space's Enrollment can be included here.
+	DeletionPolicyOrganizations *[]CoreOrganizationRid `json:"deletionPolicyOrganizations,omitempty"`
+
+	// Description The description of the Space.
+	Description *string `json:"description,omitempty"`
+
+	// DisplayName The display name of the Resource
+	DisplayName   FilesystemResourceDisplayName `json:"displayName"`
+	EnrollmentRid CoreEnrollmentRid             `json:"enrollmentRid"`
+
+	// FileSystemID The ID of the filesystem that will be used for all projects in the Space.
+	FileSystemID *FilesystemFileSystemID `json:"fileSystemId,omitempty"`
+
+	// Organizations The list of Organizations that are provisioned access to this Space. In order to access this Space, a user must be a member of at least one of these Organizations.
+	Organizations *[]CoreOrganizationRid `json:"organizations,omitempty"`
+
+	// UsageAccountRid The unique resource identifier (RID) of the usage account that will be used as a default on project creation.
+	UsageAccountRid *FilesystemUsageAccountRid `json:"usageAccountRid,omitempty"`
+}
+
 // FilesystemEveryone A principal representing all users of the platform.
 type FilesystemEveryone struct {
 	Type string `json:"type"`
@@ -4514,6 +4550,20 @@ type FilesystemReplaceProjectRequest struct {
 	DisplayName FilesystemResourceDisplayName `json:"displayName"`
 }
 
+// FilesystemReplaceSpaceRequest defines model for Filesystem.ReplaceSpaceRequest.
+type FilesystemReplaceSpaceRequest struct {
+	DefaultRoleSetID *CoreRoleSetID `json:"defaultRoleSetId,omitempty"`
+
+	// Description The description of the Space.
+	Description *string `json:"description,omitempty"`
+
+	// DisplayName The display name of the Resource
+	DisplayName FilesystemResourceDisplayName `json:"displayName"`
+
+	// UsageAccountRid The unique resource identifier (RID) of the usage account that will be used as a default on project creation.
+	UsageAccountRid *FilesystemUsageAccountRid `json:"usageAccountRid,omitempty"`
+}
+
 // FilesystemResource defines model for Filesystem.Resource.
 type FilesystemResource struct {
 	// CreatedBy The ID of a Foundry Group or User.
@@ -4586,6 +4636,11 @@ type FilesystemResourceType string
 
 // FilesystemSpace defines model for Filesystem.Space.
 type FilesystemSpace struct {
+	DefaultRoleSetID CoreRoleSetID `json:"defaultRoleSetId"`
+
+	// DeletionPolicyOrganizations By default, this Space will use a Last Out deletion policy, meaning that this Space and its projects will be deleted when the last Organization listed here is deleted. Only Organizations in the Space's Enrollment can be included here.
+	DeletionPolicyOrganizations *[]CoreOrganizationRid `json:"deletionPolicyOrganizations,omitempty"`
+
 	// Description The description of the Space.
 	Description *string `json:"description,omitempty"`
 
@@ -4593,8 +4648,10 @@ type FilesystemSpace struct {
 	DisplayName FilesystemResourceDisplayName `json:"displayName"`
 
 	// FileSystemID The ID of the filesystem that will be used for all projects in the Space.
-	FileSystemID  *FilesystemFileSystemID `json:"fileSystemId,omitempty"`
-	Organizations *[]CoreOrganizationRid  `json:"organizations,omitempty"`
+	FileSystemID FilesystemFileSystemID `json:"fileSystemId"`
+
+	// Organizations The list of Organizations that are provisioned access to this Space. In order to access this Space, a user must be a member of at least one of these Organizations.
+	Organizations *[]CoreOrganizationRid `json:"organizations,omitempty"`
 
 	// Path The full path to the resource, including the resource name itself
 	Path FilesystemResourcePath `json:"path"`
@@ -4603,7 +4660,7 @@ type FilesystemSpace struct {
 	Rid FilesystemSpaceRid `json:"rid"`
 
 	// UsageAccountRid The unique resource identifier (RID) of the usage account that will be used as a default on project creation.
-	UsageAccountRid *FilesystemUsageAccountRid `json:"usageAccountRid,omitempty"`
+	UsageAccountRid FilesystemUsageAccountRid `json:"usageAccountRid"`
 }
 
 // FilesystemSpaceRid The unique resource identifier (RID) of a Space.
@@ -6871,6 +6928,11 @@ type OntologiesListOntologiesV2Response struct {
 	Data *[]OntologiesOntologyV2 `json:"data,omitempty"`
 }
 
+// OntologiesListOntologyValueTypesResponse defines model for Ontologies.ListOntologyValueTypesResponse.
+type OntologiesListOntologyValueTypesResponse struct {
+	Data *[]OntologiesOntologyValueType `json:"data,omitempty"`
+}
+
 // OntologiesListOutgoingInterfaceLinkTypesResponse defines model for Ontologies.ListOutgoingInterfaceLinkTypesResponse.
 type OntologiesListOutgoingInterfaceLinkTypesResponse struct {
 	// Data The list of interface link types in the current page.
@@ -6959,6 +7021,11 @@ type OntologiesLoadObjectSetV2MultipleObjectTypesRequest struct {
 	// Setting this to true may improve performance of this endpoint for object types in OSV2.
 	ExcludeRid *bool `json:"excludeRid,omitempty"`
 
+	// IncludeComputeUsage Indicates whether the response should include compute usage details for the request. This feature is currently
+	// only available for OSDK applications.
+	// Note: Enabling this flag may slow down query performance and is not recommended for use in production.
+	IncludeComputeUsage *CoreIncludeComputeUsage `json:"includeComputeUsage,omitempty"`
+
 	// ObjectSet Represents the definition of an `ObjectSet` in the `Ontology`.
 	ObjectSet OntologiesObjectSet `json:"objectSet"`
 
@@ -6990,6 +7057,9 @@ type OntologiesLoadObjectSetV2MultipleObjectTypesRequest struct {
 // The `interfaceToObjectTypeMappings` field contains mappings from `SharedPropertyTypeApiName`s on the interface(s) to
 // `PropertyApiName` for properties on the object(s).
 type OntologiesLoadObjectSetV2MultipleObjectTypesResponse struct {
+	// ComputeUsage A measurement of compute usage expressed in [compute-seconds](/docs/foundry/resource-management/usage-types#compute-second). For more information, please refer to the [Usage types](/docs/foundry/resource-management/usage-types) documentation.
+	ComputeUsage *CoreComputeSeconds `json:"computeUsage,omitempty"`
+
 	// Data The list of objects in the current page.
 	Data                          *[]OntologiesOntologyObjectV2                       `json:"data,omitempty"`
 	InterfaceToObjectTypeMappings *map[string]OntologiesInterfaceToObjectTypeMappings `json:"interfaceToObjectTypeMappings,omitempty"`
@@ -7637,7 +7707,10 @@ type OntologiesOntologyDataType struct {
 
 // OntologiesOntologyFullMetadata defines model for Ontologies.OntologyFullMetadata.
 type OntologiesOntologyFullMetadata struct {
-	ActionTypes    *map[string]OntologiesActionTypeV2           `json:"actionTypes,omitempty"`
+	ActionTypes *map[string]OntologiesActionTypeV2 `json:"actionTypes,omitempty"`
+
+	// Branch Metadata about a Foundry branch.
+	Branch         *CoreBranchMetadata                          `json:"branch,omitempty"`
 	InterfaceTypes *map[string]OntologiesInterfaceType          `json:"interfaceTypes,omitempty"`
 	ObjectTypes    *map[string]OntologiesObjectTypeFullMetadata `json:"objectTypes,omitempty"`
 
@@ -7753,6 +7826,21 @@ type OntologiesOntologyV2 struct {
 	// Rid The unique Resource Identifier (RID) of the Ontology. To look up your Ontology RID, please use the
 	// `List ontologies` endpoint or check the **Ontology Manager**.
 	Rid OntologiesOntologyRid `json:"rid"`
+}
+
+// OntologiesOntologyValueType defines model for Ontologies.OntologyValueType.
+type OntologiesOntologyValueType struct {
+	// APIName The name of the value type in the API in camelCase format.
+	APIName     OntologiesValueTypeAPIName       `json:"apiName"`
+	Constraints *[]OntologiesValueTypeConstraint `json:"constraints,omitempty"`
+	Description *string                          `json:"description,omitempty"`
+
+	// DisplayName The display name of the entity.
+	DisplayName CoreDisplayName              `json:"displayName"`
+	FieldType   OntologiesValueTypeFieldType `json:"fieldType"`
+	Rid         OntologiesValueTypeRid       `json:"rid"`
+	Status      *OntologiesValueTypeStatus   `json:"status,omitempty"`
+	Version     string                       `json:"version"`
 }
 
 // OntologiesOrQuery Returns objects where at least 1 query is satisfied.
@@ -8686,9 +8774,69 @@ type OntologiesValidationResult string
 // OntologiesValueTypeAPIName The name of the value type in the API in camelCase format.
 type OntologiesValueTypeAPIName = string
 
+// OntologiesValueTypeArrayType defines model for Ontologies.ValueTypeArrayType.
+type OntologiesValueTypeArrayType struct {
+	SubType *OntologiesValueTypeFieldType `json:"subType,omitempty"`
+	Type    string                        `json:"type"`
+}
+
 // OntologiesValueTypeConstraint defines model for Ontologies.ValueTypeConstraint.
 type OntologiesValueTypeConstraint struct {
 	union json.RawMessage
+}
+
+// OntologiesValueTypeDecimalType defines model for Ontologies.ValueTypeDecimalType.
+type OntologiesValueTypeDecimalType struct {
+	Type string `json:"type"`
+}
+
+// OntologiesValueTypeFieldType defines model for Ontologies.ValueTypeFieldType.
+type OntologiesValueTypeFieldType struct {
+	union json.RawMessage
+}
+
+// OntologiesValueTypeMapType defines model for Ontologies.ValueTypeMapType.
+type OntologiesValueTypeMapType struct {
+	KeyType   *OntologiesValueTypeFieldType `json:"keyType,omitempty"`
+	Type      string                        `json:"type"`
+	ValueType *OntologiesValueTypeFieldType `json:"valueType,omitempty"`
+}
+
+// OntologiesValueTypeOptionalType defines model for Ontologies.ValueTypeOptionalType.
+type OntologiesValueTypeOptionalType struct {
+	Type        string                        `json:"type"`
+	WrappedType *OntologiesValueTypeFieldType `json:"wrappedType,omitempty"`
+}
+
+// OntologiesValueTypeReferenceType defines model for Ontologies.ValueTypeReferenceType.
+type OntologiesValueTypeReferenceType struct {
+	Type string `json:"type"`
+}
+
+// OntologiesValueTypeRid defines model for Ontologies.ValueTypeRid.
+type OntologiesValueTypeRid = string
+
+// OntologiesValueTypeStatus defines model for Ontologies.ValueTypeStatus.
+type OntologiesValueTypeStatus string
+
+// OntologiesValueTypeStructField defines model for Ontologies.ValueTypeStructField.
+type OntologiesValueTypeStructField struct {
+	FieldType *OntologiesValueTypeFieldType `json:"fieldType,omitempty"`
+
+	// Name The name of a field in a `Struct`.
+	Name *CoreStructFieldName `json:"name,omitempty"`
+}
+
+// OntologiesValueTypeStructType defines model for Ontologies.ValueTypeStructType.
+type OntologiesValueTypeStructType struct {
+	Fields *[]OntologiesValueTypeStructField `json:"fields,omitempty"`
+	Type   string                            `json:"type"`
+}
+
+// OntologiesValueTypeUnionType defines model for Ontologies.ValueTypeUnionType.
+type OntologiesValueTypeUnionType struct {
+	MemberTypes *[]OntologiesValueTypeFieldType `json:"memberTypes,omitempty"`
+	Type        string                          `json:"type"`
 }
 
 // OntologiesVersionedQueryTypeAPIName The name of the Query in the API and an optional version identifier separated by a colon.
@@ -10842,12 +10990,6 @@ type FilesystemCreateProjectFromTemplateParams struct {
 	Preview *CorePreviewMode `form:"preview,omitempty" json:"preview,omitempty"`
 }
 
-// FilesystemGetProjectParams defines parameters for FilesystemGetProject.
-type FilesystemGetProjectParams struct {
-	// Preview Enables the use of preview functionality.
-	Preview *CorePreviewMode `form:"preview,omitempty" json:"preview,omitempty"`
-}
-
 // FilesystemReplaceProjectParams defines parameters for FilesystemReplaceProject.
 type FilesystemReplaceProjectParams struct {
 	// Preview Enables the use of preview functionality.
@@ -10984,6 +11126,30 @@ type FilesystemListSpacesParams struct {
 	// and use it to populate the `pageToken` field of the next request.
 	PageToken *CorePageToken `form:"pageToken,omitempty" json:"pageToken,omitempty"`
 
+	// Preview Enables the use of preview functionality.
+	Preview *CorePreviewMode `form:"preview,omitempty" json:"preview,omitempty"`
+}
+
+// FilesystemCreateSpaceParams defines parameters for FilesystemCreateSpace.
+type FilesystemCreateSpaceParams struct {
+	// Preview Enables the use of preview functionality.
+	Preview *CorePreviewMode `form:"preview,omitempty" json:"preview,omitempty"`
+}
+
+// FilesystemDeleteSpaceParams defines parameters for FilesystemDeleteSpace.
+type FilesystemDeleteSpaceParams struct {
+	// Preview Enables the use of preview functionality.
+	Preview *CorePreviewMode `form:"preview,omitempty" json:"preview,omitempty"`
+}
+
+// FilesystemGetSpaceParams defines parameters for FilesystemGetSpace.
+type FilesystemGetSpaceParams struct {
+	// Preview Enables the use of preview functionality.
+	Preview *CorePreviewMode `form:"preview,omitempty" json:"preview,omitempty"`
+}
+
+// FilesystemReplaceSpaceParams defines parameters for FilesystemReplaceSpace.
+type FilesystemReplaceSpaceParams struct {
 	// Preview Enables the use of preview functionality.
 	Preview *CorePreviewMode `form:"preview,omitempty" json:"preview,omitempty"`
 }
@@ -11667,6 +11833,18 @@ type OntologiesGetQueryTypeV2Params struct {
 	Version *OntologiesFunctionVersion `form:"version,omitempty" json:"version,omitempty"`
 }
 
+// OntologiesListOntologyValueTypesParams defines parameters for OntologiesListOntologyValueTypes.
+type OntologiesListOntologyValueTypesParams struct {
+	// Preview A boolean flag that, when set to true, enables the use of beta features in preview mode.
+	Preview *CorePreviewMode `form:"preview,omitempty" json:"preview,omitempty"`
+}
+
+// OntologiesGetOntologyValueTypeParams defines parameters for OntologiesGetOntologyValueType.
+type OntologiesGetOntologyValueTypeParams struct {
+	// Preview A boolean flag that, when set to true, enables the use of beta features in preview mode.
+	Preview *CorePreviewMode `form:"preview,omitempty" json:"preview,omitempty"`
+}
+
 // OrchestrationGetBuildsBatchJSONBody defines parameters for OrchestrationGetBuildsBatch.
 type OrchestrationGetBuildsBatchJSONBody = []OrchestrationGetBuildsBatchRequestElement
 
@@ -12105,6 +12283,12 @@ type FilesystemAddResourceRolesJSONRequestBody = FilesystemAddResourceRolesReque
 
 // FilesystemRemoveResourceRolesJSONRequestBody defines body for FilesystemRemoveResourceRoles for application/json ContentType.
 type FilesystemRemoveResourceRolesJSONRequestBody = FilesystemRemoveResourceRolesRequest
+
+// FilesystemCreateSpaceJSONRequestBody defines body for FilesystemCreateSpace for application/json ContentType.
+type FilesystemCreateSpaceJSONRequestBody = FilesystemCreateSpaceRequest
+
+// FilesystemReplaceSpaceJSONRequestBody defines body for FilesystemReplaceSpace for application/json ContentType.
+type FilesystemReplaceSpaceJSONRequestBody = FilesystemReplaceSpaceRequest
 
 // FunctionsGetByRidQueriesJSONRequestBody defines body for FunctionsGetByRidQueries for application/json ContentType.
 type FunctionsGetByRidQueriesJSONRequestBody = FunctionsGetByRidQueriesRequest
@@ -27342,6 +27526,575 @@ func (t *OntologiesValueTypeConstraint) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// AsCoreDateType returns the union data inside the OntologiesValueTypeFieldType as a CoreDateType
+func (t OntologiesValueTypeFieldType) AsCoreDateType() (CoreDateType, error) {
+	var body CoreDateType
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCoreDateType overwrites any union data inside the OntologiesValueTypeFieldType as the provided CoreDateType
+func (t *OntologiesValueTypeFieldType) FromCoreDateType(v CoreDateType) error {
+	v.Type = "date"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCoreDateType performs a merge with any union data inside the OntologiesValueTypeFieldType, using the provided CoreDateType
+func (t *OntologiesValueTypeFieldType) MergeCoreDateType(v CoreDateType) error {
+	v.Type = "date"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsOntologiesValueTypeStructType returns the union data inside the OntologiesValueTypeFieldType as a OntologiesValueTypeStructType
+func (t OntologiesValueTypeFieldType) AsOntologiesValueTypeStructType() (OntologiesValueTypeStructType, error) {
+	var body OntologiesValueTypeStructType
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromOntologiesValueTypeStructType overwrites any union data inside the OntologiesValueTypeFieldType as the provided OntologiesValueTypeStructType
+func (t *OntologiesValueTypeFieldType) FromOntologiesValueTypeStructType(v OntologiesValueTypeStructType) error {
+	v.Type = "struct"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeOntologiesValueTypeStructType performs a merge with any union data inside the OntologiesValueTypeFieldType, using the provided OntologiesValueTypeStructType
+func (t *OntologiesValueTypeFieldType) MergeOntologiesValueTypeStructType(v OntologiesValueTypeStructType) error {
+	v.Type = "struct"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCoreStringType returns the union data inside the OntologiesValueTypeFieldType as a CoreStringType
+func (t OntologiesValueTypeFieldType) AsCoreStringType() (CoreStringType, error) {
+	var body CoreStringType
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCoreStringType overwrites any union data inside the OntologiesValueTypeFieldType as the provided CoreStringType
+func (t *OntologiesValueTypeFieldType) FromCoreStringType(v CoreStringType) error {
+	v.Type = "string"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCoreStringType performs a merge with any union data inside the OntologiesValueTypeFieldType, using the provided CoreStringType
+func (t *OntologiesValueTypeFieldType) MergeCoreStringType(v CoreStringType) error {
+	v.Type = "string"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCoreByteType returns the union data inside the OntologiesValueTypeFieldType as a CoreByteType
+func (t OntologiesValueTypeFieldType) AsCoreByteType() (CoreByteType, error) {
+	var body CoreByteType
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCoreByteType overwrites any union data inside the OntologiesValueTypeFieldType as the provided CoreByteType
+func (t *OntologiesValueTypeFieldType) FromCoreByteType(v CoreByteType) error {
+	v.Type = "byte"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCoreByteType performs a merge with any union data inside the OntologiesValueTypeFieldType, using the provided CoreByteType
+func (t *OntologiesValueTypeFieldType) MergeCoreByteType(v CoreByteType) error {
+	v.Type = "byte"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCoreDoubleType returns the union data inside the OntologiesValueTypeFieldType as a CoreDoubleType
+func (t OntologiesValueTypeFieldType) AsCoreDoubleType() (CoreDoubleType, error) {
+	var body CoreDoubleType
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCoreDoubleType overwrites any union data inside the OntologiesValueTypeFieldType as the provided CoreDoubleType
+func (t *OntologiesValueTypeFieldType) FromCoreDoubleType(v CoreDoubleType) error {
+	v.Type = "double"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCoreDoubleType performs a merge with any union data inside the OntologiesValueTypeFieldType, using the provided CoreDoubleType
+func (t *OntologiesValueTypeFieldType) MergeCoreDoubleType(v CoreDoubleType) error {
+	v.Type = "double"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsOntologiesValueTypeOptionalType returns the union data inside the OntologiesValueTypeFieldType as a OntologiesValueTypeOptionalType
+func (t OntologiesValueTypeFieldType) AsOntologiesValueTypeOptionalType() (OntologiesValueTypeOptionalType, error) {
+	var body OntologiesValueTypeOptionalType
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromOntologiesValueTypeOptionalType overwrites any union data inside the OntologiesValueTypeFieldType as the provided OntologiesValueTypeOptionalType
+func (t *OntologiesValueTypeFieldType) FromOntologiesValueTypeOptionalType(v OntologiesValueTypeOptionalType) error {
+	v.Type = "optional"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeOntologiesValueTypeOptionalType performs a merge with any union data inside the OntologiesValueTypeFieldType, using the provided OntologiesValueTypeOptionalType
+func (t *OntologiesValueTypeFieldType) MergeOntologiesValueTypeOptionalType(v OntologiesValueTypeOptionalType) error {
+	v.Type = "optional"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCoreIntegerType returns the union data inside the OntologiesValueTypeFieldType as a CoreIntegerType
+func (t OntologiesValueTypeFieldType) AsCoreIntegerType() (CoreIntegerType, error) {
+	var body CoreIntegerType
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCoreIntegerType overwrites any union data inside the OntologiesValueTypeFieldType as the provided CoreIntegerType
+func (t *OntologiesValueTypeFieldType) FromCoreIntegerType(v CoreIntegerType) error {
+	v.Type = "integer"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCoreIntegerType performs a merge with any union data inside the OntologiesValueTypeFieldType, using the provided CoreIntegerType
+func (t *OntologiesValueTypeFieldType) MergeCoreIntegerType(v CoreIntegerType) error {
+	v.Type = "integer"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsOntologiesValueTypeUnionType returns the union data inside the OntologiesValueTypeFieldType as a OntologiesValueTypeUnionType
+func (t OntologiesValueTypeFieldType) AsOntologiesValueTypeUnionType() (OntologiesValueTypeUnionType, error) {
+	var body OntologiesValueTypeUnionType
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromOntologiesValueTypeUnionType overwrites any union data inside the OntologiesValueTypeFieldType as the provided OntologiesValueTypeUnionType
+func (t *OntologiesValueTypeFieldType) FromOntologiesValueTypeUnionType(v OntologiesValueTypeUnionType) error {
+	v.Type = "union"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeOntologiesValueTypeUnionType performs a merge with any union data inside the OntologiesValueTypeFieldType, using the provided OntologiesValueTypeUnionType
+func (t *OntologiesValueTypeFieldType) MergeOntologiesValueTypeUnionType(v OntologiesValueTypeUnionType) error {
+	v.Type = "union"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCoreFloatType returns the union data inside the OntologiesValueTypeFieldType as a CoreFloatType
+func (t OntologiesValueTypeFieldType) AsCoreFloatType() (CoreFloatType, error) {
+	var body CoreFloatType
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCoreFloatType overwrites any union data inside the OntologiesValueTypeFieldType as the provided CoreFloatType
+func (t *OntologiesValueTypeFieldType) FromCoreFloatType(v CoreFloatType) error {
+	v.Type = "float"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCoreFloatType performs a merge with any union data inside the OntologiesValueTypeFieldType, using the provided CoreFloatType
+func (t *OntologiesValueTypeFieldType) MergeCoreFloatType(v CoreFloatType) error {
+	v.Type = "float"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCoreLongType returns the union data inside the OntologiesValueTypeFieldType as a CoreLongType
+func (t OntologiesValueTypeFieldType) AsCoreLongType() (CoreLongType, error) {
+	var body CoreLongType
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCoreLongType overwrites any union data inside the OntologiesValueTypeFieldType as the provided CoreLongType
+func (t *OntologiesValueTypeFieldType) FromCoreLongType(v CoreLongType) error {
+	v.Type = "long"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCoreLongType performs a merge with any union data inside the OntologiesValueTypeFieldType, using the provided CoreLongType
+func (t *OntologiesValueTypeFieldType) MergeCoreLongType(v CoreLongType) error {
+	v.Type = "long"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsOntologiesValueTypeReferenceType returns the union data inside the OntologiesValueTypeFieldType as a OntologiesValueTypeReferenceType
+func (t OntologiesValueTypeFieldType) AsOntologiesValueTypeReferenceType() (OntologiesValueTypeReferenceType, error) {
+	var body OntologiesValueTypeReferenceType
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromOntologiesValueTypeReferenceType overwrites any union data inside the OntologiesValueTypeFieldType as the provided OntologiesValueTypeReferenceType
+func (t *OntologiesValueTypeFieldType) FromOntologiesValueTypeReferenceType(v OntologiesValueTypeReferenceType) error {
+	v.Type = "reference"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeOntologiesValueTypeReferenceType performs a merge with any union data inside the OntologiesValueTypeFieldType, using the provided OntologiesValueTypeReferenceType
+func (t *OntologiesValueTypeFieldType) MergeOntologiesValueTypeReferenceType(v OntologiesValueTypeReferenceType) error {
+	v.Type = "reference"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCoreBooleanType returns the union data inside the OntologiesValueTypeFieldType as a CoreBooleanType
+func (t OntologiesValueTypeFieldType) AsCoreBooleanType() (CoreBooleanType, error) {
+	var body CoreBooleanType
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCoreBooleanType overwrites any union data inside the OntologiesValueTypeFieldType as the provided CoreBooleanType
+func (t *OntologiesValueTypeFieldType) FromCoreBooleanType(v CoreBooleanType) error {
+	v.Type = "boolean"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCoreBooleanType performs a merge with any union data inside the OntologiesValueTypeFieldType, using the provided CoreBooleanType
+func (t *OntologiesValueTypeFieldType) MergeCoreBooleanType(v CoreBooleanType) error {
+	v.Type = "boolean"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsOntologiesValueTypeArrayType returns the union data inside the OntologiesValueTypeFieldType as a OntologiesValueTypeArrayType
+func (t OntologiesValueTypeFieldType) AsOntologiesValueTypeArrayType() (OntologiesValueTypeArrayType, error) {
+	var body OntologiesValueTypeArrayType
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromOntologiesValueTypeArrayType overwrites any union data inside the OntologiesValueTypeFieldType as the provided OntologiesValueTypeArrayType
+func (t *OntologiesValueTypeFieldType) FromOntologiesValueTypeArrayType(v OntologiesValueTypeArrayType) error {
+	v.Type = "array"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeOntologiesValueTypeArrayType performs a merge with any union data inside the OntologiesValueTypeFieldType, using the provided OntologiesValueTypeArrayType
+func (t *OntologiesValueTypeFieldType) MergeOntologiesValueTypeArrayType(v OntologiesValueTypeArrayType) error {
+	v.Type = "array"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCoreBinaryType returns the union data inside the OntologiesValueTypeFieldType as a CoreBinaryType
+func (t OntologiesValueTypeFieldType) AsCoreBinaryType() (CoreBinaryType, error) {
+	var body CoreBinaryType
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCoreBinaryType overwrites any union data inside the OntologiesValueTypeFieldType as the provided CoreBinaryType
+func (t *OntologiesValueTypeFieldType) FromCoreBinaryType(v CoreBinaryType) error {
+	v.Type = "binary"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCoreBinaryType performs a merge with any union data inside the OntologiesValueTypeFieldType, using the provided CoreBinaryType
+func (t *OntologiesValueTypeFieldType) MergeCoreBinaryType(v CoreBinaryType) error {
+	v.Type = "binary"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCoreShortType returns the union data inside the OntologiesValueTypeFieldType as a CoreShortType
+func (t OntologiesValueTypeFieldType) AsCoreShortType() (CoreShortType, error) {
+	var body CoreShortType
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCoreShortType overwrites any union data inside the OntologiesValueTypeFieldType as the provided CoreShortType
+func (t *OntologiesValueTypeFieldType) FromCoreShortType(v CoreShortType) error {
+	v.Type = "short"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCoreShortType performs a merge with any union data inside the OntologiesValueTypeFieldType, using the provided CoreShortType
+func (t *OntologiesValueTypeFieldType) MergeCoreShortType(v CoreShortType) error {
+	v.Type = "short"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsOntologiesValueTypeDecimalType returns the union data inside the OntologiesValueTypeFieldType as a OntologiesValueTypeDecimalType
+func (t OntologiesValueTypeFieldType) AsOntologiesValueTypeDecimalType() (OntologiesValueTypeDecimalType, error) {
+	var body OntologiesValueTypeDecimalType
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromOntologiesValueTypeDecimalType overwrites any union data inside the OntologiesValueTypeFieldType as the provided OntologiesValueTypeDecimalType
+func (t *OntologiesValueTypeFieldType) FromOntologiesValueTypeDecimalType(v OntologiesValueTypeDecimalType) error {
+	v.Type = "decimal"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeOntologiesValueTypeDecimalType performs a merge with any union data inside the OntologiesValueTypeFieldType, using the provided OntologiesValueTypeDecimalType
+func (t *OntologiesValueTypeFieldType) MergeOntologiesValueTypeDecimalType(v OntologiesValueTypeDecimalType) error {
+	v.Type = "decimal"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsOntologiesValueTypeMapType returns the union data inside the OntologiesValueTypeFieldType as a OntologiesValueTypeMapType
+func (t OntologiesValueTypeFieldType) AsOntologiesValueTypeMapType() (OntologiesValueTypeMapType, error) {
+	var body OntologiesValueTypeMapType
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromOntologiesValueTypeMapType overwrites any union data inside the OntologiesValueTypeFieldType as the provided OntologiesValueTypeMapType
+func (t *OntologiesValueTypeFieldType) FromOntologiesValueTypeMapType(v OntologiesValueTypeMapType) error {
+	v.Type = "map"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeOntologiesValueTypeMapType performs a merge with any union data inside the OntologiesValueTypeFieldType, using the provided OntologiesValueTypeMapType
+func (t *OntologiesValueTypeFieldType) MergeOntologiesValueTypeMapType(v OntologiesValueTypeMapType) error {
+	v.Type = "map"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCoreTimestampType returns the union data inside the OntologiesValueTypeFieldType as a CoreTimestampType
+func (t OntologiesValueTypeFieldType) AsCoreTimestampType() (CoreTimestampType, error) {
+	var body CoreTimestampType
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCoreTimestampType overwrites any union data inside the OntologiesValueTypeFieldType as the provided CoreTimestampType
+func (t *OntologiesValueTypeFieldType) FromCoreTimestampType(v CoreTimestampType) error {
+	v.Type = "timestamp"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCoreTimestampType performs a merge with any union data inside the OntologiesValueTypeFieldType, using the provided CoreTimestampType
+func (t *OntologiesValueTypeFieldType) MergeCoreTimestampType(v CoreTimestampType) error {
+	v.Type = "timestamp"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t OntologiesValueTypeFieldType) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"type"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t OntologiesValueTypeFieldType) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "array":
+		return t.AsOntologiesValueTypeArrayType()
+	case "binary":
+		return t.AsCoreBinaryType()
+	case "boolean":
+		return t.AsCoreBooleanType()
+	case "byte":
+		return t.AsCoreByteType()
+	case "date":
+		return t.AsCoreDateType()
+	case "decimal":
+		return t.AsOntologiesValueTypeDecimalType()
+	case "double":
+		return t.AsCoreDoubleType()
+	case "float":
+		return t.AsCoreFloatType()
+	case "integer":
+		return t.AsCoreIntegerType()
+	case "long":
+		return t.AsCoreLongType()
+	case "map":
+		return t.AsOntologiesValueTypeMapType()
+	case "optional":
+		return t.AsOntologiesValueTypeOptionalType()
+	case "reference":
+		return t.AsOntologiesValueTypeReferenceType()
+	case "short":
+		return t.AsCoreShortType()
+	case "string":
+		return t.AsCoreStringType()
+	case "struct":
+		return t.AsOntologiesValueTypeStructType()
+	case "timestamp":
+		return t.AsCoreTimestampType()
+	case "union":
+		return t.AsOntologiesValueTypeUnionType()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (t OntologiesValueTypeFieldType) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *OntologiesValueTypeFieldType) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsGeoGeoPoint returns the union data inside the OntologiesWithinBoundingBoxPoint as a GeoGeoPoint
 func (t OntologiesWithinBoundingBoxPoint) AsGeoGeoPoint() (GeoGeoPoint, error) {
 	var body GeoGeoPoint
@@ -29526,7 +30279,7 @@ type ClientInterface interface {
 	FilesystemCreateProjectFromTemplate(ctx context.Context, params *FilesystemCreateProjectFromTemplateParams, body FilesystemCreateProjectFromTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// FilesystemGetProject request
-	FilesystemGetProject(ctx context.Context, projectRid FilesystemProjectRid, params *FilesystemGetProjectParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+	FilesystemGetProject(ctx context.Context, projectRid FilesystemProjectRid, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// FilesystemReplaceProjectWithBody request with any body
 	FilesystemReplaceProjectWithBody(ctx context.Context, projectRid FilesystemProjectRid, params *FilesystemReplaceProjectParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -29592,6 +30345,22 @@ type ClientInterface interface {
 
 	// FilesystemListSpaces request
 	FilesystemListSpaces(ctx context.Context, params *FilesystemListSpacesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// FilesystemCreateSpaceWithBody request with any body
+	FilesystemCreateSpaceWithBody(ctx context.Context, params *FilesystemCreateSpaceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	FilesystemCreateSpace(ctx context.Context, params *FilesystemCreateSpaceParams, body FilesystemCreateSpaceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// FilesystemDeleteSpace request
+	FilesystemDeleteSpace(ctx context.Context, spaceRid FilesystemSpaceRid, params *FilesystemDeleteSpaceParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// FilesystemGetSpace request
+	FilesystemGetSpace(ctx context.Context, spaceRid FilesystemSpaceRid, params *FilesystemGetSpaceParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// FilesystemReplaceSpaceWithBody request with any body
+	FilesystemReplaceSpaceWithBody(ctx context.Context, spaceRid FilesystemSpaceRid, params *FilesystemReplaceSpaceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	FilesystemReplaceSpace(ctx context.Context, spaceRid FilesystemSpaceRid, params *FilesystemReplaceSpaceParams, body FilesystemReplaceSpaceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// FunctionsGetByRidQueriesWithBody request with any body
 	FunctionsGetByRidQueriesWithBody(ctx context.Context, params *FunctionsGetByRidQueriesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -29845,6 +30614,12 @@ type ClientInterface interface {
 
 	// OntologiesGetQueryTypeV2 request
 	OntologiesGetQueryTypeV2(ctx context.Context, ontology OntologiesOntologyIdentifier, queryAPIName OntologiesQueryAPIName, params *OntologiesGetQueryTypeV2Params, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// OntologiesListOntologyValueTypes request
+	OntologiesListOntologyValueTypes(ctx context.Context, ontology OntologiesOntologyIdentifier, params *OntologiesListOntologyValueTypesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// OntologiesGetOntologyValueType request
+	OntologiesGetOntologyValueType(ctx context.Context, ontology OntologiesOntologyIdentifier, valueType OntologiesValueTypeAPIName, params *OntologiesGetOntologyValueTypeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// OperationsGetOperation request
 	OperationsGetOperation(ctx context.Context, operationID string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -32128,8 +32903,8 @@ func (c *Client) FilesystemCreateProjectFromTemplate(ctx context.Context, params
 	return c.Client.Do(req)
 }
 
-func (c *Client) FilesystemGetProject(ctx context.Context, projectRid FilesystemProjectRid, params *FilesystemGetProjectParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewFilesystemGetProjectRequest(c.Server, projectRid, params)
+func (c *Client) FilesystemGetProject(ctx context.Context, projectRid FilesystemProjectRid, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewFilesystemGetProjectRequest(c.Server, projectRid)
 	if err != nil {
 		return nil, err
 	}
@@ -32418,6 +33193,78 @@ func (c *Client) FilesystemRemoveResourceRoles(ctx context.Context, resourceRid 
 
 func (c *Client) FilesystemListSpaces(ctx context.Context, params *FilesystemListSpacesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewFilesystemListSpacesRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) FilesystemCreateSpaceWithBody(ctx context.Context, params *FilesystemCreateSpaceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewFilesystemCreateSpaceRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) FilesystemCreateSpace(ctx context.Context, params *FilesystemCreateSpaceParams, body FilesystemCreateSpaceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewFilesystemCreateSpaceRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) FilesystemDeleteSpace(ctx context.Context, spaceRid FilesystemSpaceRid, params *FilesystemDeleteSpaceParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewFilesystemDeleteSpaceRequest(c.Server, spaceRid, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) FilesystemGetSpace(ctx context.Context, spaceRid FilesystemSpaceRid, params *FilesystemGetSpaceParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewFilesystemGetSpaceRequest(c.Server, spaceRid, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) FilesystemReplaceSpaceWithBody(ctx context.Context, spaceRid FilesystemSpaceRid, params *FilesystemReplaceSpaceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewFilesystemReplaceSpaceRequestWithBody(c.Server, spaceRid, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) FilesystemReplaceSpace(ctx context.Context, spaceRid FilesystemSpaceRid, params *FilesystemReplaceSpaceParams, body FilesystemReplaceSpaceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewFilesystemReplaceSpaceRequest(c.Server, spaceRid, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -33510,6 +34357,30 @@ func (c *Client) OntologiesListQueryTypesV2(ctx context.Context, ontology Ontolo
 
 func (c *Client) OntologiesGetQueryTypeV2(ctx context.Context, ontology OntologiesOntologyIdentifier, queryAPIName OntologiesQueryAPIName, params *OntologiesGetQueryTypeV2Params, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewOntologiesGetQueryTypeV2Request(c.Server, ontology, queryAPIName, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) OntologiesListOntologyValueTypes(ctx context.Context, ontology OntologiesOntologyIdentifier, params *OntologiesListOntologyValueTypesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewOntologiesListOntologyValueTypesRequest(c.Server, ontology, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) OntologiesGetOntologyValueType(ctx context.Context, ontology OntologiesOntologyIdentifier, valueType OntologiesValueTypeAPIName, params *OntologiesGetOntologyValueTypeParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewOntologiesGetOntologyValueTypeRequest(c.Server, ontology, valueType, params)
 	if err != nil {
 		return nil, err
 	}
@@ -42306,7 +43177,7 @@ func NewFilesystemCreateProjectFromTemplateRequestWithBody(server string, params
 }
 
 // NewFilesystemGetProjectRequest generates requests for FilesystemGetProject
-func NewFilesystemGetProjectRequest(server string, projectRid FilesystemProjectRid, params *FilesystemGetProjectParams) (*http.Request, error) {
+func NewFilesystemGetProjectRequest(server string, projectRid FilesystemProjectRid) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -42329,28 +43200,6 @@ func NewFilesystemGetProjectRequest(server string, projectRid FilesystemProjectR
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
-	}
-
-	if params != nil {
-		queryValues := queryURL.Query()
-
-		if params.Preview != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "preview", runtime.ParamLocationQuery, *params.Preview); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		queryURL.RawQuery = queryValues.Encode()
 	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
@@ -43542,6 +44391,249 @@ func NewFilesystemListSpacesRequest(server string, params *FilesystemListSpacesP
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewFilesystemCreateSpaceRequest calls the generic FilesystemCreateSpace builder with application/json body
+func NewFilesystemCreateSpaceRequest(server string, params *FilesystemCreateSpaceParams, body FilesystemCreateSpaceJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewFilesystemCreateSpaceRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewFilesystemCreateSpaceRequestWithBody generates requests for FilesystemCreateSpace with any type of body
+func NewFilesystemCreateSpaceRequestWithBody(server string, params *FilesystemCreateSpaceParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v2/filesystem/spaces")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Preview != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "preview", runtime.ParamLocationQuery, *params.Preview); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewFilesystemDeleteSpaceRequest generates requests for FilesystemDeleteSpace
+func NewFilesystemDeleteSpaceRequest(server string, spaceRid FilesystemSpaceRid, params *FilesystemDeleteSpaceParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "spaceRid", runtime.ParamLocationPath, spaceRid)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v2/filesystem/spaces/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Preview != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "preview", runtime.ParamLocationQuery, *params.Preview); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewFilesystemGetSpaceRequest generates requests for FilesystemGetSpace
+func NewFilesystemGetSpaceRequest(server string, spaceRid FilesystemSpaceRid, params *FilesystemGetSpaceParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "spaceRid", runtime.ParamLocationPath, spaceRid)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v2/filesystem/spaces/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Preview != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "preview", runtime.ParamLocationQuery, *params.Preview); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewFilesystemReplaceSpaceRequest calls the generic FilesystemReplaceSpace builder with application/json body
+func NewFilesystemReplaceSpaceRequest(server string, spaceRid FilesystemSpaceRid, params *FilesystemReplaceSpaceParams, body FilesystemReplaceSpaceJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewFilesystemReplaceSpaceRequestWithBody(server, spaceRid, params, "application/json", bodyReader)
+}
+
+// NewFilesystemReplaceSpaceRequestWithBody generates requests for FilesystemReplaceSpace with any type of body
+func NewFilesystemReplaceSpaceRequestWithBody(server string, spaceRid FilesystemSpaceRid, params *FilesystemReplaceSpaceParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "spaceRid", runtime.ParamLocationPath, spaceRid)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v2/filesystem/spaces/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Preview != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "preview", runtime.ParamLocationQuery, *params.Preview); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -49760,6 +50852,125 @@ func NewOntologiesGetQueryTypeV2Request(server string, ontology OntologiesOntolo
 	return req, nil
 }
 
+// NewOntologiesListOntologyValueTypesRequest generates requests for OntologiesListOntologyValueTypes
+func NewOntologiesListOntologyValueTypesRequest(server string, ontology OntologiesOntologyIdentifier, params *OntologiesListOntologyValueTypesParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "ontology", runtime.ParamLocationPath, ontology)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v2/ontologies/%s/valueTypes", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Preview != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "preview", runtime.ParamLocationQuery, *params.Preview); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewOntologiesGetOntologyValueTypeRequest generates requests for OntologiesGetOntologyValueType
+func NewOntologiesGetOntologyValueTypeRequest(server string, ontology OntologiesOntologyIdentifier, valueType OntologiesValueTypeAPIName, params *OntologiesGetOntologyValueTypeParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "ontology", runtime.ParamLocationPath, ontology)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "valueType", runtime.ParamLocationPath, valueType)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v2/ontologies/%s/valueTypes/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Preview != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "preview", runtime.ParamLocationQuery, *params.Preview); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewOperationsGetOperationRequest generates requests for OperationsGetOperation
 func NewOperationsGetOperationRequest(server string, operationID string) (*http.Request, error) {
 	var err error
@@ -53073,7 +54284,7 @@ type ClientWithResponsesInterface interface {
 	FilesystemCreateProjectFromTemplateWithResponse(ctx context.Context, params *FilesystemCreateProjectFromTemplateParams, body FilesystemCreateProjectFromTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*FilesystemCreateProjectFromTemplateHttpResp, error)
 
 	// FilesystemGetProjectWithResponse request
-	FilesystemGetProjectWithResponse(ctx context.Context, projectRid FilesystemProjectRid, params *FilesystemGetProjectParams, reqEditors ...RequestEditorFn) (*FilesystemGetProjectHttpResp, error)
+	FilesystemGetProjectWithResponse(ctx context.Context, projectRid FilesystemProjectRid, reqEditors ...RequestEditorFn) (*FilesystemGetProjectHttpResp, error)
 
 	// FilesystemReplaceProjectWithBodyWithResponse request with any body
 	FilesystemReplaceProjectWithBodyWithResponse(ctx context.Context, projectRid FilesystemProjectRid, params *FilesystemReplaceProjectParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*FilesystemReplaceProjectHttpResp, error)
@@ -53139,6 +54350,22 @@ type ClientWithResponsesInterface interface {
 
 	// FilesystemListSpacesWithResponse request
 	FilesystemListSpacesWithResponse(ctx context.Context, params *FilesystemListSpacesParams, reqEditors ...RequestEditorFn) (*FilesystemListSpacesHttpResp, error)
+
+	// FilesystemCreateSpaceWithBodyWithResponse request with any body
+	FilesystemCreateSpaceWithBodyWithResponse(ctx context.Context, params *FilesystemCreateSpaceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*FilesystemCreateSpaceHttpResp, error)
+
+	FilesystemCreateSpaceWithResponse(ctx context.Context, params *FilesystemCreateSpaceParams, body FilesystemCreateSpaceJSONRequestBody, reqEditors ...RequestEditorFn) (*FilesystemCreateSpaceHttpResp, error)
+
+	// FilesystemDeleteSpaceWithResponse request
+	FilesystemDeleteSpaceWithResponse(ctx context.Context, spaceRid FilesystemSpaceRid, params *FilesystemDeleteSpaceParams, reqEditors ...RequestEditorFn) (*FilesystemDeleteSpaceHttpResp, error)
+
+	// FilesystemGetSpaceWithResponse request
+	FilesystemGetSpaceWithResponse(ctx context.Context, spaceRid FilesystemSpaceRid, params *FilesystemGetSpaceParams, reqEditors ...RequestEditorFn) (*FilesystemGetSpaceHttpResp, error)
+
+	// FilesystemReplaceSpaceWithBodyWithResponse request with any body
+	FilesystemReplaceSpaceWithBodyWithResponse(ctx context.Context, spaceRid FilesystemSpaceRid, params *FilesystemReplaceSpaceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*FilesystemReplaceSpaceHttpResp, error)
+
+	FilesystemReplaceSpaceWithResponse(ctx context.Context, spaceRid FilesystemSpaceRid, params *FilesystemReplaceSpaceParams, body FilesystemReplaceSpaceJSONRequestBody, reqEditors ...RequestEditorFn) (*FilesystemReplaceSpaceHttpResp, error)
 
 	// FunctionsGetByRidQueriesWithBodyWithResponse request with any body
 	FunctionsGetByRidQueriesWithBodyWithResponse(ctx context.Context, params *FunctionsGetByRidQueriesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*FunctionsGetByRidQueriesHttpResp, error)
@@ -53392,6 +54619,12 @@ type ClientWithResponsesInterface interface {
 
 	// OntologiesGetQueryTypeV2WithResponse request
 	OntologiesGetQueryTypeV2WithResponse(ctx context.Context, ontology OntologiesOntologyIdentifier, queryAPIName OntologiesQueryAPIName, params *OntologiesGetQueryTypeV2Params, reqEditors ...RequestEditorFn) (*OntologiesGetQueryTypeV2HttpResp, error)
+
+	// OntologiesListOntologyValueTypesWithResponse request
+	OntologiesListOntologyValueTypesWithResponse(ctx context.Context, ontology OntologiesOntologyIdentifier, params *OntologiesListOntologyValueTypesParams, reqEditors ...RequestEditorFn) (*OntologiesListOntologyValueTypesHttpResp, error)
+
+	// OntologiesGetOntologyValueTypeWithResponse request
+	OntologiesGetOntologyValueTypeWithResponse(ctx context.Context, ontology OntologiesOntologyIdentifier, valueType OntologiesValueTypeAPIName, params *OntologiesGetOntologyValueTypeParams, reqEditors ...RequestEditorFn) (*OntologiesGetOntologyValueTypeHttpResp, error)
 
 	// OperationsGetOperationWithResponse request
 	OperationsGetOperationWithResponse(ctx context.Context, operationID string, reqEditors ...RequestEditorFn) (*OperationsGetOperationHttpResp, error)
@@ -56643,6 +57876,93 @@ func (r FilesystemListSpacesHttpResp) StatusCode() int {
 	return 0
 }
 
+type FilesystemCreateSpaceHttpResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *FilesystemSpace
+}
+
+// Status returns HTTPResponse.Status
+func (r FilesystemCreateSpaceHttpResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r FilesystemCreateSpaceHttpResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type FilesystemDeleteSpaceHttpResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r FilesystemDeleteSpaceHttpResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r FilesystemDeleteSpaceHttpResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type FilesystemGetSpaceHttpResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *FilesystemSpace
+}
+
+// Status returns HTTPResponse.Status
+func (r FilesystemGetSpaceHttpResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r FilesystemGetSpaceHttpResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type FilesystemReplaceSpaceHttpResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *FilesystemSpace
+}
+
+// Status returns HTTPResponse.Status
+func (r FilesystemReplaceSpaceHttpResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r FilesystemReplaceSpaceHttpResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type FunctionsGetByRidQueriesHttpResp struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -58186,6 +59506,50 @@ func (r OntologiesGetQueryTypeV2HttpResp) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r OntologiesGetQueryTypeV2HttpResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type OntologiesListOntologyValueTypesHttpResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *OntologiesListOntologyValueTypesResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r OntologiesListOntologyValueTypesHttpResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r OntologiesListOntologyValueTypesHttpResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type OntologiesGetOntologyValueTypeHttpResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *OntologiesOntologyValueType
+}
+
+// Status returns HTTPResponse.Status
+func (r OntologiesGetOntologyValueTypeHttpResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r OntologiesGetOntologyValueTypeHttpResp) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -60830,8 +62194,8 @@ func (c *ClientWithResponses) FilesystemCreateProjectFromTemplateWithResponse(ct
 }
 
 // FilesystemGetProjectWithResponse request returning *FilesystemGetProjectHttpResp
-func (c *ClientWithResponses) FilesystemGetProjectWithResponse(ctx context.Context, projectRid FilesystemProjectRid, params *FilesystemGetProjectParams, reqEditors ...RequestEditorFn) (*FilesystemGetProjectHttpResp, error) {
-	rsp, err := c.FilesystemGetProject(ctx, projectRid, params, reqEditors...)
+func (c *ClientWithResponses) FilesystemGetProjectWithResponse(ctx context.Context, projectRid FilesystemProjectRid, reqEditors ...RequestEditorFn) (*FilesystemGetProjectHttpResp, error) {
+	rsp, err := c.FilesystemGetProject(ctx, projectRid, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -61045,6 +62409,58 @@ func (c *ClientWithResponses) FilesystemListSpacesWithResponse(ctx context.Conte
 		return nil, err
 	}
 	return ParseFilesystemListSpacesHttpResp(rsp)
+}
+
+// FilesystemCreateSpaceWithBodyWithResponse request with arbitrary body returning *FilesystemCreateSpaceHttpResp
+func (c *ClientWithResponses) FilesystemCreateSpaceWithBodyWithResponse(ctx context.Context, params *FilesystemCreateSpaceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*FilesystemCreateSpaceHttpResp, error) {
+	rsp, err := c.FilesystemCreateSpaceWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseFilesystemCreateSpaceHttpResp(rsp)
+}
+
+func (c *ClientWithResponses) FilesystemCreateSpaceWithResponse(ctx context.Context, params *FilesystemCreateSpaceParams, body FilesystemCreateSpaceJSONRequestBody, reqEditors ...RequestEditorFn) (*FilesystemCreateSpaceHttpResp, error) {
+	rsp, err := c.FilesystemCreateSpace(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseFilesystemCreateSpaceHttpResp(rsp)
+}
+
+// FilesystemDeleteSpaceWithResponse request returning *FilesystemDeleteSpaceHttpResp
+func (c *ClientWithResponses) FilesystemDeleteSpaceWithResponse(ctx context.Context, spaceRid FilesystemSpaceRid, params *FilesystemDeleteSpaceParams, reqEditors ...RequestEditorFn) (*FilesystemDeleteSpaceHttpResp, error) {
+	rsp, err := c.FilesystemDeleteSpace(ctx, spaceRid, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseFilesystemDeleteSpaceHttpResp(rsp)
+}
+
+// FilesystemGetSpaceWithResponse request returning *FilesystemGetSpaceHttpResp
+func (c *ClientWithResponses) FilesystemGetSpaceWithResponse(ctx context.Context, spaceRid FilesystemSpaceRid, params *FilesystemGetSpaceParams, reqEditors ...RequestEditorFn) (*FilesystemGetSpaceHttpResp, error) {
+	rsp, err := c.FilesystemGetSpace(ctx, spaceRid, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseFilesystemGetSpaceHttpResp(rsp)
+}
+
+// FilesystemReplaceSpaceWithBodyWithResponse request with arbitrary body returning *FilesystemReplaceSpaceHttpResp
+func (c *ClientWithResponses) FilesystemReplaceSpaceWithBodyWithResponse(ctx context.Context, spaceRid FilesystemSpaceRid, params *FilesystemReplaceSpaceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*FilesystemReplaceSpaceHttpResp, error) {
+	rsp, err := c.FilesystemReplaceSpaceWithBody(ctx, spaceRid, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseFilesystemReplaceSpaceHttpResp(rsp)
+}
+
+func (c *ClientWithResponses) FilesystemReplaceSpaceWithResponse(ctx context.Context, spaceRid FilesystemSpaceRid, params *FilesystemReplaceSpaceParams, body FilesystemReplaceSpaceJSONRequestBody, reqEditors ...RequestEditorFn) (*FilesystemReplaceSpaceHttpResp, error) {
+	rsp, err := c.FilesystemReplaceSpace(ctx, spaceRid, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseFilesystemReplaceSpaceHttpResp(rsp)
 }
 
 // FunctionsGetByRidQueriesWithBodyWithResponse request with arbitrary body returning *FunctionsGetByRidQueriesHttpResp
@@ -61844,6 +63260,24 @@ func (c *ClientWithResponses) OntologiesGetQueryTypeV2WithResponse(ctx context.C
 		return nil, err
 	}
 	return ParseOntologiesGetQueryTypeV2HttpResp(rsp)
+}
+
+// OntologiesListOntologyValueTypesWithResponse request returning *OntologiesListOntologyValueTypesHttpResp
+func (c *ClientWithResponses) OntologiesListOntologyValueTypesWithResponse(ctx context.Context, ontology OntologiesOntologyIdentifier, params *OntologiesListOntologyValueTypesParams, reqEditors ...RequestEditorFn) (*OntologiesListOntologyValueTypesHttpResp, error) {
+	rsp, err := c.OntologiesListOntologyValueTypes(ctx, ontology, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseOntologiesListOntologyValueTypesHttpResp(rsp)
+}
+
+// OntologiesGetOntologyValueTypeWithResponse request returning *OntologiesGetOntologyValueTypeHttpResp
+func (c *ClientWithResponses) OntologiesGetOntologyValueTypeWithResponse(ctx context.Context, ontology OntologiesOntologyIdentifier, valueType OntologiesValueTypeAPIName, params *OntologiesGetOntologyValueTypeParams, reqEditors ...RequestEditorFn) (*OntologiesGetOntologyValueTypeHttpResp, error) {
+	rsp, err := c.OntologiesGetOntologyValueType(ctx, ontology, valueType, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseOntologiesGetOntologyValueTypeHttpResp(rsp)
 }
 
 // OperationsGetOperationWithResponse request returning *OperationsGetOperationHttpResp
@@ -65743,6 +67177,100 @@ func ParseFilesystemListSpacesHttpResp(rsp *http.Response) (*FilesystemListSpace
 	return response, nil
 }
 
+// ParseFilesystemCreateSpaceHttpResp parses an HTTP response from a FilesystemCreateSpaceWithResponse call
+func ParseFilesystemCreateSpaceHttpResp(rsp *http.Response) (*FilesystemCreateSpaceHttpResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &FilesystemCreateSpaceHttpResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FilesystemSpace
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseFilesystemDeleteSpaceHttpResp parses an HTTP response from a FilesystemDeleteSpaceWithResponse call
+func ParseFilesystemDeleteSpaceHttpResp(rsp *http.Response) (*FilesystemDeleteSpaceHttpResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &FilesystemDeleteSpaceHttpResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseFilesystemGetSpaceHttpResp parses an HTTP response from a FilesystemGetSpaceWithResponse call
+func ParseFilesystemGetSpaceHttpResp(rsp *http.Response) (*FilesystemGetSpaceHttpResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &FilesystemGetSpaceHttpResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FilesystemSpace
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseFilesystemReplaceSpaceHttpResp parses an HTTP response from a FilesystemReplaceSpaceWithResponse call
+func ParseFilesystemReplaceSpaceHttpResp(rsp *http.Response) (*FilesystemReplaceSpaceHttpResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &FilesystemReplaceSpaceHttpResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FilesystemSpace
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseFunctionsGetByRidQueriesHttpResp parses an HTTP response from a FunctionsGetByRidQueriesWithResponse call
 func ParseFunctionsGetByRidQueriesHttpResp(rsp *http.Response) (*FunctionsGetByRidQueriesHttpResp, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -67449,6 +68977,58 @@ func ParseOntologiesGetQueryTypeV2HttpResp(rsp *http.Response) (*OntologiesGetQu
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest OntologiesQueryTypeV2
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseOntologiesListOntologyValueTypesHttpResp parses an HTTP response from a OntologiesListOntologyValueTypesWithResponse call
+func ParseOntologiesListOntologyValueTypesHttpResp(rsp *http.Response) (*OntologiesListOntologyValueTypesHttpResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &OntologiesListOntologyValueTypesHttpResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest OntologiesListOntologyValueTypesResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseOntologiesGetOntologyValueTypeHttpResp parses an HTTP response from a OntologiesGetOntologyValueTypeWithResponse call
+func ParseOntologiesGetOntologyValueTypeHttpResp(rsp *http.Response) (*OntologiesGetOntologyValueTypeHttpResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &OntologiesGetOntologyValueTypeHttpResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest OntologiesOntologyValueType
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

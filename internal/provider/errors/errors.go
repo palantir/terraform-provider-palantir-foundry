@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/helper"
 )
 
@@ -50,4 +51,8 @@ func FormatHTTPError(httpResp *http.Response) (string, error) {
 		httpResp.StatusCode, errorResp.ErrorCode, errorResp.ErrorName)
 
 	return errMsg, nil
+}
+
+func ResourceNotFoundWarning(id string, resourceType string) diag.Diagnostic {
+	return diag.NewWarningDiagnostic("Resource does not exist in Foundry anymore, removing from Terraform state", "Resource ID:"+id+", Resource type: "+resourceType)
 }

@@ -42,13 +42,13 @@ resource "foundry_organization" "example-organization" {
 
 ### Required
 
-- `enrollment_rid` (String) The RID of the Enrollment this Organization belongs to. This field is immutable after creation.
 - `name` (String) Name of the Organization.
 - `organization_roles` (Set of Object) List of role assignments for this Organization. (see [below for nested schema](#nestedatt--organization_roles))
 
 ### Optional
 
 - `description` (String) Description of the Organization.
+- `enrollment_rid` (String) The RID of the Enrollment this Organization belongs to. This field required if the resource is created within Terraform, but not necessarily if created outside of Terraform and imported.
 - `host_name` (String) The primary host name of the Organization. This should be used when constructing URLs for users of this Organization.
 - `organization_members` (Set of String) List of the IDs of the members that belong to this Organization.
 

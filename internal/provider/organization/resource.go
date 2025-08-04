@@ -93,8 +93,8 @@ func (r *organizationResource) Schema(_ context.Context, _ resource.SchemaReques
 				Computed:    true,
 			},
 			"enrollment_rid": schema.StringAttribute{
-				Description: "The RID of the Enrollment this Organization belongs to. This field is immutable after creation.",
-				Required:    true,
+				Description: "The RID of the Enrollment this Organization belongs to. This field required if the resource is created within Terraform, but not necessarily if created outside of Terraform and imported.",
+				Optional:    true,
 			},
 			"description": schema.StringAttribute{
 				Description: "Description of the Organization.",
@@ -325,6 +325,11 @@ func (r *organizationResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
+	if resp.Diagnostics.Warnings().Contains(providerError.ResourceNotFoundWarning(state.RID.ValueString(), "Organization")) {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	err = r.ReadOrganizationMembers(ctx, &state)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading the Organization members", err.Error())
@@ -356,8 +361,8 @@ func (r *organizationResource) ReadOrganization(ctx context.Context, resp *resou
 
 	if httpResp.StatusCode != http.StatusOK {
 		if httpResp.StatusCode == http.StatusNotFound {
-			resp.State.RemoveResource(ctx)
-			return fmt.Errorf("organization not found, removing resource from Terraform state: %w", err)
+			resp.Diagnostics.Append(providerError.ResourceNotFoundWarning(state.RID.ValueString(), "Organization"))
+			return nil
 		}
 		returnString, err := providerError.FormatHTTPError(httpResp)
 		if err != nil {
@@ -530,6 +535,9 @@ func (r *organizationResource) Update(ctx context.Context, req resource.UpdateRe
 }
 
 func (r *organizationResource) UpdateOrganization(ctx context.Context, resp *resource.UpdateResponse, plan *organizationResourceModel, state *organizationResourceModel) error {
+	if state.EnrollmentRID != plan.EnrollmentRID {
+		return fmt.Errorf("you may not change the Enrollment RID of an Organization once it has been created. Please revert your plan to the existing Enrollment RID and re-apply")
+	}
 	previewMode := constants.PreviewMode
 
 	adminReplaceOrganizationParams := v2.AdminReplaceOrganizationParams{Preview: &previewMode}
