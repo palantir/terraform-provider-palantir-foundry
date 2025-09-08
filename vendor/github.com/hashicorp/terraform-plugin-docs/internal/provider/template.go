@@ -150,7 +150,7 @@ func (t providerTemplate) Render(providerDir, providerName, renderedProviderName
 		ExampleFile: exampleFile,
 
 		ProviderName:      providerName,
-		ProviderShortName: providerShortName(providerName),
+		ProviderShortName: providerShortName(renderedProviderName),
 
 		SchemaMarkdown: schemaComment + "\n" + schemaBuffer.String(),
 
@@ -158,7 +158,7 @@ func (t providerTemplate) Render(providerDir, providerName, renderedProviderName
 	})
 }
 
-func (t resourceTemplate) Render(providerDir, name, providerName, renderedProviderName, typeName, exampleFile, importFile string, schema *tfjson.Schema) (string, error) {
+func (t resourceTemplate) Render(providerDir, name, providerName, renderedProviderName, typeName, exampleFile, importIDConfigFile, importIdentityConfigFile, importCmdFile string, schema *tfjson.Schema, identitySchema *tfjson.IdentitySchema) (string, error) {
 	schemaBuffer := bytes.NewBuffer(nil)
 	err := schemamd.Render(schema, schemaBuffer)
 	if err != nil {
@@ -168,6 +168,25 @@ func (t resourceTemplate) Render(providerDir, name, providerName, renderedProvid
 	s := string(t)
 	if s == "" {
 		return "", nil
+	}
+
+	hasImportIdentityConfig := importIdentityConfigFile != "" && fileExists(importIdentityConfigFile)
+	identitySchemaBuffer := bytes.NewBuffer(nil)
+
+	// Always render the identity schema if we have one, so it can be used in custom templates.
+	if identitySchema != nil {
+		_, err := io.WriteString(identitySchemaBuffer, schemaComment+"\n")
+		if err != nil {
+			return "", fmt.Errorf("unable to render identity schema comment: %w", err)
+		}
+
+		err = schemamd.RenderIdentitySchema(identitySchema, identitySchemaBuffer)
+		if err != nil {
+			return "", fmt.Errorf("unable to render identity schema: %w", err)
+		}
+	} else if hasImportIdentityConfig {
+		// If there is an identity example, but we don't have an identity schema, we should return an error to ensure the example file was intended.
+		return "", fmt.Errorf("unable to render: an identity import example (%q) was provided for a resource (%q) that does not support resource identity", importIdentityConfigFile, name)
 	}
 
 	return renderStringTemplate(providerDir, "resourceTemplate", s, struct {
@@ -180,6 +199,13 @@ func (t resourceTemplate) Render(providerDir, name, providerName, renderedProvid
 
 		HasImport  bool
 		ImportFile string
+
+		HasImportIDConfig  bool
+		ImportIDConfigFile string
+
+		HasImportIdentityConfig  bool
+		ImportIdentityConfigFile string
+		IdentitySchemaMarkdown   string
 
 		ProviderName      string
 		ProviderShortName string
@@ -195,11 +221,18 @@ func (t resourceTemplate) Render(providerDir, name, providerName, renderedProvid
 		HasExample:  exampleFile != "" && fileExists(exampleFile),
 		ExampleFile: exampleFile,
 
-		HasImport:  importFile != "" && fileExists(importFile),
-		ImportFile: importFile,
+		HasImport:  importCmdFile != "" && fileExists(importCmdFile),
+		ImportFile: importCmdFile,
+
+		HasImportIDConfig:  importIDConfigFile != "" && fileExists(importIDConfigFile),
+		ImportIDConfigFile: importIDConfigFile,
+
+		HasImportIdentityConfig:  hasImportIdentityConfig,
+		ImportIdentityConfigFile: importIdentityConfigFile,
+		IdentitySchemaMarkdown:   identitySchemaBuffer.String(),
 
 		ProviderName:      providerName,
-		ProviderShortName: providerShortName(providerName),
+		ProviderShortName: providerShortName(renderedProviderName),
 
 		SchemaMarkdown: schemaComment + "\n" + schemaBuffer.String(),
 
@@ -257,7 +290,7 @@ func (t functionTemplate) Render(providerDir, name, providerName, renderedProvid
 		ExampleFile: exampleFile,
 
 		ProviderName:      providerName,
-		ProviderShortName: providerShortName(providerName),
+		ProviderShortName: providerShortName(renderedProviderName),
 
 		FunctionSignatureMarkdown: signatureComment + "\n" + funcSig,
 		FunctionArgumentsMarkdown: argumentComment + "\n" + funcArgs,
@@ -271,7 +304,7 @@ func (t functionTemplate) Render(providerDir, name, providerName, renderedProvid
 
 const defaultResourceTemplate resourceTemplate = `---
 ` + frontmatterComment + `
-page_title: "{{.Name}} {{.Type}} - {{.ProviderName}}"
+page_title: "{{.Name}} {{.Type}} - {{.RenderedProviderName}}"
 subcategory: ""
 description: |-
 {{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
@@ -288,11 +321,29 @@ description: |-
 {{- end }}
 
 {{ .SchemaMarkdown | trimspace }}
-{{- if .HasImport }}
+{{- if or .HasImport .HasImportIDConfig .HasImportIdentityConfig }}
 
 ## Import
 
 Import is supported using the following syntax:
+{{- end }}
+{{- if .HasImportIdentityConfig }}
+
+In Terraform v1.12.0 and later, the [` + "`" + `import` + "`" + ` block](https://developer.hashicorp.com/terraform/language/import) can be used with the ` + "`" + `identity` + "`" + ` attribute, for example:
+
+{{tffile .ImportIdentityConfigFile }}
+
+{{ .IdentitySchemaMarkdown | trimspace }}
+{{- end }}
+{{- if .HasImportIDConfig }}
+
+In Terraform v1.5.0 and later, the [` + "`" + `import` + "`" + ` block](https://developer.hashicorp.com/terraform/language/import) can be used with the ` + "`" + `id` + "`" + ` attribute, for example:
+
+{{tffile .ImportIDConfigFile }}
+{{- end }}
+{{- if .HasImport }}
+
+The [` + "`" + `terraform import` + "`" + ` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
 
 {{codefile "shell" .ImportFile }}
 {{- end }}
@@ -300,7 +351,7 @@ Import is supported using the following syntax:
 
 const defaultFunctionTemplate functionTemplate = `---
 ` + frontmatterComment + `
-page_title: "{{.Name}} {{.Type}} - {{.ProviderName}}"
+page_title: "{{.Name}} {{.Type}} - {{.RenderedProviderName}}"
 subcategory: ""
 description: |-
 {{ .Summary | plainmarkdown | trimspace | prefixlines "  " }}
@@ -323,7 +374,7 @@ description: |-
 ## Arguments
 
 {{ .FunctionArgumentsMarkdown }}
-{{ if .HasVariadic -}}
+{{- if .HasVariadic }}
 {{ .FunctionVariadicArgumentMarkdown }}
 {{- end }}
 `
@@ -331,7 +382,6 @@ description: |-
 const defaultProviderTemplate providerTemplate = `---
 ` + frontmatterComment + `
 page_title: "{{.ProviderShortName}} Provider"
-subcategory: ""
 description: |-
 {{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
 ---
