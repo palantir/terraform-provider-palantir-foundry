@@ -6,7 +6,7 @@ tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/hashicorp/terraform-plugin-docs v0.19.2
+	github.com/hashicorp/terraform-plugin-docs v0.22.0
 	github.com/hashicorp/terraform-plugin-framework v1.15.0
 	github.com/hashicorp/terraform-plugin-log v0.9.0
 	github.com/oapi-codegen/oapi-codegen/v2 v2.4.1

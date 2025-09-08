@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/hashicorp/cli"
@@ -58,6 +59,14 @@ var (
 		"functions/%s.html.markdown",
 		"functions/%s.html.md",
 	}
+	websiteEphemeralResourceFile                 = "ephemeral-resources/%s.md.tmpl"
+	websiteEphemeralResourceFallbackFile         = "ephemeral-resources.md.tmpl"
+	websiteEphemeralResourceFileStaticCandidates = []string{
+		"ephemeral-resources/%s.md",
+		"ephemeral-resources/%s.markdown",
+		"ephemeral-resources/%s.html.markdown",
+		"ephemeral-resources/%s.html.md",
+	}
 	websiteProviderFile                 = "index.md.tmpl"
 	websiteProviderFileStaticCandidates = []string{
 		"index.markdown",
@@ -71,6 +80,7 @@ var (
 		"guides",
 		"resources",
 		"functions",
+		"ephemeral-resources",
 	}
 
 	managedWebsiteFiles = []string{
@@ -372,6 +382,42 @@ func (g *generator) generateMissingFunctionTemplate(functionName string) error {
 	return nil
 }
 
+func (g *generator) generateMissingEphemeralResourceTemplate(resourceName string) error {
+	templatePath := fmt.Sprintf(websiteEphemeralResourceFile, resourceShortName(resourceName, g.providerName))
+	templatePath = filepath.Join(g.TempTemplatesDir(), templatePath)
+	if fileExists(templatePath) {
+		g.infof("ephemeral resource %q template exists, skipping", resourceName)
+		return nil
+	}
+
+	fallbackTemplatePath := filepath.Join(g.TempTemplatesDir(), websiteEphemeralResourceFallbackFile)
+	if fileExists(fallbackTemplatePath) {
+		g.infof("ephemeral resource %q fallback template exists, creating template", resourceName)
+		err := cp(fallbackTemplatePath, templatePath)
+		if err != nil {
+			return fmt.Errorf("unable to copy fallback template for %q: %w", resourceName, err)
+		}
+		return nil
+	}
+
+	for _, candidate := range websiteEphemeralResourceFileStaticCandidates {
+		candidatePath := fmt.Sprintf(candidate, resourceShortName(resourceName, g.providerName))
+		candidatePath = filepath.Join(g.TempTemplatesDir(), candidatePath)
+		if fileExists(candidatePath) {
+			g.infof("ephemeral resource %q static file exists, skipping", resourceName)
+			return nil
+		}
+	}
+
+	g.infof("generating new template for %q", resourceName)
+	err := writeFile(templatePath, string(defaultResourceTemplate))
+	if err != nil {
+		return fmt.Errorf("unable to write template for %q: %w", resourceName, err)
+	}
+
+	return nil
+}
+
 func (g *generator) generateMissingProviderTemplate() error {
 	templatePath := filepath.Join(g.TempTemplatesDir(), websiteProviderFile)
 	if fileExists(templatePath) {
@@ -398,7 +444,16 @@ func (g *generator) generateMissingProviderTemplate() error {
 
 func (g *generator) generateMissingTemplates(providerSchema *tfjson.ProviderSchema) error {
 	g.infof("generating missing resource content")
-	for name, schema := range providerSchema.ResourceSchemas {
+
+	resourceKeys := make([]string, 0, len(providerSchema.ResourceSchemas))
+	for key := range providerSchema.ResourceSchemas {
+		resourceKeys = append(resourceKeys, key)
+	}
+	sort.Strings(resourceKeys)
+
+	for _, name := range resourceKeys {
+		schema := providerSchema.ResourceSchemas[name]
+
 		if g.ignoreDeprecated && schema.Block.Deprecated {
 			continue
 		}
@@ -410,7 +465,16 @@ func (g *generator) generateMissingTemplates(providerSchema *tfjson.ProviderSche
 	}
 
 	g.infof("generating missing data source content")
-	for name, schema := range providerSchema.DataSourceSchemas {
+
+	dataSourceKeys := make([]string, 0, len(providerSchema.DataSourceSchemas))
+	for key := range providerSchema.DataSourceSchemas {
+		dataSourceKeys = append(dataSourceKeys, key)
+	}
+	sort.Strings(dataSourceKeys)
+
+	for _, name := range dataSourceKeys {
+		schema := providerSchema.DataSourceSchemas[name]
+
 		if g.ignoreDeprecated && schema.Block.Deprecated {
 			continue
 		}
@@ -422,7 +486,16 @@ func (g *generator) generateMissingTemplates(providerSchema *tfjson.ProviderSche
 	}
 
 	g.infof("generating missing function content")
-	for name, signature := range providerSchema.Functions {
+
+	functionKeys := make([]string, 0, len(providerSchema.Functions))
+	for key := range providerSchema.Functions {
+		functionKeys = append(functionKeys, key)
+	}
+	sort.Strings(functionKeys)
+
+	for _, name := range functionKeys {
+		signature := providerSchema.Functions[name]
+
 		if g.ignoreDeprecated && signature.DeprecationMessage != "" {
 			continue
 		}
@@ -430,6 +503,27 @@ func (g *generator) generateMissingTemplates(providerSchema *tfjson.ProviderSche
 		err := g.generateMissingFunctionTemplate(name)
 		if err != nil {
 			return fmt.Errorf("unable to generate template for function %q: %w", name, err)
+		}
+	}
+
+	g.infof("generating missing ephemeral resource content")
+
+	ephemeralKeys := make([]string, 0, len(providerSchema.EphemeralResourceSchemas))
+	for key := range providerSchema.EphemeralResourceSchemas {
+		ephemeralKeys = append(ephemeralKeys, key)
+	}
+	sort.Strings(ephemeralKeys)
+
+	for _, name := range ephemeralKeys {
+		schema := providerSchema.EphemeralResourceSchemas[name]
+
+		if g.ignoreDeprecated && schema.Block.Deprecated {
+			continue
+		}
+
+		err := g.generateMissingEphemeralResourceTemplate(name)
+		if err != nil {
+			return fmt.Errorf("unable to generate template for ephemeral resource %q: %w", name, err)
 		}
 	}
 
@@ -494,8 +588,11 @@ func (g *generator) renderStaticWebsite(providerSchema *tfjson.ProviderSchema) e
 		relDir, relFile := filepath.Split(rel)
 		relDir = filepath.ToSlash(relDir)
 
-		// skip special top-level generic resource, data source, and function templates
-		if relDir == "" && (relFile == "resources.md.tmpl" || relFile == "data-sources.md.tmpl" || relFile == "functions.md.tmpl") {
+		// skip special top-level generic resource, data source, function, and ephemeral resource templates
+		if relDir == "" && (relFile == "resources.md.tmpl" ||
+			relFile == "data-sources.md.tmpl" ||
+			relFile == "functions.md.tmpl" ||
+			relFile == "ephemeral-resources.md.tmpl") {
 			return nil
 		}
 
@@ -532,7 +629,7 @@ func (g *generator) renderStaticWebsite(providerSchema *tfjson.ProviderSchema) e
 
 			if resSchema != nil {
 				tmpl := resourceTemplate(tmplData)
-				render, err := tmpl.Render(g.providerDir, resName, g.providerName, g.renderedProviderName, "Data Source", exampleFilePath, "", resSchema)
+				render, err := tmpl.Render(g.providerDir, resName, g.providerName, g.renderedProviderName, "Data Source", exampleFilePath, "", "", "", resSchema, nil)
 				if err != nil {
 					return fmt.Errorf("unable to render data source template %q: %w", rel, err)
 				}
@@ -545,12 +642,15 @@ func (g *generator) renderStaticWebsite(providerSchema *tfjson.ProviderSchema) e
 			g.warnf("data source entitled %q, or %q does not exist", shortName, resName)
 		case "resources/":
 			resSchema, resName := resourceSchema(providerSchema.ResourceSchemas, shortName, relFile)
+			resIdentitySchema := resourceIdentitySchema(providerSchema.ResourceIdentitySchemas, shortName, relFile)
 			exampleFilePath := filepath.Join(g.ProviderExamplesDir(), "resources", resName, "resource.tf")
 			importFilePath := filepath.Join(g.ProviderExamplesDir(), "resources", resName, "import.sh")
+			importIDConfigFilePath := filepath.Join(g.ProviderExamplesDir(), "resources", resName, "import-by-string-id.tf")
+			importIdentityConfigFilePath := filepath.Join(g.ProviderExamplesDir(), "resources", resName, "import-by-identity.tf")
 
 			if resSchema != nil {
 				tmpl := resourceTemplate(tmplData)
-				render, err := tmpl.Render(g.providerDir, resName, g.providerName, g.renderedProviderName, "Resource", exampleFilePath, importFilePath, resSchema)
+				render, err := tmpl.Render(g.providerDir, resName, g.providerName, g.renderedProviderName, "Resource", exampleFilePath, importIDConfigFilePath, importIdentityConfigFilePath, importFilePath, resSchema, resIdentitySchema)
 				if err != nil {
 					return fmt.Errorf("unable to render resource template %q: %w", rel, err)
 				}
@@ -579,6 +679,23 @@ func (g *generator) renderStaticWebsite(providerSchema *tfjson.ProviderSchema) e
 			}
 
 			g.warnf("function entitled %q does not exist", funcName)
+		case "ephemeral-resources/":
+			resSchema, resName := resourceSchema(providerSchema.EphemeralResourceSchemas, shortName, relFile)
+			exampleFilePath := filepath.Join(g.ProviderExamplesDir(), "ephemeral-resources", resName, "ephemeral-resource.tf")
+
+			if resSchema != nil {
+				tmpl := resourceTemplate(tmplData)
+				render, err := tmpl.Render(g.providerDir, resName, g.providerName, g.renderedProviderName, "Ephemeral Resource", exampleFilePath, "", "", "", resSchema, nil)
+				if err != nil {
+					return fmt.Errorf("unable to render ephemeral resource template %q: %w", rel, err)
+				}
+				_, err = out.WriteString(render)
+				if err != nil {
+					return fmt.Errorf("unable to write rendered string: %w", err)
+				}
+				return nil
+			}
+			g.warnf("ephemeral resource entitled %q, or %q does not exist", shortName, resName)
 		case "": // provider
 			if relFile == "index.md.tmpl" {
 				tmpl := providerTemplate(tmplData)
