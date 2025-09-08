@@ -293,8 +293,8 @@ github.com/perimeterx/marshmallow
 github.com/posener/complete
 github.com/posener/complete/cmd
 github.com/posener/complete/cmd/install
-# github.com/rivo/uniseg v0.2.0
-## explicit; go 1.12
+# github.com/rivo/uniseg v0.4.7
+## explicit; go 1.18
 github.com/rivo/uniseg
 # github.com/shopspring/decimal v1.4.0
 ## explicit; go 1.10
