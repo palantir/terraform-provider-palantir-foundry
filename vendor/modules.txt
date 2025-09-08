@@ -341,9 +341,10 @@ github.com/yuin/goldmark/util
 # github.com/yuin/goldmark-meta v1.1.0
 ## explicit; go 1.17
 github.com/yuin/goldmark-meta
-# github.com/zclconf/go-cty v1.16.4
-## explicit; go 1.18
+# github.com/zclconf/go-cty v1.17.0
+## explicit; go 1.23
 github.com/zclconf/go-cty/cty
+github.com/zclconf/go-cty/cty/ctymarks
 github.com/zclconf/go-cty/cty/ctystrings
 github.com/zclconf/go-cty/cty/set
 # go.abhg.dev/goldmark/frontmatter v0.2.0
