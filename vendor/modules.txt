@@ -76,12 +76,12 @@ github.com/fatih/color
 # github.com/getkin/kin-openapi v0.133.0
 ## explicit; go 1.22.5
 github.com/getkin/kin-openapi/openapi3
-# github.com/go-openapi/jsonpointer v0.21.0
+# github.com/go-openapi/jsonpointer v0.22.0
 ## explicit; go 1.20
 github.com/go-openapi/jsonpointer
-# github.com/go-openapi/swag v0.23.0
-## explicit; go 1.20
-github.com/go-openapi/swag
+# github.com/go-openapi/swag/jsonname v0.24.0
+## explicit; go 1.20.0
+github.com/go-openapi/swag/jsonname
 # github.com/golang/protobuf v1.5.4
 ## explicit; go 1.17
 github.com/golang/protobuf/ptypes/empty
@@ -244,9 +244,7 @@ github.com/imdario/mergo
 github.com/josharian/intern
 # github.com/mailru/easyjson v0.9.0
 ## explicit; go 1.20
-github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
-github.com/mailru/easyjson/jwriter
 # github.com/mattn/go-colorable v0.1.14
 ## explicit; go 1.18
 github.com/mattn/go-colorable
