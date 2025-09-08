@@ -73,7 +73,7 @@ require (
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/vmware-labs/yaml-jsonpath v0.3.2 // indirect
-	github.com/woodsbury/decimal128 v1.3.0 // indirect
+	github.com/woodsbury/decimal128 v1.4.0 // indirect
 	github.com/yuin/goldmark v1.7.13 // indirect
 	github.com/yuin/goldmark-meta v1.1.0 // indirect
 	github.com/zclconf/go-cty v1.17.0 // indirect

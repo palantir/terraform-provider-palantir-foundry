@@ -324,8 +324,8 @@ github.com/vmihailenco/tagparser/v2/internal/parser
 # github.com/vmware-labs/yaml-jsonpath v0.3.2
 ## explicit; go 1.13
 github.com/vmware-labs/yaml-jsonpath/pkg/yamlpath
-# github.com/woodsbury/decimal128 v1.3.0
-## explicit; go 1.21
+# github.com/woodsbury/decimal128 v1.4.0
+## explicit; go 1.24.0
 github.com/woodsbury/decimal128
 # github.com/yuin/goldmark v1.7.13
 ## explicit; go 1.22
