@@ -70,8 +70,8 @@ github.com/cloudflare/circl/math/mlsbset
 github.com/cloudflare/circl/sign
 github.com/cloudflare/circl/sign/ed25519
 github.com/cloudflare/circl/sign/ed448
-# github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936
-## explicit; go 1.13
+# github.com/dprotaso/go-yit v0.0.0-20250909171706-0a81c39169bc
+## explicit; go 1.23.0
 github.com/dprotaso/go-yit
 # github.com/fatih/color v1.18.0
 ## explicit; go 1.17
@@ -350,6 +350,9 @@ github.com/zclconf/go-cty/cty/set
 # go.abhg.dev/goldmark/frontmatter v0.2.0
 ## explicit; go 1.20
 go.abhg.dev/goldmark/frontmatter
+# go.yaml.in/yaml/v4 v4.0.0-rc.2
+## explicit; go 1.18
+go.yaml.in/yaml/v4
 # golang.org/x/crypto v0.42.0
 ## explicit; go 1.24.0
 golang.org/x/crypto/argon2
