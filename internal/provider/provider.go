@@ -139,14 +139,14 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 
 	if clientID == "" {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("host"),
-			"Missing Foundry API clientID", "Please provide the API clientID for Foundry in the provider configuration.")
+			path.Root("client_id"),
+			"Missing Foundry API Client ID", "Please provide the API Client ID for Foundry in the provider configuration.")
 	}
 
 	if clientSecret == "" {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("host"),
-			"Missing Foundry API clientSecret", "Please provide the API clientSecret for Foundry in the provider configuration.")
+			path.Root("client_secret"),
+			"Missing Foundry API Client Secret", "Please provide the API Client Secret for Foundry in the provider configuration.")
 	}
 
 	if resp.Diagnostics.HasError() {
@@ -156,25 +156,26 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 	tokenString, err := auth.GetAuthToken(host, clientID, clientSecret)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Unable to retrieve Foundry API Token",
-			"Unable to retrieve Foundry API Token: "+err.Error(),
+			"Authentication Failed",
+			"Failed to retrieve authentication token from Foundry API. Please verify your client credentials and host configuration. Error: "+err.Error(),
 		)
+		return
 	}
 
 	token, err := securityprovider.NewSecurityProviderBearerToken(tokenString)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Unable to convert Foundry API Token",
-			"Unable to convert Foundry API Token: "+err.Error(),
+			"Token Processing Failed",
+			"Failed to create security provider from authentication token. Error: "+err.Error(),
 		)
 		return
 	}
+	
 	client, err := v2.NewClientWithResponses(host+"api", v2.WithRequestEditorFn(token.Intercept))
-
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Unable to create Foundry API Client",
-			"Unable to create Foundry API Client: "+err.Error(),
+			"Client Creation Failed",
+			"Failed to create Foundry API client. Please verify the host URL is correct and accessible. Error: "+err.Error(),
 		)
 		return
 	}
