@@ -145,7 +145,7 @@ github.com/hashicorp/hc-install/version
 ## explicit; go 1.23.0
 github.com/hashicorp/terraform-exec/internal/version
 github.com/hashicorp/terraform-exec/tfexec
-# github.com/hashicorp/terraform-json v0.27.1
+# github.com/hashicorp/terraform-json v0.27.2
 ## explicit; go 1.21
 github.com/hashicorp/terraform-json
 # github.com/hashicorp/terraform-plugin-docs v0.22.0
