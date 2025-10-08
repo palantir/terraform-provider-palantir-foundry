@@ -34,6 +34,7 @@ import (
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/constants"
 	providerError "github.com/palantir/terraform-provider-palantir-foundry/internal/provider/errors"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/helper"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/shared"
 )
 
 // Ensure the implementation satisfies the expected interfaces
@@ -49,26 +50,28 @@ func NewProjectResource() resource.Resource {
 
 // projectResource is the resource implementation.
 type projectResource struct {
-	client *v2.ClientWithResponses
+	client           *v2.ClientWithResponses
+	deletionsEnabled bool
 }
 
-// Configure adds the provider configured client to the resource.
+// Configure adds the provider data to the resource.
 func (r *projectResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
 
-	client, ok := req.ProviderData.(*v2.ClientWithResponses)
+	providerData, ok := req.ProviderData.(*shared.FoundryProviderData)
 
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected v2.ClientWithResponses, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected shared.FoundryProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 		return
 	}
 
-	r.client = client
+	r.client = providerData.Client
+	r.deletionsEnabled = providerData.Flags.DeletionsEnabled
 }
 
 // Metadata returns the resource type name.
@@ -914,6 +917,12 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// If deletions are disabled, just return. The resource will be dropped from state without removing the project.
+	if !r.deletionsEnabled {
+		tflog.Info(ctx, fmt.Sprintf("Deletions are disabled, remote project with rid %s will not be deleted", state.RID.ValueString()))
 		return
 	}
 

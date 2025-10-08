@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/oapi-codegen/oapi-codegen/v2/pkg/securityprovider"
 	v2 "github.com/palantir/terraform-provider-palantir-foundry/gateway-client/v2"
@@ -32,6 +33,7 @@ import (
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/marking"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/organization"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/project"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/shared"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/space"
 )
 
@@ -68,14 +70,18 @@ func (p *FoundryProvider) Schema(_ context.Context, _ provider.SchemaRequest, re
 				Optional:  true,
 				Sensitive: true,
 			},
+			"deletions_enabled": schema.BoolAttribute{
+				Optional: true,
+			},
 		},
 	}
 }
 
 type foundryProviderModel struct {
-	Host         types.String `tfsdk:"host"`
-	ClientID     types.String `tfsdk:"client_id"`
-	ClientSecret types.String `tfsdk:"client_secret"`
+	Host             types.String `tfsdk:"host"`
+	ClientID         types.String `tfsdk:"client_id"`
+	ClientSecret     types.String `tfsdk:"client_secret"`
+	DeletionsEnabled types.Bool   `tfsdk:"deletions_enabled"`
 }
 
 // Configure prepares a Foundry API client for data sources and resources.
@@ -104,6 +110,11 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 			path.Root("client_secret"),
 			"Unknown Foundry API Client Secret", "Please provide the API Client Secret for Foundry in the provider configuration.")
 	}
+	if config.DeletionsEnabled.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("host"),
+			"Unknown Deletion Flag", "Please provide the deletion flag in the provider configuration.")
+	}
 
 	if resp.Diagnostics.HasError() {
 		return
@@ -115,6 +126,14 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 	host := os.Getenv("BASE_HOSTNAME")
 	clientID := os.Getenv("CLIENT_ID")
 	clientSecret := os.Getenv("CLIENT_SECRET")
+
+	// If no deletions flag provided, default to true.
+	var deletionsEnabled bool
+	if config.DeletionsEnabled.IsNull() {
+		deletionsEnabled = true
+	} else {
+		deletionsEnabled = config.DeletionsEnabled.ValueBool()
+	}
 
 	if !config.Host.IsNull() {
 		host = config.Host.ValueString()
@@ -179,8 +198,15 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 		return
 	}
 
-	resp.DataSourceData = client
-	resp.ResourceData = client
+	providerData := &shared.FoundryProviderData{
+		Client: client,
+		Flags: &shared.Flags{
+			DeletionsEnabled: deletionsEnabled,
+		},
+	}
+
+	resp.DataSourceData = providerData
+	resp.ResourceData = providerData
 }
 
 // DataSources defines the data sources implemented in the provider.

@@ -33,6 +33,7 @@ import (
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/constants"
 	providerError "github.com/palantir/terraform-provider-palantir-foundry/internal/provider/errors"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/helper"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/shared"
 )
 
 // Ensure the implementation satisfies the expected interfaces
@@ -51,13 +52,13 @@ type markingResource struct {
 	client *v2.ClientWithResponses
 }
 
-// Configure adds the provider configured client to the resource.
+// Configure adds the provider data to the resource.
 func (r *markingResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
 
-	client, ok := req.ProviderData.(*v2.ClientWithResponses)
+	providerData, ok := req.ProviderData.(*shared.FoundryProviderData)
 
 	if !ok {
 		resp.Diagnostics.AddError(
@@ -68,7 +69,7 @@ func (r *markingResource) Configure(_ context.Context, req resource.ConfigureReq
 		return
 	}
 
-	r.client = client
+	r.client = providerData.Client
 }
 
 // Metadata returns the resource type name.
