@@ -920,7 +920,7 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	// If deletions are disabled, just return. The resource will be dropped from state without removing the project.
+	// If deletions are disabled, just return. The resource will be dropped from state without removing the remote project.
 	if !r.deletionsEnabled {
 		tflog.Info(ctx, fmt.Sprintf("Deletions are disabled, remote project with rid %s will not be deleted", state.RID.ValueString()))
 		return

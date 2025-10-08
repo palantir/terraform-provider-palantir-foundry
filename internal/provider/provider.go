@@ -127,7 +127,7 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 	clientID := os.Getenv("CLIENT_ID")
 	clientSecret := os.Getenv("CLIENT_SECRET")
 
-	// If no deletions flag provided, default to true.
+	// If no deletions enabled flag provided, default to true.
 	var deletionsEnabled bool
 	if config.DeletionsEnabled.IsNull() {
 		deletionsEnabled = true

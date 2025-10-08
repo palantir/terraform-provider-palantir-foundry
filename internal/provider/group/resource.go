@@ -469,7 +469,7 @@ func (r *groupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 		return
 	}
 
-	// If deletions are disabled, just return. The resource will be dropped from state without removing the group.
+	// If deletions are disabled, just return. The resource will be dropped from state without removing the remote group.
 	if !r.deletionsEnabled {
 		tflog.Info(ctx, fmt.Sprintf("Deletions are disabled, remote group with id %s will not be deleted", state.ID.ValueString()))
 		return

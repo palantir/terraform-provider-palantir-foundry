@@ -422,7 +422,7 @@ func (r *spaceResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 		return
 	}
 
-	// If deletions are disabled, just return. The resource will be dropped from state without removing the space.
+	// If deletions are disabled, just return. The resource will be dropped from state without removing the remote space.
 	if !r.deletionsEnabled {
 		tflog.Info(ctx, fmt.Sprintf("Deletions are disabled, remote space with rid %s will not be deleted", state.RID.ValueString()))
 		return
