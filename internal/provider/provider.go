@@ -113,7 +113,7 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 	if config.DeletionsDisabled.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("host"),
-			"Unknown Deletion Flag", "Please provide the deletion flag in the provider configuration.")
+			"Unknown Deletions Disabled Flag", "Please provide the Deletions Disabled Flag in the provider configuration.")
 	}
 
 	if resp.Diagnostics.HasError() {
