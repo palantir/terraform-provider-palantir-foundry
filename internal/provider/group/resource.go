@@ -471,8 +471,8 @@ func (r *groupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 
 	// If deletions are disabled, error.
 	if r.deletionsDisabled {
-		resp.Diagnostics.AddError("Tried to perform a deletion when the deletions_enabled flag was set to true.",
-			fmt.Sprintf("Group with id %s will not be deleted", state.ID.ValueString()))
+		resp.Diagnostics.AddError("Tried to perform a deletion when the deletions_disabled flag was set to true.",
+			fmt.Sprintf("Group with name %s and id %s will not be deleted.", state.Name.ValueString(), state.ID.ValueString()))
 		return
 	}
 

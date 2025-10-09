@@ -922,8 +922,8 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 
 	// If deletions are disabled, error.
 	if r.deletionsDisabled {
-		resp.Diagnostics.AddError("Tried to perform a deletion when the deletions_enabled flag was set to true.",
-			fmt.Sprintf("Project with rid %s will not be deleted", state.RID.ValueString()))
+		resp.Diagnostics.AddError("Tried to perform a deletion when the deletions_disabled flag was set to true.",
+			fmt.Sprintf("Project with name %s and rid %s will not be deleted.", state.DisplayName.ValueString(), state.RID.ValueString()))
 		return
 	}
 
