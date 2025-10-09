@@ -38,4 +38,5 @@ provider "foundry" {
 
 - `client_id` (String)
 - `client_secret` (String, Sensitive)
+- `deletions_disabled` (Boolean)
 - `host` (String)
