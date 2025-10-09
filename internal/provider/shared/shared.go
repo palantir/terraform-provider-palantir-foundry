@@ -10,5 +10,5 @@ type FoundryProviderData struct {
 }
 
 type Flags struct {
-	DeletionsEnabled bool
+	DeletionsDisabled bool
 }

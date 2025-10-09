@@ -70,7 +70,7 @@ func (p *FoundryProvider) Schema(_ context.Context, _ provider.SchemaRequest, re
 				Optional:  true,
 				Sensitive: true,
 			},
-			"deletions_enabled": schema.BoolAttribute{
+			"deletions_disabled": schema.BoolAttribute{
 				Optional: true,
 			},
 		},
@@ -78,10 +78,10 @@ func (p *FoundryProvider) Schema(_ context.Context, _ provider.SchemaRequest, re
 }
 
 type foundryProviderModel struct {
-	Host             types.String `tfsdk:"host"`
-	ClientID         types.String `tfsdk:"client_id"`
-	ClientSecret     types.String `tfsdk:"client_secret"`
-	DeletionsEnabled types.Bool   `tfsdk:"deletions_enabled"`
+	Host              types.String `tfsdk:"host"`
+	ClientID          types.String `tfsdk:"client_id"`
+	ClientSecret      types.String `tfsdk:"client_secret"`
+	DeletionsDisabled types.Bool   `tfsdk:"deletions_disabled"`
 }
 
 // Configure prepares a Foundry API client for data sources and resources.
@@ -110,7 +110,7 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 			path.Root("client_secret"),
 			"Unknown Foundry API Client Secret", "Please provide the API Client Secret for Foundry in the provider configuration.")
 	}
-	if config.DeletionsEnabled.IsUnknown() {
+	if config.DeletionsDisabled.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("host"),
 			"Unknown Deletion Flag", "Please provide the deletion flag in the provider configuration.")
@@ -127,12 +127,12 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 	clientID := os.Getenv("CLIENT_ID")
 	clientSecret := os.Getenv("CLIENT_SECRET")
 
-	// If no deletions enabled flag provided, default to true.
-	var deletionsEnabled bool
-	if config.DeletionsEnabled.IsNull() {
-		deletionsEnabled = true
+	// If no deletionsDisabled flag provided, default to false.
+	var deletionsDisabled bool
+	if config.DeletionsDisabled.IsNull() {
+		deletionsDisabled = false
 	} else {
-		deletionsEnabled = config.DeletionsEnabled.ValueBool()
+		deletionsDisabled = config.DeletionsDisabled.ValueBool()
 	}
 
 	if !config.Host.IsNull() {
@@ -201,7 +201,7 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 	providerData := &shared.FoundryProviderData{
 		Client: client,
 		Flags: &shared.Flags{
-			DeletionsEnabled: deletionsEnabled,
+			DeletionsDisabled: deletionsDisabled,
 		},
 	}
 

@@ -50,8 +50,8 @@ func NewProjectResource() resource.Resource {
 
 // projectResource is the resource implementation.
 type projectResource struct {
-	client           *v2.ClientWithResponses
-	deletionsEnabled bool
+	client            *v2.ClientWithResponses
+	deletionsDisabled bool
 }
 
 // Configure adds the provider data to the resource.
@@ -71,7 +71,7 @@ func (r *projectResource) Configure(_ context.Context, req resource.ConfigureReq
 	}
 
 	r.client = providerData.Client
-	r.deletionsEnabled = providerData.Flags.DeletionsEnabled
+	r.deletionsDisabled = providerData.Flags.DeletionsDisabled
 }
 
 // Metadata returns the resource type name.
@@ -920,9 +920,10 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	// If deletions are disabled, just return. The resource will be dropped from state without removing the remote project.
-	if !r.deletionsEnabled {
-		tflog.Info(ctx, fmt.Sprintf("Deletions are disabled, remote project with rid %s will not be deleted", state.RID.ValueString()))
+	// If deletions are disabled, error.
+	if r.deletionsDisabled {
+		resp.Diagnostics.AddError("Tried to perform a deletion when the deletions_enabled flag was set to true.",
+			fmt.Sprintf("Project with rid %s will not be deleted", state.RID.ValueString()))
 		return
 	}
 

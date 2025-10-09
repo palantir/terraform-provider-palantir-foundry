@@ -47,8 +47,8 @@ func NewGroupResource() resource.Resource {
 
 // groupResource is the resource implementation.
 type groupResource struct {
-	client           *v2.ClientWithResponses
-	deletionsEnabled bool
+	client            *v2.ClientWithResponses
+	deletionsDisabled bool
 }
 
 // Configure adds the provider data to the resource.
@@ -69,7 +69,7 @@ func (r *groupResource) Configure(_ context.Context, req resource.ConfigureReque
 	}
 
 	r.client = providerData.Client
-	r.deletionsEnabled = providerData.Flags.DeletionsEnabled
+	r.deletionsDisabled = providerData.Flags.DeletionsDisabled
 }
 
 // Metadata returns the resource type name.
@@ -469,9 +469,10 @@ func (r *groupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 		return
 	}
 
-	// If deletions are disabled, just return. The resource will be dropped from state without removing the remote group.
-	if !r.deletionsEnabled {
-		tflog.Info(ctx, fmt.Sprintf("Deletions are disabled, remote group with id %s will not be deleted", state.ID.ValueString()))
+	// If deletions are disabled, error.
+	if r.deletionsDisabled {
+		resp.Diagnostics.AddError("Tried to perform a deletion when the deletions_enabled flag was set to true.",
+			fmt.Sprintf("Group with id %s will not be deleted", state.ID.ValueString()))
 		return
 	}
 

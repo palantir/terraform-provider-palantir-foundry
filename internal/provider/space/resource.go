@@ -45,8 +45,8 @@ func NewSpaceResource() resource.Resource {
 
 // spaceResource is the resource implementation.
 type spaceResource struct {
-	client           *v2.ClientWithResponses
-	deletionsEnabled bool
+	client            *v2.ClientWithResponses
+	deletionsDisabled bool
 }
 
 // Configure adds the provider data to the resource.
@@ -67,7 +67,7 @@ func (r *spaceResource) Configure(_ context.Context, req resource.ConfigureReque
 	}
 
 	r.client = providerData.Client
-	r.deletionsEnabled = providerData.Flags.DeletionsEnabled
+	r.deletionsDisabled = providerData.Flags.DeletionsDisabled
 }
 
 // Metadata returns the resource type name.
@@ -422,9 +422,10 @@ func (r *spaceResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 		return
 	}
 
-	// If deletions are disabled, just return. The resource will be dropped from state without removing the remote space.
-	if !r.deletionsEnabled {
-		tflog.Info(ctx, fmt.Sprintf("Deletions are disabled, remote space with rid %s will not be deleted", state.RID.ValueString()))
+	// If deletions are disabled, error.
+	if r.deletionsDisabled {
+		resp.Diagnostics.AddError("Tried to perform a deletion when the deletions_enabled flag was set to true.",
+			fmt.Sprintf("Space with rid %s will not be deleted", state.RID.ValueString()))
 		return
 	}
 
