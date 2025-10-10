@@ -688,7 +688,7 @@ func (r *projectResource) UpdateProjectMarkings(ctx context.Context, plan *proje
 				return errors.New(returnString)
 			}
 		}
-		if len(markingsToRemove) != 0 {
+		if len(markingsToRemove) != 0 && !r.deletionsDisabled {
 			markingIdsToRemove := make([]v2.CoreMarkingID, len(markingsToRemove))
 			for i, markingID := range markingsToRemove {
 				markingUUID, err := uuid.Parse(markingID)
@@ -795,7 +795,7 @@ func (r *projectResource) UpdateProjectRoles(ctx context.Context, plan *projectR
 				return errors.New(returnString)
 			}
 		}
-		if len(rolesToRemove) != 0 {
+		if len(rolesToRemove) != 0 && !r.deletionsDisabled {
 			roleUpdates := make([]v2.FilesystemResourceRole, len(rolesToRemove))
 
 			for i, role := range rolesToRemove {
@@ -887,7 +887,7 @@ func (r *projectResource) UpdateProjectOrganizations(ctx context.Context, plan *
 				return errors.New(returnString)
 			}
 		}
-		if len(organizationsToRemove) != 0 {
+		if len(organizationsToRemove) != 0 && !r.deletionsDisabled {
 			filesystemRemoveOrganizationsParams := v2.FilesystemRemoveOrganizationsParams{Preview: &previewMode}
 			httpResp, err := r.client.FilesystemRemoveOrganizations(ctx, state.RID.ValueString(), &filesystemRemoveOrganizationsParams, v2.FilesystemRemoveOrganizationsJSONRequestBody{
 				OrganizationRids: &organizationsToRemove,
