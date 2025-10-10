@@ -358,6 +358,7 @@ func (r *spaceResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
 }
 
 func (r *spaceResource) UpdateSpace(ctx context.Context, resp *resource.UpdateResponse, plan *spaceResourceModel, state *spaceResourceModel) error {

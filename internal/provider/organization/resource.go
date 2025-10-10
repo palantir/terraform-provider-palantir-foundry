@@ -48,7 +48,8 @@ func NewOrganizationResource() resource.Resource {
 
 // organizationResource is the resource implementation.
 type organizationResource struct {
-	client *v2.ClientWithResponses
+	client            *v2.ClientWithResponses
+	deletionsDisabled bool
 }
 
 // Configure adds the provider data to the resource.
@@ -69,6 +70,7 @@ func (r *organizationResource) Configure(_ context.Context, req resource.Configu
 	}
 
 	r.client = providerData.Client
+	r.deletionsDisabled = providerData.Flags.DeletionsDisabled
 }
 
 // Metadata returns the resource type name.
@@ -636,7 +638,7 @@ func (r *organizationResource) UpdateOrganizationMembers(ctx context.Context, pl
 				return errors.New(returnString)
 			}
 		}
-		if len(membersToRemove) != 0 {
+		if len(membersToRemove) != 0 && !r.deletionsDisabled {
 			adminRemoveMarkingRoleAssignmentsParams := v2.AdminRemoveMarkingMembersParams{Preview: &previewMode}
 			httpResp, err := r.client.AdminRemoveMarkingMembers(ctx, markingUUID, &adminRemoveMarkingRoleAssignmentsParams, v2.AdminRemoveMarkingMembersJSONRequestBody{
 				PrincipalIds: &membersToRemove,
@@ -719,7 +721,7 @@ func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan
 				return errors.New(returnString)
 			}
 		}
-		if len(rolesToRemove) != 0 {
+		if len(rolesToRemove) != 0 && !r.deletionsDisabled {
 			roleUpdates := make([]v2.CoreRoleAssignmentUpdate, len(rolesToRemove))
 			for i, role := range rolesToRemove {
 				roleUpdates[i] = v2.CoreRoleAssignmentUpdate{

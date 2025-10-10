@@ -48,7 +48,8 @@ func NewEnrollmentResource() resource.Resource {
 
 // enrollmentResource is the resource implementation.
 type enrollmentResource struct {
-	client *v2.ClientWithResponses
+	client            *v2.ClientWithResponses
+	deletionsDisabled bool
 }
 
 func (r *enrollmentResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -68,6 +69,7 @@ func (r *enrollmentResource) Configure(_ context.Context, req resource.Configure
 	}
 
 	r.client = providerData.Client
+	r.deletionsDisabled = providerData.Flags.DeletionsDisabled
 }
 
 // Metadata returns the resource type name.
@@ -272,7 +274,7 @@ func (r *enrollmentResource) UpdateEnrollmentRoles(ctx context.Context, plan *en
 				return errors.New(returnString)
 			}
 		}
-		if len(rolesToRemove) != 0 {
+		if len(rolesToRemove) != 0 && !r.deletionsDisabled {
 			roleUpdates := make([]v2.CoreRoleAssignmentUpdate, len(rolesToRemove))
 			for i, role := range rolesToRemove {
 				roleUpdates[i] = v2.CoreRoleAssignmentUpdate{

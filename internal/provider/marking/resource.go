@@ -49,7 +49,8 @@ func NewMarkingResource() resource.Resource {
 
 // markingResource is the resource implementation.
 type markingResource struct {
-	client *v2.ClientWithResponses
+	client            *v2.ClientWithResponses
+	deletionsDisabled bool
 }
 
 // Configure adds the provider data to the resource.
@@ -70,6 +71,7 @@ func (r *markingResource) Configure(_ context.Context, req resource.ConfigureReq
 	}
 
 	r.client = providerData.Client
+	r.deletionsDisabled = providerData.Flags.DeletionsDisabled
 }
 
 // Metadata returns the resource type name.
@@ -539,7 +541,7 @@ func (r *markingResource) UpdateMarkingMembers(ctx context.Context, plan, state 
 				return errors.New(returnString)
 			}
 		}
-		if len(membersToRemove) != 0 {
+		if len(membersToRemove) != 0 && !r.deletionsDisabled {
 			params := v2.AdminRemoveMarkingMembersParams{Preview: &previewMode}
 			httpResp, err := r.client.AdminRemoveMarkingMembers(ctx, markingUUID, &params, v2.AdminRemoveMarkingMembersJSONRequestBody{
 				PrincipalIds: &membersToRemove,
@@ -609,7 +611,7 @@ func (r *markingResource) UpdateMarkingRoles(ctx context.Context, plan, state *m
 				return errors.New(returnString)
 			}
 		}
-		if len(rolesToRemove) != 0 {
+		if len(rolesToRemove) != 0 && !r.deletionsDisabled {
 			roleUpdates := make([]v2.AdminMarkingRoleUpdate, len(rolesToRemove))
 			for i, role := range rolesToRemove {
 				roleUpdates[i] = v2.AdminMarkingRoleUpdate{
