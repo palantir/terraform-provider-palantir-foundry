@@ -18,13 +18,26 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type groupResourceModel struct {
+type groupFullResourceModel struct {
 	ID            types.String `tfsdk:"id"`
 	Name          types.String `tfsdk:"name"`
 	Description   types.String `tfsdk:"description"`
 	Realm         types.String `tfsdk:"realm"`
 	Organizations types.List   `tfsdk:"organizations"`
 	GroupMembers  types.Set    `tfsdk:"group_members"`
+}
+
+type groupDeclarationResourceModel struct {
+	ID            types.String `tfsdk:"id"`
+	Name          types.String `tfsdk:"name"`
+	Description   types.String `tfsdk:"description"`
+	Realm         types.String `tfsdk:"realm"`
+	Organizations types.List   `tfsdk:"organizations"`
+}
+
+type groupMembershipResourceModel struct {
+	ID           types.String `tfsdk:"id"`
+	GroupMembers types.Set    `tfsdk:"group_members"`
 }
 
 // responseBody contains the schema for response body for groups endpoint
