@@ -284,7 +284,7 @@ func (r *groupMembershipResource) UpdateGroupMembers(ctx context.Context, plan *
 				return errors.New(returnString)
 			}
 		}
-		if len(membersToRemove) != 0 && r.deletionsDisabled {
+		if len(membersToRemove) != 0 && !r.deletionsDisabled {
 			err := r.RemoveGroupMembers(ctx, membersToRemove, state)
 			if err != nil {
 				return err

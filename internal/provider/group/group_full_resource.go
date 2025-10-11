@@ -434,7 +434,7 @@ func (r *groupResource) UpdateGroupMembers(ctx context.Context, plan *groupFullR
 				return errors.New(returnString)
 			}
 		}
-		if len(membersToRemove) != 0 && r.deletionsDisabled {
+		if len(membersToRemove) != 0 && !r.deletionsDisabled {
 			//create body
 			httpResp, err := r.client.AdminRemoveGroupMembers(ctx, state.ID.ValueString(), v2.AdminRemoveGroupMembersRequest{
 				PrincipalIds: &membersToRemove,
