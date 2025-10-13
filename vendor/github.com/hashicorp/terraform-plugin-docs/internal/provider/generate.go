@@ -75,6 +75,14 @@ var (
 		"actions/%s.html.markdown",
 		"actions/%s.html.md",
 	}
+	websiteListResourceFile                 = "list-resources/%s.md.tmpl"
+	websiteListResourceFallbackFile         = "list-resources.md.tmpl"
+	websiteListResourceFileStaticCandidates = []string{
+		"list-resources/%s.md",
+		"list-resources/%s.markdown",
+		"list-resources/%s.html.markdown",
+		"list-resources/%s.html.md",
+	}
 	websiteProviderFile                 = "index.md.tmpl"
 	websiteProviderFileStaticCandidates = []string{
 		"index.markdown",
@@ -90,6 +98,7 @@ var (
 		"functions",
 		"ephemeral-resources",
 		"actions",
+		"list-resources",
 	}
 
 	managedWebsiteFiles = []string{
@@ -463,6 +472,42 @@ func (g *generator) generateMissingActionTemplate(actionName string) error {
 	return nil
 }
 
+func (g *generator) generateMissingListResourceTemplate(resourceName string) error {
+	templatePath := fmt.Sprintf(websiteListResourceFile, resourceShortName(resourceName, g.providerName))
+	templatePath = filepath.Join(g.TempTemplatesDir(), templatePath)
+	if fileExists(templatePath) {
+		g.infof("list resource %q template exists, skipping", resourceName)
+		return nil
+	}
+
+	fallbackTemplatePath := filepath.Join(g.TempTemplatesDir(), websiteListResourceFallbackFile)
+	if fileExists(fallbackTemplatePath) {
+		g.infof("list resource %q fallback template exists, creating template", resourceName)
+		err := cp(fallbackTemplatePath, templatePath)
+		if err != nil {
+			return fmt.Errorf("unable to copy fallback template for %q: %w", resourceName, err)
+		}
+		return nil
+	}
+
+	for _, candidate := range websiteListResourceFileStaticCandidates {
+		candidatePath := fmt.Sprintf(candidate, resourceShortName(resourceName, g.providerName))
+		candidatePath = filepath.Join(g.TempTemplatesDir(), candidatePath)
+		if fileExists(candidatePath) {
+			g.infof("list resource %q static file exists, skipping", resourceName)
+			return nil
+		}
+	}
+
+	g.infof("generating new template for %q", resourceName)
+	err := writeFile(templatePath, string(defaultResourceTemplate))
+	if err != nil {
+		return fmt.Errorf("unable to write template for %q: %w", resourceName, err)
+	}
+
+	return nil
+}
+
 func (g *generator) generateMissingProviderTemplate() error {
 	templatePath := filepath.Join(g.TempTemplatesDir(), websiteProviderFile)
 	if fileExists(templatePath) {
@@ -593,6 +638,27 @@ func (g *generator) generateMissingTemplates(providerSchema *tfjson.ProviderSche
 		}
 	}
 
+	g.infof("generating missing list resource content")
+
+	listResourceKeys := make([]string, 0, len(providerSchema.ListResourceSchemas))
+	for key := range providerSchema.ListResourceSchemas {
+		listResourceKeys = append(listResourceKeys, key)
+	}
+	sort.Strings(listResourceKeys)
+
+	for _, name := range listResourceKeys {
+		schema := providerSchema.ListResourceSchemas[name]
+
+		if g.ignoreDeprecated && schema.Block.Deprecated {
+			continue
+		}
+
+		err := g.generateMissingListResourceTemplate(name)
+		if err != nil {
+			return fmt.Errorf("unable to generate template for list resource %q: %w", name, err)
+		}
+	}
+
 	g.infof("generating missing provider content")
 	err := g.generateMissingProviderTemplate()
 	if err != nil {
@@ -654,12 +720,13 @@ func (g *generator) renderStaticWebsite(providerSchema *tfjson.ProviderSchema) e
 		relDir, relFile := filepath.Split(rel)
 		relDir = filepath.ToSlash(relDir)
 
-		// skip special top-level generic resource, data source, function, ephemeral resource, and action templates
+		// skip special top-level generic resource, data source, function, ephemeral resource, action and list resource templates
 		if relDir == "" && (relFile == "resources.md.tmpl" ||
 			relFile == "data-sources.md.tmpl" ||
 			relFile == "functions.md.tmpl" ||
 			relFile == "ephemeral-resources.md.tmpl" ||
-			relFile == "actions.md.tmpl") {
+			relFile == "actions.md.tmpl" ||
+			relFile == "list-resources.md.tmpl") {
 			return nil
 		}
 
@@ -692,11 +759,20 @@ func (g *generator) renderStaticWebsite(providerSchema *tfjson.ProviderSchema) e
 		switch relDir {
 		case "data-sources/":
 			resSchema, resName := resourceSchema(providerSchema.DataSourceSchemas, shortName, relFile)
-			exampleFilePath := filepath.Join(g.ProviderExamplesDir(), "data-sources", resName, "data-source.tf")
 
 			if resSchema != nil {
+				exampleFilePath := filepath.Join(g.ProviderExamplesDir(), "data-sources", resName, "data-source.tf")
+				exampleFilesPattern := filepath.Join(g.ProviderExamplesDir(), "data-sources", resName, "data-source*.tf")
+				exampleFiles, err := filepath.Glob(exampleFilesPattern)
+
+				if err != nil {
+					return fmt.Errorf("unable to glob example files with pattern %q: %w", exampleFilesPattern, err)
+				}
+
+				slices.Sort(exampleFiles)
+
 				tmpl := resourceTemplate(tmplData)
-				render, err := tmpl.Render(g.providerDir, resName, g.providerName, g.renderedProviderName, "Data Source", exampleFilePath, "", "", "", resSchema, nil)
+				render, err := tmpl.Render(g.providerDir, resName, g.providerName, g.renderedProviderName, "Data Source", exampleFilePath, exampleFiles, "", "", "", resSchema, nil)
 				if err != nil {
 					return fmt.Errorf("unable to render data source template %q: %w", rel, err)
 				}
@@ -710,14 +786,24 @@ func (g *generator) renderStaticWebsite(providerSchema *tfjson.ProviderSchema) e
 		case "resources/":
 			resSchema, resName := resourceSchema(providerSchema.ResourceSchemas, shortName, relFile)
 			resIdentitySchema := resourceIdentitySchema(providerSchema.ResourceIdentitySchemas, shortName, relFile)
-			exampleFilePath := filepath.Join(g.ProviderExamplesDir(), "resources", resName, "resource.tf")
-			importFilePath := filepath.Join(g.ProviderExamplesDir(), "resources", resName, "import.sh")
-			importIDConfigFilePath := filepath.Join(g.ProviderExamplesDir(), "resources", resName, "import-by-string-id.tf")
-			importIdentityConfigFilePath := filepath.Join(g.ProviderExamplesDir(), "resources", resName, "import-by-identity.tf")
 
 			if resSchema != nil {
+				exampleFilePath := filepath.Join(g.ProviderExamplesDir(), "resources", resName, "resource.tf")
+				exampleFilesPattern := filepath.Join(g.ProviderExamplesDir(), "resources", resName, "resource*.tf")
+				exampleFiles, err := filepath.Glob(exampleFilesPattern)
+
+				if err != nil {
+					return fmt.Errorf("unable to glob example files with pattern %q: %w", exampleFilesPattern, err)
+				}
+
+				slices.Sort(exampleFiles)
+
+				importFilePath := filepath.Join(g.ProviderExamplesDir(), "resources", resName, "import.sh")
+				importIDConfigFilePath := filepath.Join(g.ProviderExamplesDir(), "resources", resName, "import-by-string-id.tf")
+				importIdentityConfigFilePath := filepath.Join(g.ProviderExamplesDir(), "resources", resName, "import-by-identity.tf")
+
 				tmpl := resourceTemplate(tmplData)
-				render, err := tmpl.Render(g.providerDir, resName, g.providerName, g.renderedProviderName, "Resource", exampleFilePath, importIDConfigFilePath, importIdentityConfigFilePath, importFilePath, resSchema, resIdentitySchema)
+				render, err := tmpl.Render(g.providerDir, resName, g.providerName, g.renderedProviderName, "Resource", exampleFilePath, exampleFiles, importIDConfigFilePath, importIdentityConfigFilePath, importFilePath, resSchema, resIdentitySchema)
 				if err != nil {
 					return fmt.Errorf("unable to render resource template %q: %w", rel, err)
 				}
@@ -732,9 +818,17 @@ func (g *generator) renderStaticWebsite(providerSchema *tfjson.ProviderSchema) e
 			funcName := removeAllExt(relFile)
 			if signature, ok := providerSchema.Functions[funcName]; ok {
 				exampleFilePath := filepath.Join(g.ProviderExamplesDir(), "functions", funcName, "function.tf")
+				exampleFilesPattern := filepath.Join(g.ProviderExamplesDir(), "functions", funcName, "function*.tf")
+				exampleFiles, err := filepath.Glob(exampleFilesPattern)
+
+				if err != nil {
+					return fmt.Errorf("unable to glob example files with pattern %q: %w", exampleFilesPattern, err)
+				}
+
+				slices.Sort(exampleFiles)
 
 				tmpl := functionTemplate(tmplData)
-				render, err := tmpl.Render(g.providerDir, funcName, g.providerName, g.renderedProviderName, "function", exampleFilePath, signature)
+				render, err := tmpl.Render(g.providerDir, funcName, g.providerName, g.renderedProviderName, "function", exampleFilePath, exampleFiles, signature)
 				if err != nil {
 					return fmt.Errorf("unable to render function template %q: %w", rel, err)
 				}
@@ -748,11 +842,20 @@ func (g *generator) renderStaticWebsite(providerSchema *tfjson.ProviderSchema) e
 			g.warnf("function entitled %q does not exist", funcName)
 		case "ephemeral-resources/":
 			resSchema, resName := resourceSchema(providerSchema.EphemeralResourceSchemas, shortName, relFile)
-			exampleFilePath := filepath.Join(g.ProviderExamplesDir(), "ephemeral-resources", resName, "ephemeral-resource.tf")
 
 			if resSchema != nil {
+				exampleFilePath := filepath.Join(g.ProviderExamplesDir(), "ephemeral-resources", resName, "ephemeral-resource.tf")
+				exampleFilesPattern := filepath.Join(g.ProviderExamplesDir(), "ephemeral-resources", resName, "ephemeral-resource*.tf")
+				exampleFiles, err := filepath.Glob(exampleFilesPattern)
+
+				if err != nil {
+					return fmt.Errorf("unable to glob example files with pattern %q: %w", exampleFilesPattern, err)
+				}
+
+				slices.Sort(exampleFiles)
+
 				tmpl := resourceTemplate(tmplData)
-				render, err := tmpl.Render(g.providerDir, resName, g.providerName, g.renderedProviderName, "Ephemeral Resource", exampleFilePath, "", "", "", resSchema, nil)
+				render, err := tmpl.Render(g.providerDir, resName, g.providerName, g.renderedProviderName, "Ephemeral Resource", exampleFilePath, exampleFiles, "", "", "", resSchema, nil)
 				if err != nil {
 					return fmt.Errorf("unable to render ephemeral resource template %q: %w", rel, err)
 				}
@@ -765,11 +868,20 @@ func (g *generator) renderStaticWebsite(providerSchema *tfjson.ProviderSchema) e
 			g.warnf("ephemeral resource entitled %q, or %q does not exist", shortName, resName)
 		case "actions/":
 			actionSchema, resName := actionSchema(providerSchema.ActionSchemas, shortName, relFile)
-			exampleFilePath := filepath.Join(g.ProviderExamplesDir(), "actions", resName, "action.tf")
 
 			if actionSchema != nil {
+				exampleFilePath := filepath.Join(g.ProviderExamplesDir(), "actions", resName, "action.tf")
+				exampleFilesPattern := filepath.Join(g.ProviderExamplesDir(), "actions", resName, "action*.tf")
+				exampleFiles, err := filepath.Glob(exampleFilesPattern)
+
+				if err != nil {
+					return fmt.Errorf("unable to glob example files with pattern %q: %w", exampleFilesPattern, err)
+				}
+
+				slices.Sort(exampleFiles)
+
 				tmpl := actionTemplate(tmplData)
-				render, err := tmpl.Render(g.providerDir, resName, g.providerName, g.renderedProviderName, "Action", exampleFilePath, actionSchema)
+				render, err := tmpl.Render(g.providerDir, resName, g.providerName, g.renderedProviderName, "Action", exampleFilePath, exampleFiles, actionSchema)
 				if err != nil {
 					return fmt.Errorf("unable to render action template %q: %w", rel, err)
 				}
@@ -780,11 +892,45 @@ func (g *generator) renderStaticWebsite(providerSchema *tfjson.ProviderSchema) e
 				return nil
 			}
 			g.warnf("action entitled %q, or %q does not exist", shortName, resName)
+		case "list-resources/":
+			resSchema, resName := resourceSchema(providerSchema.ListResourceSchemas, shortName, relFile)
+			exampleFilePath := filepath.Join(g.ProviderExamplesDir(), "list-resources", resName, "list-resource.tfquery.hcl")
+			exampleFilesPattern := filepath.Join(g.ProviderExamplesDir(), "list-resources", resName, "list-resource*.tfquery.hcl")
+			exampleFiles, err := filepath.Glob(exampleFilesPattern)
+
+			if err != nil {
+				return fmt.Errorf("unable to glob example files with pattern %q: %w", exampleFilesPattern, err)
+			}
+
+			slices.Sort(exampleFiles)
+
+			if resSchema != nil {
+				tmpl := resourceTemplate(tmplData)
+				render, err := tmpl.Render(g.providerDir, resName, g.providerName, g.renderedProviderName, "List Resource", exampleFilePath, exampleFiles, "", "", "", resSchema, nil)
+				if err != nil {
+					return fmt.Errorf("unable to render list resource template %q: %w", rel, err)
+				}
+				_, err = out.WriteString(render)
+				if err != nil {
+					return fmt.Errorf("unable to write rendered string: %w", err)
+				}
+				return nil
+			}
+			g.warnf("list resource entitled %q, or %q does not exist", shortName, resName)
 		case "": // provider
 			if relFile == "index.md.tmpl" {
-				tmpl := providerTemplate(tmplData)
 				exampleFilePath := filepath.Join(g.ProviderExamplesDir(), "provider", "provider.tf")
-				render, err := tmpl.Render(g.providerDir, g.providerName, g.renderedProviderName, exampleFilePath, providerSchema.ConfigSchema)
+				exampleFilesPattern := filepath.Join(g.ProviderExamplesDir(), "provider", "provider*.tf")
+				exampleFiles, err := filepath.Glob(exampleFilesPattern)
+
+				if err != nil {
+					return fmt.Errorf("unable to glob example files with pattern %q: %w", exampleFilesPattern, err)
+				}
+
+				slices.Sort(exampleFiles)
+
+				tmpl := providerTemplate(tmplData)
+				render, err := tmpl.Render(g.providerDir, g.providerName, g.renderedProviderName, exampleFilePath, exampleFiles, providerSchema.ConfigSchema)
 				if err != nil {
 					return fmt.Errorf("unable to render provider template %q: %w", rel, err)
 				}
