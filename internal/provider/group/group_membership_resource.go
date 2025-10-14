@@ -231,7 +231,7 @@ func (r *groupMembershipResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
-	err := r.UpdateGroupMembers(ctx, &plan, &state)
+	err := r.UpdateGroupMembers(ctx, &plan, &state, resp)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating the Group members. Please fix your plan if needed and re-apply", err.Error())
 	}
@@ -243,7 +243,7 @@ func (r *groupMembershipResource) Update(ctx context.Context, req resource.Updat
 	}
 }
 
-func (r *groupMembershipResource) UpdateGroupMembers(ctx context.Context, plan *groupMembershipResourceModel, state *groupMembershipResourceModel) error {
+func (r *groupMembershipResource) UpdateGroupMembers(ctx context.Context, plan *groupMembershipResourceModel, state *groupMembershipResourceModel, resp *resource.UpdateResponse) error {
 	var oldGroupMembers []string
 	var newGroupMembers []string
 
@@ -289,6 +289,9 @@ func (r *groupMembershipResource) UpdateGroupMembers(ctx context.Context, plan *
 			if err != nil {
 				return err
 			}
+		} else if len(membersToRemove) != 0 {
+			resp.Diagnostics.AddWarning("Found group members in the state that are not in the plan.",
+				"Since `deletions_disabled` is set to true, member-removal operations will not be applied.")
 		}
 		//if there was a change (and no error thrown), update state to equal plan
 		state.GroupMembers = plan.GroupMembers

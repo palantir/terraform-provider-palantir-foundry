@@ -36,23 +36,23 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces
 var (
-	_ resource.Resource              = &groupResource{}
-	_ resource.ResourceWithConfigure = &groupResource{}
+	_ resource.Resource              = &groupFullResource{}
+	_ resource.ResourceWithConfigure = &groupFullResource{}
 )
 
 // NewGroupResource is a helper function to simplify provider implementation.
-func NewGroupResource() resource.Resource {
-	return &groupResource{}
+func NewGroupFullResource() resource.Resource {
+	return &groupFullResource{}
 }
 
 // groupResource is the resource implementation.
-type groupResource struct {
+type groupFullResource struct {
 	client            *v2.ClientWithResponses
 	deletionsDisabled bool
 }
 
 // Configure adds the provider configured client to the resource.
-func (r *groupResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *groupFullResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -73,12 +73,12 @@ func (r *groupResource) Configure(_ context.Context, req resource.ConfigureReque
 }
 
 // Metadata returns the resource type name.
-func (r *groupResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+func (r *groupFullResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_group"
 }
 
 // Schema defines the schema for the resource.
-func (r *groupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *groupFullResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Manages a Foundry Group.",
 		Attributes: map[string]schema.Attribute{
@@ -113,7 +113,7 @@ func (r *groupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 }
 
 // Create creates a new resource and sets the initial Terraform state.
-func (r *groupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *groupFullResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan groupFullResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
@@ -142,7 +142,7 @@ func (r *groupResource) Create(ctx context.Context, req resource.CreateRequest, 
 	}
 }
 
-func (r *groupResource) CreateGroup(ctx context.Context, resp *resource.CreateResponse, plan *groupFullResourceModel) error {
+func (r *groupFullResource) CreateGroup(ctx context.Context, resp *resource.CreateResponse, plan *groupFullResourceModel) error {
 	var organizationsGoSlice []v2.CoreOrganizationRid
 	diags := plan.Organizations.ElementsAs(context.Background(), &organizationsGoSlice, false)
 	if diags.HasError() {
@@ -206,7 +206,7 @@ func (r *groupResource) CreateGroup(ctx context.Context, resp *resource.CreateRe
 	return nil
 }
 
-func (r *groupResource) CreateGroupMembers(ctx context.Context, resp *resource.CreateResponse, plan *groupFullResourceModel) error {
+func (r *groupFullResource) CreateGroupMembers(ctx context.Context, resp *resource.CreateResponse, plan *groupFullResourceModel) error {
 	var plannedGroupMembers []v2.CorePrincipalID
 	diags := plan.GroupMembers.ElementsAs(ctx, &plannedGroupMembers, false)
 	if diags.HasError() {
@@ -238,7 +238,7 @@ func (r *groupResource) CreateGroupMembers(ctx context.Context, resp *resource.C
 }
 
 // Read refreshes the Terraform state with the latest data.
-func (r *groupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *groupFullResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	// Get current state
 	var state groupFullResourceModel
 	diags := req.State.Get(ctx, &state)
@@ -271,7 +271,7 @@ func (r *groupResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	}
 }
 
-func (r *groupResource) ReadGroup(ctx context.Context, resp *resource.ReadResponse, state *groupFullResourceModel) error {
+func (r *groupFullResource) ReadGroup(ctx context.Context, resp *resource.ReadResponse, state *groupFullResourceModel) error {
 	httpResp, err := r.client.AdminGetGroup(ctx, state.ID.ValueString())
 
 	if err != nil {
@@ -316,7 +316,7 @@ func (r *groupResource) ReadGroup(ctx context.Context, resp *resource.ReadRespon
 	return nil
 }
 
-func (r *groupResource) ReadGroupMembers(ctx context.Context, resp *resource.ReadResponse, state *groupFullResourceModel) error {
+func (r *groupFullResource) ReadGroupMembers(ctx context.Context, resp *resource.ReadResponse, state *groupFullResourceModel) error {
 	pageSize := constants.PageSize
 	httpResp, err := r.client.AdminListGroupMembers(ctx, state.ID.ValueString(), &v2.AdminListGroupMembersParams{PageSize: &pageSize})
 
@@ -357,7 +357,7 @@ func (r *groupResource) ReadGroupMembers(ctx context.Context, resp *resource.Rea
 
 // Update updates the resource and sets the updated Terraform state on success.
 // TODO: add updating group to API-GATEWAY and implement here. Right now we are just handling group members here
-func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *groupFullResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// Retrieve values from plan
 	var plan groupFullResourceModel
 	diags := req.Plan.Get(ctx, &plan)
@@ -393,7 +393,7 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	}
 }
 
-func (r *groupResource) UpdateGroupMembers(ctx context.Context, plan *groupFullResourceModel, state *groupFullResourceModel, resp *resource.UpdateResponse) error {
+func (r *groupFullResource) UpdateGroupMembers(ctx context.Context, plan *groupFullResourceModel, state *groupFullResourceModel, resp *resource.UpdateResponse) error {
 	var oldGroupMembers []string
 	var newGroupMembers []string
 
@@ -463,7 +463,7 @@ func (r *groupResource) UpdateGroupMembers(ctx context.Context, plan *groupFullR
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
-func (r *groupResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *groupFullResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	// Retrieve values from state
 	var state groupFullResourceModel
 	diags := req.State.Get(ctx, &state)
@@ -499,7 +499,7 @@ func (r *groupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 }
 
 // ImportState imports an existing group into Terraform state.
-func (r *groupResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *groupFullResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// The import ID is expected to be the group ID
 	groupID := req.ID
 
