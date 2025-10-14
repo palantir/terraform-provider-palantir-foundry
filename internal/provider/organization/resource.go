@@ -519,12 +519,12 @@ func (r *organizationResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	err = r.UpdateOrganizationMembers(ctx, &plan, &state)
+	err = r.UpdateOrganizationMembers(ctx, &plan, &state, resp)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating the Organization members. Please fix your plan if needed and re-apply", err.Error())
 	}
 
-	err = r.UpdateOrganizationRoles(ctx, &plan, &state)
+	err = r.UpdateOrganizationRoles(ctx, &plan, &state, resp)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating the Organization roles. Please fix your plan if needed and re-apply",
 			err.Error())
