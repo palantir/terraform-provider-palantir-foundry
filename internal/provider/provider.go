@@ -23,7 +23,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/oapi-codegen/oapi-codegen/v2/pkg/securityprovider"
 	v2 "github.com/palantir/terraform-provider-palantir-foundry/gateway-client/v2"
