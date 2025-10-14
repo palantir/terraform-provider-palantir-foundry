@@ -566,17 +566,17 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	err = r.UpdateProjectMarkings(ctx, &plan, &state)
+	err = r.UpdateProjectMarkings(ctx, &plan, &state, resp)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating the Project's markings. Please fix your plan if needed and re-apply", err.Error())
 	}
 
-	err = r.UpdateProjectRoles(ctx, &plan, &state)
+	err = r.UpdateProjectRoles(ctx, &plan, &state, resp)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating the Project's roles. Please fix your plan if needed and re-apply", err.Error())
 	}
 
-	err = r.UpdateProjectOrganizations(ctx, &plan, &state)
+	err = r.UpdateProjectOrganizations(ctx, &plan, &state, resp)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating the Project's organizations. Please fix your plan if needed and re-apply", err.Error())
 	}
@@ -638,7 +638,7 @@ func (r *projectResource) UpdateProject(ctx context.Context, resp *resource.Upda
 	return nil
 }
 
-func (r *projectResource) UpdateProjectMarkings(ctx context.Context, plan *projectResourceModel, state *projectResourceModel) error {
+func (r *projectResource) UpdateProjectMarkings(ctx context.Context, plan *projectResourceModel, state *projectResourceModel, resp *resource.UpdateResponse) error {
 	var oldMarkings []string
 	var newMarkings []string
 	previewMode := constants.PreviewMode
@@ -715,13 +715,16 @@ func (r *projectResource) UpdateProjectMarkings(ctx context.Context, plan *proje
 				}
 				return errors.New(returnString)
 			}
+		} else if len(markingsToRemove) != 0 {
+			resp.Diagnostics.AddWarning("Found markings defined in the state that are not in the plan.",
+				"Since `deletions_disabled` is set to true, marking-removal operations will not be applied.")
 		}
 		state.Markings = plan.Markings
 	}
 	return nil
 }
 
-func (r *projectResource) UpdateProjectRoles(ctx context.Context, plan *projectResourceModel, state *projectResourceModel) error {
+func (r *projectResource) UpdateProjectRoles(ctx context.Context, plan *projectResourceModel, state *projectResourceModel, resp *resource.UpdateResponse) error {
 	previewMode := constants.PreviewMode
 	var oldResourceRoles []ResourceRole
 
@@ -846,12 +849,15 @@ func (r *projectResource) UpdateProjectRoles(ctx context.Context, plan *projectR
 				}
 				return errors.New(returnString)
 			}
+		} else if len(rolesToRemove) != 0 {
+			resp.Diagnostics.AddWarning("Found roles defined in the state that are not in the plan.",
+				"Since `deletions_disabled` is set to true, role-removal operations will not be applied.")
 		}
 		state.ResourceRoles = plan.ResourceRoles
 	}
 	return nil
 }
-func (r *projectResource) UpdateProjectOrganizations(ctx context.Context, plan *projectResourceModel, state *projectResourceModel) error {
+func (r *projectResource) UpdateProjectOrganizations(ctx context.Context, plan *projectResourceModel, state *projectResourceModel, resp *resource.UpdateResponse) error {
 	previewMode := constants.PreviewMode
 	var oldOrganizations []string
 	var newOrganizations []string
@@ -905,6 +911,9 @@ func (r *projectResource) UpdateProjectOrganizations(ctx context.Context, plan *
 				}
 				return errors.New(returnString)
 			}
+		} else if len(organizationsToRemove) != 0 {
+			resp.Diagnostics.AddWarning("Found organization members defined in the state that are not in the plan.",
+				"Since `deletions_disabled` is set to true, organization-member-removal operations will not be applied.")
 		}
 		state.Organizations = plan.Organizations
 	}

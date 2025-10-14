@@ -519,12 +519,12 @@ func (r *organizationResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	err = r.UpdateOrganizationMembers(ctx, &plan, &state)
+	err = r.UpdateOrganizationMembers(ctx, &plan, &state, resp)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating the Organization members. Please fix your plan if needed and re-apply", err.Error())
 	}
 
-	err = r.UpdateOrganizationRoles(ctx, &plan, &state)
+	err = r.UpdateOrganizationRoles(ctx, &plan, &state, resp)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating the Organization roles. Please fix your plan if needed and re-apply",
 			err.Error())
@@ -593,7 +593,7 @@ func (r *organizationResource) UpdateOrganization(ctx context.Context, resp *res
 	return nil
 }
 
-func (r *organizationResource) UpdateOrganizationMembers(ctx context.Context, plan *organizationResourceModel, state *organizationResourceModel) error {
+func (r *organizationResource) UpdateOrganizationMembers(ctx context.Context, plan *organizationResourceModel, state *organizationResourceModel, resp *resource.UpdateResponse) error {
 	var oldMarkingMembers []string
 	var newMarkingMembers []string
 
@@ -656,13 +656,16 @@ func (r *organizationResource) UpdateOrganizationMembers(ctx context.Context, pl
 				}
 				return errors.New(returnString)
 			}
+		} else if len(membersToRemove) != 0 {
+			resp.Diagnostics.AddWarning("Found organization members in the state that are not in the plan.",
+				"Since `deletions_disabled` is set to true, member-removal operations will not be applied.")
 		}
 		state.OrganizationMembers = plan.OrganizationMembers
 	}
 	return nil
 }
 
-func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan *organizationResourceModel, state *organizationResourceModel) error {
+func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan *organizationResourceModel, state *organizationResourceModel, resp *resource.UpdateResponse) error {
 
 	var oldOrganizationRoles []organizationRolesRequestBodyEntry
 	var newOrganizationRoles []organizationRolesRequestBodyEntry
@@ -747,6 +750,9 @@ func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan
 				}
 				return errors.New(returnString)
 			}
+		} else if len(rolesToRemove) != 0 {
+			resp.Diagnostics.AddWarning("Found roles defined in the state that are not in the plan.",
+				"Since `deletions_disabled` is set to true, role-removal operations will not be applied.")
 		}
 		state.OrganizationRoles = plan.OrganizationRoles
 	}

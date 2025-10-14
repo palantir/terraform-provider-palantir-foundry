@@ -23,7 +23,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/oapi-codegen/oapi-codegen/v2/pkg/securityprovider"
 	v2 "github.com/palantir/terraform-provider-palantir-foundry/gateway-client/v2"
@@ -71,7 +70,8 @@ func (p *FoundryProvider) Schema(_ context.Context, _ provider.SchemaRequest, re
 				Sensitive: true,
 			},
 			"deletions_disabled": schema.BoolAttribute{
-				Optional: true,
+				Optional:    true,
+				Description: "An experimental provider-level flag to fully disable deletions of resources as well as the removal of resources' associated roles, members, etc.. This puts the provider a sort of `safe-mode`, preventing the removal of existing infra which can be subject to change outside the scope of your IAC management. In this mode, drift between the actual external infrastructure state and terraform's state is accepted, and applied plans might not map 1:1 with reality. As such, this flag must be used with caution. When a deletion operation is initiated on an otherwise deletable object (currently space, group, or project) and this flag is set to true then we will error and return, preventing state removal and remote deletion.",
 			},
 		},
 	}

@@ -426,12 +426,12 @@ func (r *markingResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	err = r.UpdateMarkingMembers(ctx, &plan, &state)
+	err = r.UpdateMarkingMembers(ctx, &plan, &state, resp)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating marking members. Please fix your plan if needed and re-apply", err.Error())
 	}
 
-	err = r.UpdateMarkingRoles(ctx, &plan, &state)
+	err = r.UpdateMarkingRoles(ctx, &plan, &state, resp)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating marking roles. Please fix your plan if needed and re-apply", err.Error())
 	}
@@ -499,7 +499,7 @@ func (r *markingResource) UpdateMarking(ctx context.Context, resp *resource.Upda
 	return nil
 }
 
-func (r *markingResource) UpdateMarkingMembers(ctx context.Context, plan, state *markingResourceModel) error {
+func (r *markingResource) UpdateMarkingMembers(ctx context.Context, plan, state *markingResourceModel, resp *resource.UpdateResponse) error {
 	var oldMarkingMembers, newMarkingMembers []string
 
 	//only initialize if not null, otherwise ElementsAs will throw error instead of just handling as empty slice
@@ -556,6 +556,9 @@ func (r *markingResource) UpdateMarkingMembers(ctx context.Context, plan, state 
 				}
 				return errors.New(returnString)
 			}
+		} else if len(membersToRemove) != 0 {
+			resp.Diagnostics.AddWarning("Found marking members in the state that are not in the plan.",
+				"Since `deletions_disabled` is set to true, member-removal operations will not be applied.")
 		}
 		//if there was a change (and no error thrown), update state to equal plan
 		state.MarkingMembers = plan.MarkingMembers
@@ -563,7 +566,7 @@ func (r *markingResource) UpdateMarkingMembers(ctx context.Context, plan, state 
 	return nil
 }
 
-func (r *markingResource) UpdateMarkingRoles(ctx context.Context, plan, state *markingResourceModel) error {
+func (r *markingResource) UpdateMarkingRoles(ctx context.Context, plan, state *markingResourceModel, resp *resource.UpdateResponse) error {
 	var oldMarkingRoles, newMarkingRoles []RolesRequestBodyEntry
 
 	if !state.MarkingRoles.IsNull() {
@@ -633,6 +636,9 @@ func (r *markingResource) UpdateMarkingRoles(ctx context.Context, plan, state *m
 				}
 				return errors.New(returnString)
 			}
+		} else if len(rolesToRemove) != 0 {
+			resp.Diagnostics.AddWarning("Found roles defined in the state that are not in the plan.",
+				"Since `deletions_disabled` is set to true, role-removal operations will not be applied.")
 		}
 		//if there was a change (and no error thrown), update state to equal plan
 		state.MarkingRoles = plan.MarkingRoles
