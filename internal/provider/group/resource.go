@@ -472,10 +472,10 @@ func (r *groupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 		return
 	}
 
-	// If deletions are disabled, error.
+	// If deletions are disabled, do not delete the remote group but remove the resource from state
 	if r.deletionsDisabled {
-		resp.Diagnostics.AddError("Tried to perform a deletion when the deletions_disabled flag was set to true.",
-			fmt.Sprintf("Group with name %s and id %s will not be deleted.", state.Name.ValueString(), state.ID.ValueString()))
+		resp.Diagnostics.AddWarning("Tried to perform a deletion when the deletions_disabled flag was set to true.",
+			fmt.Sprintf("Remote group with name %s and id %s will not be deleted but this resource will be removed from state.", state.Name.ValueString(), state.ID.ValueString()))
 		return
 	}
 
