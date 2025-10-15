@@ -423,10 +423,10 @@ func (r *spaceResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 		return
 	}
 
-	// If deletions are disabled, error.
+	// If deletions are disabled, do not delete the remote space but remove the resource from state.
 	if r.deletionsDisabled {
-		resp.Diagnostics.AddError("Tried to perform a deletion when the deletions_disabled flag was set to true.",
-			fmt.Sprintf("Space with name %s and rid %s will not be deleted.", state.DisplayName.ValueString(), state.RID.ValueString()))
+		resp.Diagnostics.AddWarning("Tried to perform a deletion when the deletions_disabled flag was set to true.",
+			fmt.Sprintf("Remote space with name %s and rid %s will not be deleted, but this resource be will be removed from state.", state.DisplayName.ValueString(), state.RID.ValueString()))
 		return
 	}
 

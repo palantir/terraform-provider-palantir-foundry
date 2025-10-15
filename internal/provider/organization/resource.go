@@ -762,9 +762,9 @@ func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *organizationResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	//return error here IMMEDIATELY, as Markings are not allowed to be deleted
-	tflog.Error(ctx, "Organizations cannot be deleted")
-	resp.Diagnostics.AddError("Organizations cannot be deleted",
-		"Foundry does not support deleted Organizations!")
+	tflog.Warn(ctx, "Organizations cannot be deleted")
+	resp.Diagnostics.AddWarning("Organizations cannot be deleted",
+		"Foundry does not support deleted Organizations. The remote organization will not be deleted but the resource will be removed from state.")
 	return
 }
 

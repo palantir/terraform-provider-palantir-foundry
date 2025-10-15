@@ -648,10 +648,8 @@ func (r *markingResource) UpdateMarkingRoles(ctx context.Context, plan, state *m
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *markingResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	//return error here IMMEDIATELY, as Markings are not allowed to be deleted
-	tflog.Error(ctx, "Markings cannot be deleted")
-	resp.Diagnostics.AddError("Markings cannot be deleted",
-		"Foundry does not support deleted markings!")
+	resp.Diagnostics.AddWarning("Markings cannot be deleted",
+		"Foundry does not support deleted markings. The remote markings will not be deleted, but this resource will be removed from state.")
 	return
 }
 
