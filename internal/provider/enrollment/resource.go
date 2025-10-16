@@ -312,10 +312,16 @@ func (r *enrollmentResource) UpdateEnrollmentRoles(ctx context.Context, plan *en
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *enrollmentResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	tflog.Warn(ctx, "Enrollments cannot be deleted")
-	resp.Diagnostics.AddWarning("Enrollments cannot be deleted",
-		"The remote enrollment will not be deleted, but this resource will be removed from state.")
-	return
+	if r.deletionsDisabled {
+		tflog.Warn(ctx, "Enrollments cannot be deleted")
+		resp.Diagnostics.AddWarning("Enrollments cannot be deleted",
+			"Since deletions_disabled is set to true, the remote enrollment will not be deleted, but this resource will be removed from state.")
+		return
+	}
+
+	tflog.Error(ctx, "Enrollments cannot be deleted")
+	resp.Diagnostics.AddError("Enrollments cannot be deleted",
+		"The Terraform provider does not currently support deleting Enrollments")
 }
 
 func (r *enrollmentResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
