@@ -40,12 +40,12 @@ var (
 	_ resource.ResourceWithConfigure = &groupMembershipResource{}
 )
 
-// NewGroupResource is a helper function to simplify provider implementation.
+// NewGroupMembershipResource is a helper function to simplify provider implementation.
 func NewGroupMembershipResource() resource.Resource {
 	return &groupMembershipResource{}
 }
 
-// groupResource is the resource implementation.
+// groupMembershipResource is the resource implementation.
 type groupMembershipResource struct {
 	client            *v2.ClientWithResponses
 	deletionsDisabled bool

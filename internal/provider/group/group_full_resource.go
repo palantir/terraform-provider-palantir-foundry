@@ -40,12 +40,12 @@ var (
 	_ resource.ResourceWithConfigure = &groupFullResource{}
 )
 
-// NewGroupResource is a helper function to simplify provider implementation.
+// NewGroupFullResource is a helper function to simplify provider implementation.
 func NewGroupFullResource() resource.Resource {
 	return &groupFullResource{}
 }
 
-// groupResource is the resource implementation.
+// groupFullResource is the resource implementation.
 type groupFullResource struct {
 	client            *v2.ClientWithResponses
 	deletionsDisabled bool
@@ -62,7 +62,7 @@ func (r *groupFullResource) Configure(_ context.Context, req resource.ConfigureR
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected v2.ClientWithResponses, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected shared.FoundryProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return
