@@ -34,6 +34,7 @@ import (
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/constants"
 	providerError "github.com/palantir/terraform-provider-palantir-foundry/internal/provider/errors"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/helper"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/shared"
 )
 
 // Ensure the implementation satisfies the expected interfaces
@@ -49,26 +50,28 @@ func NewProjectResource() resource.Resource {
 
 // projectResource is the resource implementation.
 type projectResource struct {
-	client *v2.ClientWithResponses
+	client            *v2.ClientWithResponses
+	deletionsDisabled bool
 }
 
-// Configure adds the provider configured client to the resource.
+// Configure adds the provider data to the resource.
 func (r *projectResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
 
-	client, ok := req.ProviderData.(*v2.ClientWithResponses)
+	providerData, ok := req.ProviderData.(*shared.FoundryProviderData)
 
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected v2.ClientWithResponses, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected shared.FoundryProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 		return
 	}
 
-	r.client = client
+	r.client = providerData.Client
+	r.deletionsDisabled = providerData.Flags.DeletionsDisabled
 }
 
 // Metadata returns the resource type name.
@@ -563,17 +566,17 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	err = r.UpdateProjectMarkings(ctx, &plan, &state)
+	err = r.UpdateProjectMarkings(ctx, &plan, &state, resp)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating the Project's markings. Please fix your plan if needed and re-apply", err.Error())
 	}
 
-	err = r.UpdateProjectRoles(ctx, &plan, &state)
+	err = r.UpdateProjectRoles(ctx, &plan, &state, resp)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating the Project's roles. Please fix your plan if needed and re-apply", err.Error())
 	}
 
-	err = r.UpdateProjectOrganizations(ctx, &plan, &state)
+	err = r.UpdateProjectOrganizations(ctx, &plan, &state, resp)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating the Project's organizations. Please fix your plan if needed and re-apply", err.Error())
 	}
@@ -635,7 +638,7 @@ func (r *projectResource) UpdateProject(ctx context.Context, resp *resource.Upda
 	return nil
 }
 
-func (r *projectResource) UpdateProjectMarkings(ctx context.Context, plan *projectResourceModel, state *projectResourceModel) error {
+func (r *projectResource) UpdateProjectMarkings(ctx context.Context, plan *projectResourceModel, state *projectResourceModel, resp *resource.UpdateResponse) error {
 	var oldMarkings []string
 	var newMarkings []string
 	previewMode := constants.PreviewMode
@@ -685,7 +688,7 @@ func (r *projectResource) UpdateProjectMarkings(ctx context.Context, plan *proje
 				return errors.New(returnString)
 			}
 		}
-		if len(markingsToRemove) != 0 {
+		if len(markingsToRemove) != 0 && !r.deletionsDisabled {
 			markingIdsToRemove := make([]v2.CoreMarkingID, len(markingsToRemove))
 			for i, markingID := range markingsToRemove {
 				markingUUID, err := uuid.Parse(markingID)
@@ -712,13 +715,16 @@ func (r *projectResource) UpdateProjectMarkings(ctx context.Context, plan *proje
 				}
 				return errors.New(returnString)
 			}
+		} else if len(markingsToRemove) != 0 {
+			resp.Diagnostics.AddWarning("Found markings defined in the state that are not in the plan.",
+				"Since `deletions_disabled` is set to true, marking-removal operations will not be applied.")
 		}
 		state.Markings = plan.Markings
 	}
 	return nil
 }
 
-func (r *projectResource) UpdateProjectRoles(ctx context.Context, plan *projectResourceModel, state *projectResourceModel) error {
+func (r *projectResource) UpdateProjectRoles(ctx context.Context, plan *projectResourceModel, state *projectResourceModel, resp *resource.UpdateResponse) error {
 	previewMode := constants.PreviewMode
 	var oldResourceRoles []ResourceRole
 
@@ -792,7 +798,7 @@ func (r *projectResource) UpdateProjectRoles(ctx context.Context, plan *projectR
 				return errors.New(returnString)
 			}
 		}
-		if len(rolesToRemove) != 0 {
+		if len(rolesToRemove) != 0 && !r.deletionsDisabled {
 			roleUpdates := make([]v2.FilesystemResourceRole, len(rolesToRemove))
 
 			for i, role := range rolesToRemove {
@@ -843,12 +849,15 @@ func (r *projectResource) UpdateProjectRoles(ctx context.Context, plan *projectR
 				}
 				return errors.New(returnString)
 			}
+		} else if len(rolesToRemove) != 0 {
+			resp.Diagnostics.AddWarning("Found roles defined in the state that are not in the plan.",
+				"Since `deletions_disabled` is set to true, role-removal operations will not be applied.")
 		}
 		state.ResourceRoles = plan.ResourceRoles
 	}
 	return nil
 }
-func (r *projectResource) UpdateProjectOrganizations(ctx context.Context, plan *projectResourceModel, state *projectResourceModel) error {
+func (r *projectResource) UpdateProjectOrganizations(ctx context.Context, plan *projectResourceModel, state *projectResourceModel, resp *resource.UpdateResponse) error {
 	previewMode := constants.PreviewMode
 	var oldOrganizations []string
 	var newOrganizations []string
@@ -884,7 +893,7 @@ func (r *projectResource) UpdateProjectOrganizations(ctx context.Context, plan *
 				return errors.New(returnString)
 			}
 		}
-		if len(organizationsToRemove) != 0 {
+		if len(organizationsToRemove) != 0 && !r.deletionsDisabled {
 			filesystemRemoveOrganizationsParams := v2.FilesystemRemoveOrganizationsParams{Preview: &previewMode}
 			httpResp, err := r.client.FilesystemRemoveOrganizations(ctx, state.RID.ValueString(), &filesystemRemoveOrganizationsParams, v2.FilesystemRemoveOrganizationsJSONRequestBody{
 				OrganizationRids: &organizationsToRemove,
@@ -902,6 +911,9 @@ func (r *projectResource) UpdateProjectOrganizations(ctx context.Context, plan *
 				}
 				return errors.New(returnString)
 			}
+		} else if len(organizationsToRemove) != 0 {
+			resp.Diagnostics.AddWarning("Found organization members defined in the state that are not in the plan.",
+				"Since `deletions_disabled` is set to true, organization-member-removal operations will not be applied.")
 		}
 		state.Organizations = plan.Organizations
 	}
@@ -914,6 +926,13 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// If deletions are disabled, do not delete the remote project but remove the resource from state.
+	if r.deletionsDisabled {
+		resp.Diagnostics.AddWarning("Tried to perform a deletion when the deletions_disabled flag was set to true.",
+			fmt.Sprintf("Remote project with name %s and rid %s will not be deleted, but this resource will be removed from state.", state.DisplayName.ValueString(), state.RID.ValueString()))
 		return
 	}
 

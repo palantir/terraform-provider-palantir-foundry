@@ -29,6 +29,7 @@ import (
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/constants"
 	providerError "github.com/palantir/terraform-provider-palantir-foundry/internal/provider/errors"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/helper"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/shared"
 )
 
 // Ensure the implementation satisfies the expected interfaces
@@ -44,27 +45,29 @@ func NewSpaceResource() resource.Resource {
 
 // spaceResource is the resource implementation.
 type spaceResource struct {
-	client *v2.ClientWithResponses
+	client            *v2.ClientWithResponses
+	deletionsDisabled bool
 }
 
-// Configure adds the provider configured client to the resource.
+// Configure adds the provider data to the resource.
 func (r *spaceResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
 
-	client, ok := req.ProviderData.(*v2.ClientWithResponses)
+	providerData, ok := req.ProviderData.(*shared.FoundryProviderData)
 
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected v2.ClientWithResponses, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected shared.FoundryProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return
 	}
 
-	r.client = client
+	r.client = providerData.Client
+	r.deletionsDisabled = providerData.Flags.DeletionsDisabled
 }
 
 // Metadata returns the resource type name.
@@ -355,6 +358,7 @@ func (r *spaceResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
 }
 
 func (r *spaceResource) UpdateSpace(ctx context.Context, resp *resource.UpdateResponse, plan *spaceResourceModel, state *spaceResourceModel) error {
@@ -416,6 +420,13 @@ func (r *spaceResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// If deletions are disabled, do not delete the remote space but remove the resource from state.
+	if r.deletionsDisabled {
+		resp.Diagnostics.AddWarning("Tried to perform a deletion when the deletions_disabled flag was set to true.",
+			fmt.Sprintf("Remote space with name %s and rid %s will not be deleted, but this resource be will be removed from state.", state.DisplayName.ValueString(), state.RID.ValueString()))
 		return
 	}
 

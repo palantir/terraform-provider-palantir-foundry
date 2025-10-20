@@ -33,6 +33,7 @@ import (
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/constants"
 	providerError "github.com/palantir/terraform-provider-palantir-foundry/internal/provider/errors"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/helper"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/shared"
 )
 
 // Ensure the implementation satisfies the expected interfaces
@@ -48,27 +49,29 @@ func NewMarkingResource() resource.Resource {
 
 // markingResource is the resource implementation.
 type markingResource struct {
-	client *v2.ClientWithResponses
+	client            *v2.ClientWithResponses
+	deletionsDisabled bool
 }
 
-// Configure adds the provider configured client to the resource.
+// Configure adds the provider data to the resource.
 func (r *markingResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
 
-	client, ok := req.ProviderData.(*v2.ClientWithResponses)
+	providerData, ok := req.ProviderData.(*shared.FoundryProviderData)
 
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected v2.ClientWithResponses, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected shared.FoundryProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return
 	}
 
-	r.client = client
+	r.client = providerData.Client
+	r.deletionsDisabled = providerData.Flags.DeletionsDisabled
 }
 
 // Metadata returns the resource type name.
@@ -423,12 +426,12 @@ func (r *markingResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	err = r.UpdateMarkingMembers(ctx, &plan, &state)
+	err = r.UpdateMarkingMembers(ctx, &plan, &state, resp)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating marking members. Please fix your plan if needed and re-apply", err.Error())
 	}
 
-	err = r.UpdateMarkingRoles(ctx, &plan, &state)
+	err = r.UpdateMarkingRoles(ctx, &plan, &state, resp)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating marking roles. Please fix your plan if needed and re-apply", err.Error())
 	}
@@ -496,7 +499,7 @@ func (r *markingResource) UpdateMarking(ctx context.Context, resp *resource.Upda
 	return nil
 }
 
-func (r *markingResource) UpdateMarkingMembers(ctx context.Context, plan, state *markingResourceModel) error {
+func (r *markingResource) UpdateMarkingMembers(ctx context.Context, plan, state *markingResourceModel, resp *resource.UpdateResponse) error {
 	var oldMarkingMembers, newMarkingMembers []string
 
 	//only initialize if not null, otherwise ElementsAs will throw error instead of just handling as empty slice
@@ -538,7 +541,7 @@ func (r *markingResource) UpdateMarkingMembers(ctx context.Context, plan, state 
 				return errors.New(returnString)
 			}
 		}
-		if len(membersToRemove) != 0 {
+		if len(membersToRemove) != 0 && !r.deletionsDisabled {
 			params := v2.AdminRemoveMarkingMembersParams{Preview: &previewMode}
 			httpResp, err := r.client.AdminRemoveMarkingMembers(ctx, markingUUID, &params, v2.AdminRemoveMarkingMembersJSONRequestBody{
 				PrincipalIds: &membersToRemove,
@@ -553,6 +556,9 @@ func (r *markingResource) UpdateMarkingMembers(ctx context.Context, plan, state 
 				}
 				return errors.New(returnString)
 			}
+		} else if len(membersToRemove) != 0 {
+			resp.Diagnostics.AddWarning("Found marking members in the state that are not in the plan.",
+				"Since `deletions_disabled` is set to true, member-removal operations will not be applied.")
 		}
 		//if there was a change (and no error thrown), update state to equal plan
 		state.MarkingMembers = plan.MarkingMembers
@@ -560,7 +566,7 @@ func (r *markingResource) UpdateMarkingMembers(ctx context.Context, plan, state 
 	return nil
 }
 
-func (r *markingResource) UpdateMarkingRoles(ctx context.Context, plan, state *markingResourceModel) error {
+func (r *markingResource) UpdateMarkingRoles(ctx context.Context, plan, state *markingResourceModel, resp *resource.UpdateResponse) error {
 	var oldMarkingRoles, newMarkingRoles []RolesRequestBodyEntry
 
 	if !state.MarkingRoles.IsNull() {
@@ -608,7 +614,7 @@ func (r *markingResource) UpdateMarkingRoles(ctx context.Context, plan, state *m
 				return errors.New(returnString)
 			}
 		}
-		if len(rolesToRemove) != 0 {
+		if len(rolesToRemove) != 0 && !r.deletionsDisabled {
 			roleUpdates := make([]v2.AdminMarkingRoleUpdate, len(rolesToRemove))
 			for i, role := range rolesToRemove {
 				roleUpdates[i] = v2.AdminMarkingRoleUpdate{
@@ -630,6 +636,9 @@ func (r *markingResource) UpdateMarkingRoles(ctx context.Context, plan, state *m
 				}
 				return errors.New(returnString)
 			}
+		} else if len(rolesToRemove) != 0 {
+			resp.Diagnostics.AddWarning("Found roles defined in the state that are not in the plan.",
+				"Since `deletions_disabled` is set to true, role-removal operations will not be applied.")
 		}
 		//if there was a change (and no error thrown), update state to equal plan
 		state.MarkingRoles = plan.MarkingRoles
@@ -639,11 +648,16 @@ func (r *markingResource) UpdateMarkingRoles(ctx context.Context, plan, state *m
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *markingResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	//return error here IMMEDIATELY, as Markings are not allowed to be deleted
+	if r.deletionsDisabled {
+		resp.Diagnostics.AddWarning("Markings cannot be deleted",
+			"Foundry does not support deleted markings. Since deletions_disabled is set to true, the remote markings will not be deleted, but this resource will be removed from state.")
+		return
+	}
+
+	// error here IMMEDIATELY, as Markings are not allowed to be deleted
 	tflog.Error(ctx, "Markings cannot be deleted")
 	resp.Diagnostics.AddError("Markings cannot be deleted",
 		"Foundry does not support deleted markings!")
-	return
 }
 
 // ImportState imports an existing marking into Terraform state.

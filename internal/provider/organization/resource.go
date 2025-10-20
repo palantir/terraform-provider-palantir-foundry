@@ -33,6 +33,7 @@ import (
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/constants"
 	providerError "github.com/palantir/terraform-provider-palantir-foundry/internal/provider/errors"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/helper"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/shared"
 )
 
 // Ensure the implementation satisfies the expected interfaces
@@ -47,27 +48,29 @@ func NewOrganizationResource() resource.Resource {
 
 // organizationResource is the resource implementation.
 type organizationResource struct {
-	client *v2.ClientWithResponses
+	client            *v2.ClientWithResponses
+	deletionsDisabled bool
 }
 
-// Configure adds the provider configured client to the resource.
+// Configure adds the provider data to the resource.
 func (r *organizationResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
 
-	client, ok := req.ProviderData.(*v2.ClientWithResponses)
+	providerData, ok := req.ProviderData.(*shared.FoundryProviderData)
 
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected v2.ClientWithResponses, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected shared.FoundryProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return
 	}
 
-	r.client = client
+	r.client = providerData.Client
+	r.deletionsDisabled = providerData.Flags.DeletionsDisabled
 }
 
 // Metadata returns the resource type name.
@@ -516,12 +519,12 @@ func (r *organizationResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	err = r.UpdateOrganizationMembers(ctx, &plan, &state)
+	err = r.UpdateOrganizationMembers(ctx, &plan, &state, resp)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating the Organization members. Please fix your plan if needed and re-apply", err.Error())
 	}
 
-	err = r.UpdateOrganizationRoles(ctx, &plan, &state)
+	err = r.UpdateOrganizationRoles(ctx, &plan, &state, resp)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating the Organization roles. Please fix your plan if needed and re-apply",
 			err.Error())
@@ -590,7 +593,7 @@ func (r *organizationResource) UpdateOrganization(ctx context.Context, resp *res
 	return nil
 }
 
-func (r *organizationResource) UpdateOrganizationMembers(ctx context.Context, plan *organizationResourceModel, state *organizationResourceModel) error {
+func (r *organizationResource) UpdateOrganizationMembers(ctx context.Context, plan *organizationResourceModel, state *organizationResourceModel, resp *resource.UpdateResponse) error {
 	var oldMarkingMembers []string
 	var newMarkingMembers []string
 
@@ -635,7 +638,7 @@ func (r *organizationResource) UpdateOrganizationMembers(ctx context.Context, pl
 				return errors.New(returnString)
 			}
 		}
-		if len(membersToRemove) != 0 {
+		if len(membersToRemove) != 0 && !r.deletionsDisabled {
 			adminRemoveMarkingRoleAssignmentsParams := v2.AdminRemoveMarkingMembersParams{Preview: &previewMode}
 			httpResp, err := r.client.AdminRemoveMarkingMembers(ctx, markingUUID, &adminRemoveMarkingRoleAssignmentsParams, v2.AdminRemoveMarkingMembersJSONRequestBody{
 				PrincipalIds: &membersToRemove,
@@ -653,13 +656,16 @@ func (r *organizationResource) UpdateOrganizationMembers(ctx context.Context, pl
 				}
 				return errors.New(returnString)
 			}
+		} else if len(membersToRemove) != 0 {
+			resp.Diagnostics.AddWarning("Found organization members in the state that are not in the plan.",
+				"Since `deletions_disabled` is set to true, member-removal operations will not be applied.")
 		}
 		state.OrganizationMembers = plan.OrganizationMembers
 	}
 	return nil
 }
 
-func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan *organizationResourceModel, state *organizationResourceModel) error {
+func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan *organizationResourceModel, state *organizationResourceModel, resp *resource.UpdateResponse) error {
 
 	var oldOrganizationRoles []organizationRolesRequestBodyEntry
 	var newOrganizationRoles []organizationRolesRequestBodyEntry
@@ -718,7 +724,7 @@ func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan
 				return errors.New(returnString)
 			}
 		}
-		if len(rolesToRemove) != 0 {
+		if len(rolesToRemove) != 0 && !r.deletionsDisabled {
 			roleUpdates := make([]v2.CoreRoleAssignmentUpdate, len(rolesToRemove))
 			for i, role := range rolesToRemove {
 				roleUpdates[i] = v2.CoreRoleAssignmentUpdate{
@@ -744,6 +750,9 @@ func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan
 				}
 				return errors.New(returnString)
 			}
+		} else if len(rolesToRemove) != 0 {
+			resp.Diagnostics.AddWarning("Found roles defined in the state that are not in the plan.",
+				"Since `deletions_disabled` is set to true, role-removal operations will not be applied.")
 		}
 		state.OrganizationRoles = plan.OrganizationRoles
 	}
@@ -752,11 +761,17 @@ func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *organizationResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	//return error here IMMEDIATELY, as Markings are not allowed to be deleted
+	if r.deletionsDisabled {
+		tflog.Warn(ctx, "Organizations cannot be deleted")
+		resp.Diagnostics.AddWarning("Organizations cannot be deleted",
+			"Foundry does not support deleted Organizations. Since deletions_disabled is set to true, the remote organization will not be deleted but the resource will be removed from state.")
+		return
+	}
+
+	//return error here IMMEDIATELY, as Organizations are not allowed to be deleted
 	tflog.Error(ctx, "Organizations cannot be deleted")
 	resp.Diagnostics.AddError("Organizations cannot be deleted",
 		"Foundry does not support deleted Organizations!")
-	return
 }
 
 // ImportState imports an existing organization into Terraform state.

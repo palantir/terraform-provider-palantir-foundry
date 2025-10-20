@@ -31,6 +31,7 @@ import (
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/constants"
 	providerError "github.com/palantir/terraform-provider-palantir-foundry/internal/provider/errors"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/helper"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/shared"
 )
 
 // Ensure the implementation satisfies the expected interfaces
@@ -46,27 +47,29 @@ func NewGroupResource() resource.Resource {
 
 // groupResource is the resource implementation.
 type groupResource struct {
-	client *v2.ClientWithResponses
+	client            *v2.ClientWithResponses
+	deletionsDisabled bool
 }
 
-// Configure adds the provider configured client to the resource.
+// Configure adds the provider data to the resource.
 func (r *groupResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
 
-	client, ok := req.ProviderData.(*v2.ClientWithResponses)
+	providerData, ok := req.ProviderData.(*shared.FoundryProviderData)
 
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected v2.ClientWithResponses, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected shared.FoundryProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return
 	}
 
-	r.client = client
+	r.client = providerData.Client
+	r.deletionsDisabled = providerData.Flags.DeletionsDisabled
 }
 
 // Metadata returns the resource type name.
@@ -378,7 +381,7 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
-	err := r.UpdateGroupMembers(ctx, &plan, &state)
+	err := r.UpdateGroupMembers(ctx, &plan, &state, resp)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating the Group members. Please fix your plan if needed and re-apply", err.Error())
 	}
@@ -390,7 +393,7 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	}
 }
 
-func (r *groupResource) UpdateGroupMembers(ctx context.Context, plan *groupResourceModel, state *groupResourceModel) error {
+func (r *groupResource) UpdateGroupMembers(ctx context.Context, plan *groupResourceModel, state *groupResourceModel, resp *resource.UpdateResponse) error {
 	var oldGroupMembers []string
 	var newGroupMembers []string
 
@@ -431,7 +434,7 @@ func (r *groupResource) UpdateGroupMembers(ctx context.Context, plan *groupResou
 				return errors.New(returnString)
 			}
 		}
-		if len(membersToRemove) != 0 {
+		if len(membersToRemove) != 0 && !r.deletionsDisabled {
 			//create body
 			httpResp, err := r.client.AdminRemoveGroupMembers(ctx, state.ID.ValueString(), v2.AdminRemoveGroupMembersRequest{
 				PrincipalIds: &membersToRemove,
@@ -449,6 +452,9 @@ func (r *groupResource) UpdateGroupMembers(ctx context.Context, plan *groupResou
 				}
 				return errors.New(returnString)
 			}
+		} else if len(membersToRemove) != 0 {
+			resp.Diagnostics.AddWarning("Found group members in the state that are not in the plan.",
+				"Since `deletions_disabled` is set to true, member-removal operations will not be applied.")
 		}
 		//if there was a change (and no error thrown), update state to equal plan
 		state.GroupMembers = plan.GroupMembers
@@ -463,6 +469,13 @@ func (r *groupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// If deletions are disabled, do not delete the remote group but remove the resource from state
+	if r.deletionsDisabled {
+		resp.Diagnostics.AddWarning("Tried to perform a deletion when the deletions_disabled flag was set to true.",
+			fmt.Sprintf("Remote group with name %s and id %s will not be deleted but this resource will be removed from state.", state.Name.ValueString(), state.ID.ValueString()))
 		return
 	}
 

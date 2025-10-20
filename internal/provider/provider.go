@@ -32,6 +32,7 @@ import (
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/marking"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/organization"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/project"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/shared"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/space"
 )
 
@@ -68,14 +69,19 @@ func (p *FoundryProvider) Schema(_ context.Context, _ provider.SchemaRequest, re
 				Optional:  true,
 				Sensitive: true,
 			},
+			"deletions_disabled": schema.BoolAttribute{
+				Optional:    true,
+				Description: "An experimental provider-level flag to fully disable deletions of resources as well as the removal of resources' associated roles, members, etc.. This puts the provider a sort of `safe-mode`, preventing the removal of existing infra which can be subject to change outside the scope of your IAC management. In this mode, drift between the actual external infrastructure state and terraform's state is accepted, and applied plans might not map 1:1 with reality. As such, this flag must be used with caution. When a deletion operation is initiated on an otherwise deletable object (currently space, group, or project) and this flag is set to true then we will not remove the remote resource but will still remove remove the resource from state. On non-deletable resources, this flag being set to true will allow said resources to be removed from state while keeping the remote resource intact.",
+			},
 		},
 	}
 }
 
 type foundryProviderModel struct {
-	Host         types.String `tfsdk:"host"`
-	ClientID     types.String `tfsdk:"client_id"`
-	ClientSecret types.String `tfsdk:"client_secret"`
+	Host              types.String `tfsdk:"host"`
+	ClientID          types.String `tfsdk:"client_id"`
+	ClientSecret      types.String `tfsdk:"client_secret"`
+	DeletionsDisabled types.Bool   `tfsdk:"deletions_disabled"`
 }
 
 // Configure prepares a Foundry API client for data sources and resources.
@@ -104,6 +110,11 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 			path.Root("client_secret"),
 			"Unknown Foundry API Client Secret", "Please provide the API Client Secret for Foundry in the provider configuration.")
 	}
+	if config.DeletionsDisabled.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("host"),
+			"Unknown Deletions Disabled Flag", "Please provide the Deletions Disabled Flag in the provider configuration.")
+	}
 
 	if resp.Diagnostics.HasError() {
 		return
@@ -115,6 +126,14 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 	host := os.Getenv("BASE_HOSTNAME")
 	clientID := os.Getenv("CLIENT_ID")
 	clientSecret := os.Getenv("CLIENT_SECRET")
+
+	// If no deletionsDisabled flag provided, default to false.
+	var deletionsDisabled bool
+	if config.DeletionsDisabled.IsNull() {
+		deletionsDisabled = false
+	} else {
+		deletionsDisabled = config.DeletionsDisabled.ValueBool()
+	}
 
 	if !config.Host.IsNull() {
 		host = config.Host.ValueString()
@@ -179,8 +198,15 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 		return
 	}
 
-	resp.DataSourceData = client
-	resp.ResourceData = client
+	providerData := &shared.FoundryProviderData{
+		Client: client,
+		Flags: &shared.Flags{
+			DeletionsDisabled: deletionsDisabled,
+		},
+	}
+
+	resp.DataSourceData = providerData
+	resp.ResourceData = providerData
 }
 
 // DataSources defines the data sources implemented in the provider.

@@ -32,6 +32,7 @@ import (
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/constants"
 	providerError "github.com/palantir/terraform-provider-palantir-foundry/internal/provider/errors"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/helper"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/shared"
 )
 
 // Ensure the implementation satisfies the expected interfaces
@@ -47,7 +48,8 @@ func NewEnrollmentResource() resource.Resource {
 
 // enrollmentResource is the resource implementation.
 type enrollmentResource struct {
-	client *v2.ClientWithResponses
+	client            *v2.ClientWithResponses
+	deletionsDisabled bool
 }
 
 func (r *enrollmentResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -55,18 +57,19 @@ func (r *enrollmentResource) Configure(_ context.Context, req resource.Configure
 		return
 	}
 
-	client, ok := req.ProviderData.(*v2.ClientWithResponses)
+	providerData, ok := req.ProviderData.(*shared.FoundryProviderData)
 
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected v2.ClientWithResponses, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected shared.FoundryProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return
 	}
 
-	r.client = client
+	r.client = providerData.Client
+	r.deletionsDisabled = providerData.Flags.DeletionsDisabled
 }
 
 // Metadata returns the resource type name.
@@ -199,7 +202,7 @@ func (r *enrollmentResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	err := r.UpdateEnrollmentRoles(ctx, &plan, &state)
+	err := r.UpdateEnrollmentRoles(ctx, &plan, &state, resp)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating the Enrollment roles. Please fix your plan if needed and re-apply",
 			err.Error())
@@ -213,7 +216,7 @@ func (r *enrollmentResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 }
 
-func (r *enrollmentResource) UpdateEnrollmentRoles(ctx context.Context, plan *enrollmentResourceModel, state *enrollmentResourceModel) error {
+func (r *enrollmentResource) UpdateEnrollmentRoles(ctx context.Context, plan *enrollmentResourceModel, state *enrollmentResourceModel, resp *resource.UpdateResponse) error {
 
 	var oldEnrollmentRoles []enrollmentRolesRequestBodyEntry
 	var newEnrollmentRoles []enrollmentRolesRequestBodyEntry
@@ -271,7 +274,7 @@ func (r *enrollmentResource) UpdateEnrollmentRoles(ctx context.Context, plan *en
 				return errors.New(returnString)
 			}
 		}
-		if len(rolesToRemove) != 0 {
+		if len(rolesToRemove) != 0 && !r.deletionsDisabled {
 			roleUpdates := make([]v2.CoreRoleAssignmentUpdate, len(rolesToRemove))
 			for i, role := range rolesToRemove {
 				roleUpdates[i] = v2.CoreRoleAssignmentUpdate{
@@ -297,6 +300,9 @@ func (r *enrollmentResource) UpdateEnrollmentRoles(ctx context.Context, plan *en
 				}
 				return errors.New(returnString)
 			}
+		} else if len(rolesToRemove) != 0 {
+			resp.Diagnostics.AddWarning("Found roles defined in the state that are not in the plan.",
+				"Since `deletions_disabled` is set to true, role-removal operations will not be applied.")
 		}
 		//if there was a change (and no error thrown), update state to equal plan
 		state.EnrollmentRoles = plan.EnrollmentRoles
@@ -306,10 +312,16 @@ func (r *enrollmentResource) UpdateEnrollmentRoles(ctx context.Context, plan *en
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *enrollmentResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	if r.deletionsDisabled {
+		tflog.Warn(ctx, "Enrollments cannot be deleted")
+		resp.Diagnostics.AddWarning("Enrollments cannot be deleted",
+			"Since deletions_disabled is set to true, the remote enrollment will not be deleted, but this resource will be removed from state.")
+		return
+	}
+
 	tflog.Error(ctx, "Enrollments cannot be deleted")
 	resp.Diagnostics.AddError("Enrollments cannot be deleted",
 		"The Terraform provider does not currently support deleting Enrollments")
-	return
 }
 
 func (r *enrollmentResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
