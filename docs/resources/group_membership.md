@@ -27,7 +27,7 @@ resource "foundry_group_membership" "example-group-membership" {
 
 ### Required
 
-- `id` (String) ID of the Group.
+- `group_id` (String) ID of the Group.
 
 ### Optional
 

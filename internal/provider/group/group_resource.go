@@ -17,10 +17,8 @@ package group
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
-	"slices"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -28,7 +26,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	v2 "github.com/palantir/terraform-provider-palantir-foundry/gateway-client/v2"
-	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/constants"
 	providerError "github.com/palantir/terraform-provider-palantir-foundry/internal/provider/errors"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/helper"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/shared"
@@ -36,23 +33,23 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces
 var (
-	_ resource.Resource              = &groupFullResource{}
-	_ resource.ResourceWithConfigure = &groupFullResource{}
+	_ resource.Resource              = &groupResource{}
+	_ resource.ResourceWithConfigure = &groupResource{}
 )
 
-// NewGroupFullResource is a helper function to simplify provider implementation.
-func NewGroupFullResource() resource.Resource {
-	return &groupFullResource{}
+// NewGroupResource is a helper function to simplify provider implementation.
+func NewGroupResource() resource.Resource {
+	return &groupResource{}
 }
 
-// groupFullResource is the resource implementation.
-type groupFullResource struct {
+// groupResource is the resource implementation.
+type groupResource struct {
 	client            *v2.ClientWithResponses
 	deletionsDisabled bool
 }
 
 // Configure adds the provider configured client to the resource.
-func (r *groupFullResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *groupResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -62,7 +59,7 @@ func (r *groupFullResource) Configure(_ context.Context, req resource.ConfigureR
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected shared.FoundryProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected v2.ClientWithResponses, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return
@@ -73,14 +70,14 @@ func (r *groupFullResource) Configure(_ context.Context, req resource.ConfigureR
 }
 
 // Metadata returns the resource type name.
-func (r *groupFullResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_group"
+func (r *groupResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_group_declaration"
 }
 
 // Schema defines the schema for the resource.
-func (r *groupFullResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *groupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a Foundry Group.",
+		Description: "Declares a Foundry Group. Unlike the full Group resource, members are not assigned here but in a separate resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "ID of the Group.",
@@ -103,18 +100,13 @@ func (r *groupFullResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Description: "Realm of the Group.",
 				Computed:    true,
 			},
-			"group_members": schema.SetAttribute{
-				ElementType: types.StringType,
-				Description: "List of the IDs of the members (Users or Groups) of this Group.",
-				Optional:    true,
-			},
 		},
 	}
 }
 
 // Create creates a new resource and sets the initial Terraform state.
-func (r *groupFullResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan groupFullResourceModel
+func (r *groupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var plan groupResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -128,13 +120,6 @@ func (r *groupFullResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	if !plan.GroupMembers.IsNull() {
-		err = r.CreateGroupMembers(ctx, resp, &plan)
-		if err != nil {
-			resp.Diagnostics.AddError("Error creating the Group members. Please fix your plan if needed and re-apply.", err.Error())
-		}
-	}
-
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -142,7 +127,7 @@ func (r *groupFullResource) Create(ctx context.Context, req resource.CreateReque
 	}
 }
 
-func (r *groupFullResource) CreateGroup(ctx context.Context, resp *resource.CreateResponse, plan *groupFullResourceModel) error {
+func (r *groupResource) CreateGroup(ctx context.Context, resp *resource.CreateResponse, plan *groupResourceModel) error {
 	var organizationsGoSlice []v2.CoreOrganizationRid
 	diags := plan.Organizations.ElementsAs(context.Background(), &organizationsGoSlice, false)
 	if diags.HasError() {
@@ -206,41 +191,10 @@ func (r *groupFullResource) CreateGroup(ctx context.Context, resp *resource.Crea
 	return nil
 }
 
-func (r *groupFullResource) CreateGroupMembers(ctx context.Context, resp *resource.CreateResponse, plan *groupFullResourceModel) error {
-	var plannedGroupMembers []v2.CorePrincipalID
-	diags := plan.GroupMembers.ElementsAs(ctx, &plannedGroupMembers, false)
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert group members to Go slice")
-	}
-
-	httpResp, err := r.client.AdminAddGroupMembers(ctx, plan.ID.ValueString(), v2.AdminAddGroupMembersJSONRequestBody{
-		PrincipalIds: &plannedGroupMembers,
-	})
-
-	if err != nil {
-		return fmt.Errorf("AdminAddGroupMembers request failed: %w", err)
-	}
-
-	// Check the response status code
-	if httpResp.StatusCode != http.StatusNoContent {
-		returnString, err := providerError.FormatHTTPError(httpResp)
-		if err != nil {
-			return fmt.Errorf("failed to format error logging from AdminAddGroupMembers response: %w", err)
-		}
-		plan.GroupMembers, diags = types.SetValueFrom(ctx, types.StringType, make([]string, 0))
-		if diags.HasError() {
-			resp.Diagnostics.Append(diags...)
-			return fmt.Errorf("failed to initialize group members in plan")
-		}
-		return errors.New(returnString)
-	}
-	return nil
-}
-
 // Read refreshes the Terraform state with the latest data.
-func (r *groupFullResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *groupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	// Get current state
-	var state groupFullResourceModel
+	var state groupResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -258,11 +212,6 @@ func (r *groupFullResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	err = r.ReadGroupMembers(ctx, resp, &state)
-	if err != nil {
-		resp.Diagnostics.AddError("Error reading the Group members", err.Error())
-	}
-
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -271,7 +220,7 @@ func (r *groupFullResource) Read(ctx context.Context, req resource.ReadRequest, 
 	}
 }
 
-func (r *groupFullResource) ReadGroup(ctx context.Context, resp *resource.ReadResponse, state *groupFullResourceModel) error {
+func (r *groupResource) ReadGroup(ctx context.Context, resp *resource.ReadResponse, state *groupResourceModel) error {
 	httpResp, err := r.client.AdminGetGroup(ctx, state.ID.ValueString())
 
 	if err != nil {
@@ -316,50 +265,11 @@ func (r *groupFullResource) ReadGroup(ctx context.Context, resp *resource.ReadRe
 	return nil
 }
 
-func (r *groupFullResource) ReadGroupMembers(ctx context.Context, resp *resource.ReadResponse, state *groupFullResourceModel) error {
-	pageSize := constants.PageSize
-	httpResp, err := r.client.AdminListGroupMembers(ctx, state.ID.ValueString(), &v2.AdminListGroupMembersParams{PageSize: &pageSize})
-
-	if err != nil {
-		return fmt.Errorf("AdminListGroupMembers request failed: %w", err)
-	}
-
-	// Check the response status code
-	if httpResp.StatusCode != http.StatusOK {
-		returnString, err := providerError.FormatHTTPError(httpResp)
-		if err != nil {
-			return fmt.Errorf("failed to format error logging from AdminListGroupMembers response: %w", err)
-		}
-		return errors.New(returnString)
-	}
-
-	bodyBytes, err := helper.ExtractBodyFromResponse(httpResp)
-	if err != nil {
-		return fmt.Errorf("failed to parse response from AdminListGroupMembers: %w", err)
-	}
-
-	var httpGroupMembersResponseBody groupMembersResponseBody
-	if err := json.Unmarshal(bodyBytes, &httpGroupMembersResponseBody); err != nil {
-		return fmt.Errorf("error decoding response: %w", err)
-	}
-
-	groupMemberIds := make([]string, 0)
-
-	//var groupMemberIds []string
-	for _, groupMember := range httpGroupMembersResponseBody.Data {
-		groupMemberIds = append(groupMemberIds, groupMember.PrincipalID)
-	}
-	if len(groupMemberIds) != 0 {
-		state.GroupMembers, _ = types.SetValueFrom(ctx, types.StringType, groupMemberIds)
-	}
-	return nil
-}
-
 // Update updates the resource and sets the updated Terraform state on success.
-// TODO: add updating group to API-GATEWAY and implement here. Right now we are just handling group members here
-func (r *groupFullResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+// TODO: add updating group to API-GATEWAY and implement here.
+func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// Retrieve values from plan
-	var plan groupFullResourceModel
+	var plan groupResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -367,7 +277,7 @@ func (r *groupFullResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 
 	// Get current state
-	var state groupFullResourceModel
+	var state groupResourceModel
 	diags = req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -381,11 +291,6 @@ func (r *groupFullResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	err := r.UpdateGroupMembers(ctx, &plan, &state, resp)
-	if err != nil {
-		resp.Diagnostics.AddError("Error updating the Group members. Please fix your plan if needed and re-apply", err.Error())
-	}
-
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -393,79 +298,10 @@ func (r *groupFullResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 }
 
-func (r *groupFullResource) UpdateGroupMembers(ctx context.Context, plan *groupFullResourceModel, state *groupFullResourceModel, resp *resource.UpdateResponse) error {
-	var oldGroupMembers []string
-	var newGroupMembers []string
-
-	if !state.GroupMembers.IsNull() {
-		diags := state.GroupMembers.ElementsAs(ctx, &oldGroupMembers, false)
-		if diags.HasError() {
-			return fmt.Errorf("failed to convert group members to Go slice")
-		}
-	}
-
-	//only initialize if not null, otherwise ElementsAs will throw error instead of just handling as empty slice
-	if !plan.GroupMembers.IsNull() {
-		diags := plan.GroupMembers.ElementsAs(ctx, &newGroupMembers, false)
-		if diags.HasError() {
-			return fmt.Errorf("failed to convert group members to Go slice")
-		}
-	}
-
-	if !slices.Equal(oldGroupMembers, newGroupMembers) {
-		// Determine members to add and remove
-		membersToAdd, membersToRemove := helper.FindStringSliceDiff(oldGroupMembers, newGroupMembers)
-		if len(membersToAdd) != 0 {
-			//create body
-			httpResp, err := r.client.AdminAddGroupMembers(ctx, state.ID.ValueString(), v2.AdminAddGroupMembersJSONRequestBody{
-				PrincipalIds: &membersToAdd,
-			})
-
-			if err != nil {
-				return fmt.Errorf("AdminAddGroupMembers request failed: %w", err)
-			}
-
-			// Check the response status code
-			if httpResp.StatusCode != http.StatusNoContent {
-				returnString, err := providerError.FormatHTTPError(httpResp)
-				if err != nil {
-					return fmt.Errorf("failed to format error logging from AdminAddGroupMembers response: %w", err)
-				}
-				return errors.New(returnString)
-			}
-		}
-		if len(membersToRemove) != 0 && !r.deletionsDisabled {
-			//create body
-			httpResp, err := r.client.AdminRemoveGroupMembers(ctx, state.ID.ValueString(), v2.AdminRemoveGroupMembersRequest{
-				PrincipalIds: &membersToRemove,
-			})
-
-			if err != nil {
-				return fmt.Errorf("AdminRemoveGroupMembers request failed: %w", err)
-			}
-
-			// Check the response status code
-			if httpResp.StatusCode != http.StatusNoContent {
-				returnString, err := providerError.FormatHTTPError(httpResp)
-				if err != nil {
-					return fmt.Errorf("failed to format error logging from AdminRemoveGroupMembers response: %w", err)
-				}
-				return errors.New(returnString)
-			}
-		} else if len(membersToRemove) != 0 {
-			resp.Diagnostics.AddWarning("Found group members in the state that are not in the plan.",
-				"Since `deletions_disabled` is set to true, member-removal operations will not be applied.")
-		}
-		//if there was a change (and no error thrown), update state to equal plan
-		state.GroupMembers = plan.GroupMembers
-	}
-	return nil
-}
-
 // Delete deletes the resource and removes the Terraform state on success.
-func (r *groupFullResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *groupResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	// Retrieve values from state
-	var state groupFullResourceModel
+	var state groupResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -490,7 +326,7 @@ func (r *groupFullResource) Delete(ctx context.Context, req resource.DeleteReque
 	if httpResp.StatusCode != http.StatusNoContent {
 		returnString, err := providerError.FormatHTTPError(httpResp)
 		if err != nil {
-			resp.Diagnostics.AddError("failed to format error logging from AdminAddGroupMembers response", err.Error())
+			resp.Diagnostics.AddError("failed to format error logging from AdminDeleteGroup response", err.Error())
 		}
 		resp.Diagnostics.AddError("Request failed", returnString)
 		//make sure we return here so don't update state to uphold Terraform best practices
@@ -499,7 +335,7 @@ func (r *groupFullResource) Delete(ctx context.Context, req resource.DeleteReque
 }
 
 // ImportState imports an existing group into Terraform state.
-func (r *groupFullResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *groupResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// The import ID is expected to be the group ID
 	groupID := req.ID
 

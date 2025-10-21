@@ -82,7 +82,7 @@ func (r *groupMembershipResource) Schema(_ context.Context, _ resource.SchemaReq
 	resp.Schema = schema.Schema{
 		Description: "Manages a Foundry Group's Membership.",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
+			"group_id": schema.StringAttribute{
 				Description: "ID of the Group.",
 				Required:    true,
 			},
@@ -120,32 +120,53 @@ func (r *groupMembershipResource) Create(ctx context.Context, req resource.Creat
 }
 
 func (r *groupMembershipResource) CreateGroupMembers(ctx context.Context, resp *resource.CreateResponse, plan *groupMembershipResourceModel) error {
-	var plannedGroupMembers []v2.CorePrincipalID
-	diags := plan.GroupMembers.ElementsAs(ctx, &plannedGroupMembers, false)
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert group members to Go slice")
-	}
-
-	httpResp, err := r.client.AdminAddGroupMembers(ctx, plan.ID.ValueString(), v2.AdminAddGroupMembersJSONRequestBody{
-		PrincipalIds: &plannedGroupMembers,
-	})
+	oldGroupMembers, err := r.ReadGroupMembersOnCreation(ctx, resp, plan)
 
 	if err != nil {
-		return fmt.Errorf("AdminAddGroupMembers request failed: %w", err)
+		return err
 	}
 
-	// Check the response status code
-	if httpResp.StatusCode != http.StatusNoContent {
-		returnString, err := providerError.FormatHTTPError(httpResp)
-		if err != nil {
-			return fmt.Errorf("failed to format error logging from AdminAddGroupMembers response: %w", err)
-		}
-		plan.GroupMembers, diags = types.SetValueFrom(ctx, types.StringType, make([]string, 0))
+	var newGroupMembers []string
+
+	//only initialize if not null, otherwise ElementsAs will throw error instead of just handling as empty slice
+	if !plan.GroupMembers.IsNull() {
+		diags := plan.GroupMembers.ElementsAs(ctx, &newGroupMembers, false)
 		if diags.HasError() {
-			resp.Diagnostics.Append(diags...)
-			return fmt.Errorf("failed to initialize group members in plan")
+			return fmt.Errorf("failed to convert group members to Go slice")
 		}
-		return errors.New(returnString)
+	}
+
+	if !slices.Equal(oldGroupMembers, newGroupMembers) {
+		// Determine members to add or remove.
+		membersToAdd, membersToRemove := helper.FindStringSliceDiff(oldGroupMembers, newGroupMembers)
+		if len(membersToAdd) != 0 {
+			//create body
+			httpResp, err := r.client.AdminAddGroupMembers(ctx, plan.GroupId.ValueString(), v2.AdminAddGroupMembersJSONRequestBody{
+				PrincipalIds: &membersToAdd,
+			})
+
+			if err != nil {
+				return fmt.Errorf("AdminAddGroupMembers request failed: %w", err)
+			}
+
+			// Check the response status code
+			if httpResp.StatusCode != http.StatusNoContent {
+				returnString, err := providerError.FormatHTTPError(httpResp)
+				if err != nil {
+					return fmt.Errorf("failed to format error logging from AdminAddGroupMembers response: %w", err)
+				}
+				return errors.New(returnString)
+			}
+		}
+		if len(membersToRemove) != 0 && !r.deletionsDisabled {
+			err := r.RemoveGroupMembers(ctx, membersToRemove, plan.GroupId.ValueString())
+			if err != nil {
+				return err
+			}
+		} else if len(membersToRemove) != 0 {
+			resp.Diagnostics.AddWarning("Found group members in the state that are not in the plan.",
+				"Since `deletions_disabled` is set to true, member-removal operations will not be applied.")
+		}
 	}
 	return nil
 }
@@ -175,7 +196,7 @@ func (r *groupMembershipResource) Read(ctx context.Context, req resource.ReadReq
 
 func (r *groupMembershipResource) ReadGroupMembers(ctx context.Context, resp *resource.ReadResponse, state *groupMembershipResourceModel) error {
 	pageSize := constants.PageSize
-	httpResp, err := r.client.AdminListGroupMembers(ctx, state.ID.ValueString(), &v2.AdminListGroupMembersParams{PageSize: &pageSize})
+	httpResp, err := r.client.AdminListGroupMembers(ctx, state.GroupId.ValueString(), &v2.AdminListGroupMembersParams{PageSize: &pageSize})
 
 	if err != nil {
 		return fmt.Errorf("AdminListGroupMembers request failed: %w", err)
@@ -210,6 +231,45 @@ func (r *groupMembershipResource) ReadGroupMembers(ctx context.Context, resp *re
 		state.GroupMembers, _ = types.SetValueFrom(ctx, types.StringType, groupMemberIds)
 	}
 	return nil
+}
+
+func (r *groupMembershipResource) ReadGroupMembersOnCreation(ctx context.Context, resp *resource.CreateResponse, plan *groupMembershipResourceModel) ([]string, error) {
+	pageSize := constants.PageSize
+	httpResp, err := r.client.AdminListGroupMembers(ctx, plan.GroupId.ValueString(), &v2.AdminListGroupMembersParams{PageSize: &pageSize})
+
+	if err != nil {
+		return nil, fmt.Errorf("AdminListGroupMembers request failed: %w", err)
+	}
+
+	// Check the response status code
+	if httpResp.StatusCode != http.StatusOK {
+		returnString, err := providerError.FormatHTTPError(httpResp)
+		if err != nil {
+			return nil, fmt.Errorf("failed to format error logging from AdminListGroupMembers response: %w", err)
+		}
+		return nil, errors.New(returnString)
+	}
+
+	bodyBytes, err := helper.ExtractBodyFromResponse(httpResp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse response from AdminListGroupMembers: %w", err)
+	}
+
+	var httpGroupMembersResponseBody groupMembersResponseBody
+	if err := json.Unmarshal(bodyBytes, &httpGroupMembersResponseBody); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	groupMemberIds := make([]string, 0)
+
+	//var groupMemberIds []string
+	for _, groupMember := range httpGroupMembersResponseBody.Data {
+		groupMemberIds = append(groupMemberIds, groupMember.PrincipalID)
+	}
+	if len(groupMemberIds) != 0 {
+		return groupMemberIds, nil
+	}
+	return nil, nil
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
@@ -267,7 +327,7 @@ func (r *groupMembershipResource) UpdateGroupMembers(ctx context.Context, plan *
 		membersToAdd, membersToRemove := helper.FindStringSliceDiff(oldGroupMembers, newGroupMembers)
 		if len(membersToAdd) != 0 {
 			//create body
-			httpResp, err := r.client.AdminAddGroupMembers(ctx, state.ID.ValueString(), v2.AdminAddGroupMembersJSONRequestBody{
+			httpResp, err := r.client.AdminAddGroupMembers(ctx, state.GroupId.ValueString(), v2.AdminAddGroupMembersJSONRequestBody{
 				PrincipalIds: &membersToAdd,
 			})
 
@@ -285,7 +345,7 @@ func (r *groupMembershipResource) UpdateGroupMembers(ctx context.Context, plan *
 			}
 		}
 		if len(membersToRemove) != 0 && !r.deletionsDisabled {
-			err := r.RemoveGroupMembers(ctx, membersToRemove, state)
+			err := r.RemoveGroupMembers(ctx, membersToRemove, state.GroupId.ValueString())
 			if err != nil {
 				return err
 			}
@@ -309,28 +369,9 @@ func (r *groupMembershipResource) Delete(ctx context.Context, req resource.Delet
 		return
 	}
 
-	// If deletions are disabled, error.
-	if r.deletionsDisabled {
-		resp.Diagnostics.AddWarning("Tried to perform a deletion when the deletions_disabled flag was set to true.",
-			fmt.Sprintf("Group membership resource for group id %s will be removed from state.", state.ID.ValueString()))
-		return
-	}
+	resp.Diagnostics.AddWarning("Called Delete on a group membership resource.",
+		fmt.Sprintf("The membership resource for group id %s will be removed from state, but no members will be removed remotely.", state.GroupId.ValueString()))
 
-	var allGroupMembers []string
-
-	if !state.GroupMembers.IsNull() {
-		diags := state.GroupMembers.ElementsAs(ctx, &allGroupMembers, false)
-		if diags.HasError() {
-			return
-		}
-	}
-
-	// Attempt to remove all members. This will fail if the group no longer exists.
-	err := r.RemoveGroupMembers(ctx, allGroupMembers, &state)
-	if err != nil {
-		resp.Diagnostics.AddError("Group member removal failed.", err.Error())
-		return
-	}
 }
 
 // ImportState imports an existing group into Terraform state.
@@ -356,9 +397,9 @@ func (r *groupMembershipResource) ImportState(ctx context.Context, req resource.
 	// to refresh all the other attributes based on the RID
 }
 
-func (r *groupMembershipResource) RemoveGroupMembers(ctx context.Context, membersToRemove []string, state *groupMembershipResourceModel) error {
+func (r *groupMembershipResource) RemoveGroupMembers(ctx context.Context, membersToRemove []string, id string) error {
 	//create body
-	httpResp, err := r.client.AdminRemoveGroupMembers(ctx, state.ID.ValueString(), v2.AdminRemoveGroupMembersRequest{
+	httpResp, err := r.client.AdminRemoveGroupMembers(ctx, id, v2.AdminRemoveGroupMembersRequest{
 		PrincipalIds: &membersToRemove,
 	})
 

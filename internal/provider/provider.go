@@ -218,8 +218,7 @@ func (p *FoundryProvider) DataSources(_ context.Context) []func() datasource.Dat
 func (p *FoundryProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		enrollment.NewEnrollmentResource,
-		group.NewGroupFullResource,
-		group.NewGroupDeclarationResource,
+		group.NewGroupResource,
 		group.NewGroupMembershipResource,
 		marking.NewMarkingResource,
 		organization.NewOrganizationResource,

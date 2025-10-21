@@ -18,16 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type groupFullResourceModel struct {
-	ID            types.String `tfsdk:"id"`
-	Name          types.String `tfsdk:"name"`
-	Description   types.String `tfsdk:"description"`
-	Realm         types.String `tfsdk:"realm"`
-	Organizations types.List   `tfsdk:"organizations"`
-	GroupMembers  types.Set    `tfsdk:"group_members"`
-}
-
-type groupDeclarationResourceModel struct {
+type groupResourceModel struct {
 	ID            types.String `tfsdk:"id"`
 	Name          types.String `tfsdk:"name"`
 	Description   types.String `tfsdk:"description"`
@@ -36,7 +27,7 @@ type groupDeclarationResourceModel struct {
 }
 
 type groupMembershipResourceModel struct {
-	ID           types.String `tfsdk:"id"`
+	GroupId      types.String `tfsdk:"group_id"`
 	GroupMembers types.Set    `tfsdk:"group_members"`
 }
 
