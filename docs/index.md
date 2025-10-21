@@ -10,8 +10,6 @@ description: |-
 
 Manage your Palantir Foundry enrollment.
 
-This provider is currently in ALPHA and is not intended for production use.
-
 In order to use this provider with your Foundry instance, you will need to provision client credentials for a service user. You can follow the [instructions here](https://www.palantir.com/docs/foundry/platform-security-third-party/register-3pa) to register a third-party application on your Foundry instance and then use the [instructions here](https://www.palantir.com/docs/foundry/platform-security-third-party/writing-oauth2-clients#client-credentials-grant) to set up your client credentials.
 
 ```terraform
