@@ -10,8 +10,6 @@ description: |-
 
     - Add or remove a group's members
 
-    Note: currently, the provider does not have the ability to update its name or description. Additionally, the provider does not have support for updating the organizations a group belongs to after creation.
-
 ---
 # Foundry Group
 
