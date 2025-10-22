@@ -4,7 +4,7 @@
 page_title: "Palantir Foundry Group"
 subcategory: ""
 description: |-
-  Declares a Foundry Group. Unlike the full Group resource, members are not assigned here but in a separate resource."
+  Manages a Foundry Group."
 
   The following operations are currently supported:
 
