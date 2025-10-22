@@ -77,7 +77,7 @@ func (r *groupResource) Metadata(_ context.Context, req resource.MetadataRequest
 // Schema defines the schema for the resource.
 func (r *groupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Declares a Foundry Group. Unlike the full Group resource, members are not assigned here but in a separate resource.",
+		Description: "Manages a Foundry Group.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "ID of the Group.",
