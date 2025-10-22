@@ -273,7 +273,6 @@ func (r *groupMembershipResource) ReadGroupMembersOnCreation(ctx context.Context
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
-// TODO: add updating group to API-GATEWAY and implement here. Right now we are just handling group members here
 func (r *groupMembershipResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// Retrieve values from plan
 	var plan groupMembershipResourceModel
