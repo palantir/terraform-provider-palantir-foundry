@@ -219,6 +219,7 @@ func (p *FoundryProvider) Resources(_ context.Context) []func() resource.Resourc
 	return []func() resource.Resource{
 		enrollment.NewEnrollmentResource,
 		group.NewGroupResource,
+		group.NewGroupMembershipResource,
 		marking.NewMarkingResource,
 		organization.NewOrganizationResource,
 		project.NewProjectResource,

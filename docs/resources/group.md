@@ -4,14 +4,13 @@
 page_title: "Palantir Foundry Group"
 subcategory: ""
 description: |-
-  Manages a Foundry Group.
+  Manages a Foundry Group."
 
   The following operations are currently supported:
 
     - Create a group
     - Delete a group
     - Import a group
-    - Add or remove a group's members
 
     Note: currently, the provider does not have the ability to update its name or description. Additionally, the provider does not have support for updating the organizations a group belongs to after creation.
 
@@ -22,8 +21,7 @@ description: |-
 resource "foundry_group" "example-group" {
   name        = "Example group name"
   description = "An example group in Foundry"
-  organizations = ["example-organization-rid", "second-example-organization-rid"]
-  group_members = ["example-user-id", "example-group-id"]
+  organizations = ["example-organization-rid"]
 }
 ```
 
@@ -38,7 +36,6 @@ resource "foundry_group" "example-group" {
 ### Optional
 
 - `description` (String) Description of the Group.
-- `group_members` (Set of String) List of the IDs of the members (Users or Groups) of this Group.
 
 ### Read-Only
 

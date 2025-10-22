@@ -24,7 +24,11 @@ type groupResourceModel struct {
 	Description   types.String `tfsdk:"description"`
 	Realm         types.String `tfsdk:"realm"`
 	Organizations types.List   `tfsdk:"organizations"`
-	GroupMembers  types.Set    `tfsdk:"group_members"`
+}
+
+type groupMembershipResourceModel struct {
+	GroupId      types.String `tfsdk:"group_id"`
+	GroupMembers types.Set    `tfsdk:"group_members"`
 }
 
 // responseBody contains the schema for response body for groups endpoint
