@@ -4,7 +4,7 @@
 page_title: "Palantir Foundry Group"
 subcategory: ""
 description: |-
-  Manages a Foundry Group."
+  Manages a Foundry Group.
 
   The following operations are currently supported:
 
