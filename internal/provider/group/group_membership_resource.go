@@ -389,8 +389,8 @@ func (r *groupMembershipResource) ImportState(ctx context.Context, req resource.
 
 	tflog.Info(ctx, fmt.Sprintf("Importing group membership for group with ID %s", groupID))
 
-	// Set the organization RID in state
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), groupID)...)
+	// Set the Group ID in state
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("group_id"), groupID)...)
 
 	// The Read method will be called automatically after ImportState
 	// to refresh all the other attributes based on the RID

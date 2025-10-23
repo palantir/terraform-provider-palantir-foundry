@@ -350,7 +350,7 @@ func (r *groupResource) ImportState(ctx context.Context, req resource.ImportStat
 
 	tflog.Info(ctx, fmt.Sprintf("Importing group with ID %s", groupID))
 
-	// Set the organization RID in state
+	// Set the Group ID in state
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), groupID)...)
 
 	// The Read method will be called automatically after ImportState
