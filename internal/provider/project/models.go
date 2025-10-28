@@ -19,14 +19,26 @@ import (
 )
 
 type projectResourceModel struct {
-	RID           types.String `tfsdk:"rid"`
-	DisplayName   types.String `tfsdk:"display_name"`
-	SpaceRID      types.String `tfsdk:"space_rid"`
-	Description   types.String `tfsdk:"description"`
-	Organizations types.Set    `tfsdk:"organizations"`
-	ResourceRoles types.Set    `tfsdk:"resource_roles"`
-	Markings      types.Set    `tfsdk:"markings"`
-	TrashStatus   types.String `tfsdk:"trash_status"`
+	RID         types.String `tfsdk:"rid"`
+	DisplayName types.String `tfsdk:"display_name"`
+	SpaceRID    types.String `tfsdk:"space_rid"`
+	Description types.String `tfsdk:"description"`
+	TrashStatus types.String `tfsdk:"trash_status"`
+}
+
+type projectMarkingsResourceModel struct {
+	ProjectRid      types.String `tfsdk:"project_rid"`
+	ProjectMarkings types.Set    `tfsdk:"project_markings"`
+}
+
+type projectOrganizationsResourceModel struct {
+	ProjectRid           types.String `tfsdk:"project_rid"`
+	ProjectOrganizations types.Set    `tfsdk:"project_organizations"`
+}
+
+type projectResourceRolesResourceModel struct {
+	ProjectRid           types.String `tfsdk:"project_rid"`
+	ProjectResourceRoles types.Set    `tfsdk:"project_resource_roles"`
 }
 
 // requestBody contains the schema for request body

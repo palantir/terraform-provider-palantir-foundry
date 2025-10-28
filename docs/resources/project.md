@@ -60,33 +60,13 @@ resource "foundry_project" "example-project" {
 ### Required
 
 - `display_name` (String) Display name of the Project.
-- `organizations` (Set of String) List of Organizations applied to this Project.
 - `space_rid` (String) RID of the Space that this Project belongs to.
 
 ### Optional
 
 - `description` (String) Description of the Project.
-- `markings` (Set of String) List of Markings applied to this Project.
-- `resource_roles` (Set of Object) Set of Role Grants applied to this Project. (see [below for nested schema](#nestedatt--resource_roles))
 
 ### Read-Only
 
 - `rid` (String) RID of the Project.
 - `trash_status` (String) Current trash status of the Project.
-
-<a id="nestedatt--resource_roles"></a>
-### Nested Schema for `resource_roles`
-
-Optional:
-
-- `resource_role_principal` (Object) (see [below for nested schema](#nestedobjatt--resource_roles--resource_role_principal))
-- `role_id` (String)
-
-<a id="nestedobjatt--resource_roles--resource_role_principal"></a>
-### Nested Schema for `resource_roles.resource_role_principal`
-
-Optional:
-
-- `principal_id` (String)
-- `principal_type` (String)
-- `type` (String)
