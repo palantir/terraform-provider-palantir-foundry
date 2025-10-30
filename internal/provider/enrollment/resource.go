@@ -238,7 +238,7 @@ func (r *enrollmentResource) UpdateEnrollmentRoles(ctx context.Context, plan *en
 			break
 		}
 	}
-	if !hasAdmin {
+	if !hasAdmin && !r.deletionsDisabled {
 		return fmt.Errorf("the Enrollment must have at least one Administrator")
 	}
 

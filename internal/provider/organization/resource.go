@@ -687,7 +687,7 @@ func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan
 			break
 		}
 	}
-	if !hasAdmin {
+	if !hasAdmin && !r.deletionsDisabled {
 		return fmt.Errorf("the Organization must have at least one administrator")
 	}
 
