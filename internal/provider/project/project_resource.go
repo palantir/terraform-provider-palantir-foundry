@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -99,6 +100,35 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: "Current trash status of the Project.",
 				Computed:    true,
 			},
+			"initial_resource_roles": schema.MapAttribute{
+				Description: "The initial set of Resource Roles to be applied when creating the Project. " +
+					"Any changes to this field after Project creation will not be applied; " +
+					"instead, use the project_resource_roles resource to manage Resource Roles.",
+				Optional: true,
+				ElementType: types.ListType{
+					ElemType: types.ObjectType{
+						AttrTypes: map[string]attr.Type{
+							"principal_id":   types.StringType,
+							"principal_type": types.StringType,
+						},
+					},
+				},
+			},
+			"initial_default_roles": schema.SetAttribute{
+				Description: "The initial Default Roles to be applied when creating the Project. " +
+					"Any changes to this field after Project creation will not be applied; " +
+					"instead, use the project_resource_roles resource to manage Default Roles using the" +
+					"'everyone' principal.",
+				Optional:    true,
+				ElementType: types.StringType,
+			},
+			"initial_organizations": schema.SetAttribute{
+				Description: "The initial list of Organizations to be applied when creating the Project. " +
+					"Any changes to this field after Project creation will not be applied; " +
+					"instead, use the project_organizations resource to manage Organizations.",
+				Optional:    true,
+				ElementType: types.StringType,
+			},
 		},
 	}
 }
@@ -132,13 +162,68 @@ func (r *projectResource) CreateProject(ctx context.Context, resp *resource.Crea
 	filesystemCreateProjectParams := v2.FilesystemCreateProjectParams{Preview: &previewMode}
 	description := plan.Description.ValueString()
 
+	//handle initial resource roles
+
+	roleGrants := make(map[string][]v2.FilesystemPrincipalWithID)
+
+	initialResourceRoles := make(map[string][]Principals)
+
+	diags := plan.InitialResourceRoles.ElementsAs(ctx, &initialResourceRoles, false)
+	if diags.HasError() {
+		return fmt.Errorf("failed to convert initial resource roles to Go map")
+	}
+
+	// Unmarshal the map into a generic map
+
+	// Iterate through each role
+	for roleID, principalsValue := range initialResourceRoles {
+
+		// Step 4: Convert each object to FilesystemPrincipalWithID
+		var principals []v2.FilesystemPrincipalWithID
+		for _, principalObj := range principalsValue {
+
+			principal := v2.FilesystemPrincipalWithID{
+				PrincipalID:   principalObj.PrincipalID,
+				PrincipalType: v2.CorePrincipalType(principalObj.PrincipalType),
+				Type:          "principalWithId",
+			}
+			principals = append(principals, principal)
+		}
+
+		tflog.Debug(ctx, fmt.Sprintf("Created principal objects for role id : %+v", roleID))
+
+		roleGrants[roleID] = principals
+	}
+	//handle initial default roles
+
+	var defaultRoles []v2.CoreRoleID
+	diags = plan.InitialDefaultRoles.ElementsAs(ctx, &defaultRoles, false)
+
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return fmt.Errorf("failed to convert default roles to Go slice")
+	}
+
+	var organizations []string
+	diags = plan.InitialOrganizations.ElementsAs(ctx, &organizations, false)
+
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return fmt.Errorf("failed to convert organizations to Go slice")
+	}
+
 	httpResp, err := r.client.FilesystemCreateProject(ctx,
 		&filesystemCreateProjectParams,
 		v2.FilesystemCreateProjectJSONRequestBody{
-			Description: &description,
-			DisplayName: plan.DisplayName.ValueString(),
-			SpaceRid:    plan.SpaceRID.ValueString(),
+			Description:      &description,
+			DisplayName:      plan.DisplayName.ValueString(),
+			SpaceRid:         plan.SpaceRID.ValueString(),
+			RoleGrants:       &roleGrants,
+			DefaultRoles:     &defaultRoles,
+			OrganizationRids: &organizations,
 		})
+
+	tflog.Debug(ctx, fmt.Sprintf("FilesystemCreateProject response: %+v", httpResp))
 
 	if err != nil {
 		resp.Diagnostics.AddError("FilesystemCreateProject request failed", err.Error())
@@ -276,6 +361,22 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	//three cases for errors here. We should throw an error here, as if we let the provider continue, it will throw an error due to discrepancy between plan (which has changed value) and state (which has not)
+	if !plan.InitialResourceRoles.Equal(state.InitialResourceRoles) {
+		resp.Diagnostics.AddError("Initial Resource Roles cannot be updated after creation. Any changes will not be applied.",
+			"Initial Resource Roles cannot be updated after creation. Any changes will not be applied.")
+	}
+
+	if !plan.InitialDefaultRoles.Equal(state.InitialDefaultRoles) {
+		resp.Diagnostics.AddError("Initial Default Roles cannot be updated after creation. Any changes will not be applied.",
+			"Initial Default Roles cannot be updated after creation. Any changes will not be applied.")
+	}
+
+	if !plan.InitialOrganizations.Equal(state.InitialOrganizations) {
+		resp.Diagnostics.AddError("Initial organizations cannot be updated after creation. Any changes will not be applied.",
+			"Initial organizations cannot be updated after creation. Any changes will not be applied.")
 	}
 
 	err := r.UpdateProject(ctx, resp, &plan, &state)
