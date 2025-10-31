@@ -19,11 +19,14 @@ import (
 )
 
 type projectResourceModel struct {
-	RID         types.String `tfsdk:"rid"`
-	DisplayName types.String `tfsdk:"display_name"`
-	SpaceRID    types.String `tfsdk:"space_rid"`
-	Description types.String `tfsdk:"description"`
-	TrashStatus types.String `tfsdk:"trash_status"`
+	RID                  types.String `tfsdk:"rid"`
+	DisplayName          types.String `tfsdk:"display_name"`
+	SpaceRID             types.String `tfsdk:"space_rid"`
+	Description          types.String `tfsdk:"description"`
+	TrashStatus          types.String `tfsdk:"trash_status"`
+	InitialResourceRoles types.Map    `tfsdk:"initial_resource_roles"`
+	InitialDefaultRoles  types.Set    `tfsdk:"initial_default_roles"`
+	InitialOrganizations types.Set    `tfsdk:"initial_organizations"`
 }
 
 type projectMarkingsResourceModel struct {
@@ -76,4 +79,9 @@ type ResourceRole struct {
 		PrincipalType string `json:"principalType" tfsdk:"principal_type"`
 	} `tfsdk:"resource_role_principal" json:"resourceRolePrincipal"`
 	RoleID string `json:"roleId" tfsdk:"role_id"`
+}
+
+type Principals struct {
+	PrincipalID   string `json:"principalId" tfsdk:"principal_id"`
+	PrincipalType string `json:"principalType" tfsdk:"principal_type"`
 }

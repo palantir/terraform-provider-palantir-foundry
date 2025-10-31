@@ -13,9 +13,6 @@ description: |-
     - Update a project
     - Delete a project
     - Import a project
-    - Add or remove a project's roles
-    - Add or remove a project's markings
-    - Add or remove a project's tags
 
 ---
 # Project
@@ -65,6 +62,9 @@ resource "foundry_project" "example-project" {
 ### Optional
 
 - `description` (String) Description of the Project.
+- `initial_default_roles` (Set of String) The initial Default Roles to be applied when creating the Project. Any changes to this field after Project creation will not be applied; instead, use the project_resource_roles resource to manage Default Roles using the'everyone' principal.
+- `initial_organizations` (Set of String) The initial list of Organizations to be applied when creating the Project. Any changes to this field after Project creation will not be applied; instead, use the project_organizations resource to manage Organizations.
+- `initial_resource_roles` (Map of List of Object) The initial set of Resource Roles to be applied when creating the Project. Any changes to this field after Project creation will not be applied; instead, use the project_resource_roles resource to manage Resource Roles.
 
 ### Read-Only
 
