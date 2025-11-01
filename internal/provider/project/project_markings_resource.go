@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -367,11 +366,7 @@ func (r *projectMarkingsResource) ImportState(ctx context.Context, req resource.
 func (r *projectMarkingsResource) AddProjectMarkings(ctx context.Context, markingsToAdd []string, id string) error {
 	markingIdsToAdd := make([]v2.CoreMarkingID, len(markingsToAdd))
 	for i, markingID := range markingsToAdd {
-		markingUUID, err := uuid.Parse(markingID)
-		if err != nil {
-			return fmt.Errorf("error parsing marking UUID: %w", err)
-		}
-		markingIdsToAdd[i] = markingUUID
+		markingIdsToAdd[i] = markingID
 	}
 
 	previewMode := constants.PreviewMode
@@ -399,11 +394,7 @@ func (r *projectMarkingsResource) AddProjectMarkings(ctx context.Context, markin
 func (r *projectMarkingsResource) RemoveProjectMarkings(ctx context.Context, markingsToRemove []string, id string) error {
 	markingIdsToRemove := make([]v2.CoreMarkingID, len(markingsToRemove))
 	for i, markingID := range markingsToRemove {
-		markingUUID, err := uuid.Parse(markingID)
-		if err != nil {
-			return fmt.Errorf("error parsing marking UUID: %w", err)
-		}
-		markingIdsToRemove[i] = markingUUID
+		markingIdsToRemove[i] = markingID
 	}
 
 	previewMode := constants.PreviewMode
