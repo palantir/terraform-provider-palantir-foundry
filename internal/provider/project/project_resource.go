@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -182,8 +183,14 @@ func (r *projectResource) CreateProject(ctx context.Context, resp *resource.Crea
 		var principals []v2.FilesystemPrincipalWithID
 		for _, principalObj := range principalsValue {
 
+			principalIDAsUUID, err := uuid.Parse(principalObj.PrincipalID)
+
+			if err != nil {
+				return fmt.Errorf("invalid UUID format for principal ID %s: %w", principalIDAsUUID, err)
+			}
+
 			principal := v2.FilesystemPrincipalWithID{
-				PrincipalID:   principalObj.PrincipalID,
+				PrincipalID:   principalIDAsUUID,
 				PrincipalType: v2.CorePrincipalType(principalObj.PrincipalType),
 				Type:          "principalWithId",
 			}

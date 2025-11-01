@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"slices"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -192,9 +193,8 @@ func (r *projectResourceRolesResource) Read(ctx context.Context, req resource.Re
 }
 
 func (r *projectResourceRolesResource) ReadProjectResourceRoles(ctx context.Context, state *projectResourceRolesResourceModel) error {
-	previewMode := constants.PreviewMode
 	pageSize := constants.PageSize
-	filesystemListResourceRolesParams := v2.FilesystemListResourceRolesParams{Preview: &previewMode, PageSize: &pageSize}
+	filesystemListResourceRolesParams := v2.FilesystemListResourceRolesParams{PageSize: &pageSize}
 	httpResp, err := r.client.FilesystemListResourceRoles(ctx, state.ProjectRid.ValueString(), &filesystemListResourceRolesParams)
 
 	if err != nil {
@@ -281,9 +281,8 @@ func (r *projectResourceRolesResource) ReadProjectResourceRoles(ctx context.Cont
 }
 
 func (r *projectResourceRolesResource) ReadProjectResourceRolesOnCreation(ctx context.Context, plan *projectResourceRolesResourceModel) ([]ResourceRole, error) {
-	previewMode := constants.PreviewMode
 	pageSize := constants.PageSize
-	filesystemListResourceRolesParams := v2.FilesystemListResourceRolesParams{Preview: &previewMode, PageSize: &pageSize}
+	filesystemListResourceRolesParams := v2.FilesystemListResourceRolesParams{PageSize: &pageSize}
 	httpResp, err := r.client.FilesystemListResourceRoles(ctx, plan.ProjectRid.ValueString(), &filesystemListResourceRolesParams)
 
 	if err != nil {
@@ -479,16 +478,25 @@ func (r *projectResourceRolesResource) ImportState(ctx context.Context, req reso
 }
 
 func (r *projectResourceRolesResource) AddProjectResourceRoles(ctx context.Context, rolesToAdd []ResourceRole, id string) error {
-	roleUpdates := make([]v2.FilesystemResourceRole, len(rolesToAdd))
+	roleUpdates := make([]v2.FilesystemResourceRoleIdentifier, len(rolesToAdd))
 
 	for i, role := range rolesToAdd {
-		principal := v2.FilesystemResourceRolePrincipal{}
+		principal := v2.FilesystemResourceRolePrincipalIdentifier{}
 		if role.ResourceRolePrincipal.Type == "principalWithId" {
-			err := principal.FromFilesystemPrincipalWithID(v2.FilesystemPrincipalWithID{
-				PrincipalID:   role.ResourceRolePrincipal.PrincipalID,
-				PrincipalType: v2.CorePrincipalType(role.ResourceRolePrincipal.PrincipalType),
-				Type:          role.ResourceRolePrincipal.Type,
+			principalIDAsUUID, err := uuid.Parse(role.ResourceRolePrincipal.PrincipalID)
+
+			if err != nil {
+				return fmt.Errorf("invalid UUID format for principal ID %s: %w", role.ResourceRolePrincipal.PrincipalID, err)
+			}
+
+			err = principal.FromFilesystemPrincipalIDOnly(v2.FilesystemPrincipalIDOnly{
+				PrincipalID: principalIDAsUUID,
+				Type:        role.ResourceRolePrincipal.Type,
 			})
+			roleUpdates[i] = v2.FilesystemResourceRoleIdentifier{
+				ResourceRolePrincipal: principal,
+				RoleID:                role.RoleID,
+			}
 			if err != nil {
 				return fmt.Errorf("FilesystemPrincipalWithID request failed: %w", err)
 			}
@@ -498,7 +506,7 @@ func (r *projectResourceRolesResource) AddProjectResourceRoles(ctx context.Conte
 			err := principal.FromFilesystemEveryone(v2.FilesystemEveryone{
 				Type: role.ResourceRolePrincipal.Type,
 			})
-			roleUpdates[i] = v2.FilesystemResourceRole{
+			roleUpdates[i] = v2.FilesystemResourceRoleIdentifier{
 				ResourceRolePrincipal: principal,
 				RoleID:                role.RoleID,
 			}
@@ -506,16 +514,9 @@ func (r *projectResourceRolesResource) AddProjectResourceRoles(ctx context.Conte
 				return fmt.Errorf("FilesystemPrincipalWithID request failed: %w", err)
 			}
 		}
-		roleUpdates[i] = v2.FilesystemResourceRole{
-			ResourceRolePrincipal: principal,
-			RoleID:                role.RoleID,
-		}
 	}
 
-	previewMode := constants.PreviewMode
-
-	filesystemAddResourceRoleParams := v2.FilesystemAddResourceRolesParams{Preview: &previewMode}
-	httpResp, err := r.client.FilesystemAddResourceRoles(ctx, id, &filesystemAddResourceRoleParams, v2.FilesystemAddResourceRolesJSONRequestBody{
+	httpResp, err := r.client.FilesystemAddResourceRoles(ctx, id, v2.FilesystemAddResourceRolesJSONRequestBody{
 		Roles: &roleUpdates,
 	})
 
@@ -536,17 +537,26 @@ func (r *projectResourceRolesResource) AddProjectResourceRoles(ctx context.Conte
 }
 
 func (r *projectResourceRolesResource) RemoveProjectResourceRoles(ctx context.Context, rolesToRemove []ResourceRole, id string) error {
-	previewMode := constants.PreviewMode
-	roleUpdates := make([]v2.FilesystemResourceRole, len(rolesToRemove))
+
+	roleUpdates := make([]v2.FilesystemResourceRoleIdentifier, len(rolesToRemove))
 
 	for i, role := range rolesToRemove {
-		principal := v2.FilesystemResourceRolePrincipal{}
+		principal := v2.FilesystemResourceRolePrincipalIdentifier{}
 		if role.ResourceRolePrincipal.Type == "principalWithId" {
-			err := principal.FromFilesystemPrincipalWithID(v2.FilesystemPrincipalWithID{
-				PrincipalID:   role.ResourceRolePrincipal.PrincipalID,
-				PrincipalType: v2.CorePrincipalType(role.ResourceRolePrincipal.PrincipalType),
-				Type:          role.ResourceRolePrincipal.Type,
+			principalIDAsUUID, err := uuid.Parse(role.ResourceRolePrincipal.PrincipalID)
+
+			if err != nil {
+				return fmt.Errorf("invalid UUID format for principal ID %s: %w", role.ResourceRolePrincipal.PrincipalID, err)
+			}
+
+			err = principal.FromFilesystemPrincipalIDOnly(v2.FilesystemPrincipalIDOnly{
+				PrincipalID: principalIDAsUUID,
+				Type:        role.ResourceRolePrincipal.Type,
 			})
+			roleUpdates[i] = v2.FilesystemResourceRoleIdentifier{
+				ResourceRolePrincipal: principal,
+				RoleID:                role.RoleID,
+			}
 			if err != nil {
 				return fmt.Errorf("FilesystemPrincipalWithID request failed: %w", err)
 			}
@@ -556,7 +566,7 @@ func (r *projectResourceRolesResource) RemoveProjectResourceRoles(ctx context.Co
 			err := principal.FromFilesystemEveryone(v2.FilesystemEveryone{
 				Type: role.ResourceRolePrincipal.Type,
 			})
-			roleUpdates[i] = v2.FilesystemResourceRole{
+			roleUpdates[i] = v2.FilesystemResourceRoleIdentifier{
 				ResourceRolePrincipal: principal,
 				RoleID:                role.RoleID,
 			}
@@ -564,14 +574,9 @@ func (r *projectResourceRolesResource) RemoveProjectResourceRoles(ctx context.Co
 				return fmt.Errorf("FilesystemPrincipalWithID request failed: %w", err)
 			}
 		}
-		roleUpdates[i] = v2.FilesystemResourceRole{
-			ResourceRolePrincipal: principal,
-			RoleID:                role.RoleID,
-		}
 	}
 
-	filesystemRemoveResourceRoleParams := v2.FilesystemRemoveResourceRolesParams{Preview: &previewMode}
-	httpResp, err := r.client.FilesystemRemoveResourceRoles(ctx, id, &filesystemRemoveResourceRoleParams, v2.FilesystemRemoveResourceRolesJSONRequestBody{
+	httpResp, err := r.client.FilesystemRemoveResourceRoles(ctx, id, v2.FilesystemRemoveResourceRolesJSONRequestBody{
 		Roles: &roleUpdates,
 	})
 
