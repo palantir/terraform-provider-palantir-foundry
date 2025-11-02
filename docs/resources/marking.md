@@ -4,7 +4,7 @@
 page_title: "Palantir Foundry Marking"
 subcategory: ""
 description: |-
-  Manages a Foundry Marking.
+  Manages a Marking.
 
   The following operations are currently supported:
 
@@ -17,7 +17,7 @@ description: |-
     Note: the provider does not support deleting a marking. Additionally, a marking's categoryId is immutable after creation.
 
 ---
-# Foundry Marking
+# Marking
 
 ```terraform
 resource "foundry_marking" "example-marking" {

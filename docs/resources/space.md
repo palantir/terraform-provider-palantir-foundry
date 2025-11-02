@@ -4,7 +4,7 @@
 page_title: "Palantir Foundry Space"
 subcategory: ""
 description: |-
-  Manages a Foundry Space.
+  Manages a Space.
 
   The following operations are currently supported:
 
@@ -14,7 +14,7 @@ description: |-
     - Import a space
 
 ---
-# Foundry Space
+# Space
 
 ```terraform
 resource "foundry_space" "example-space" {

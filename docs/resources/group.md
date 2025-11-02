@@ -4,7 +4,7 @@
 page_title: "Palantir Foundry Group"
 subcategory: "Groups"
 description: |-
-  Manages a Foundry Group."
+  Manages a Group."
 
   The following operations are currently supported:
 
@@ -15,7 +15,7 @@ description: |-
     Note: currently, the provider does not have the ability to update its name or description. Additionally, the provider does not have support for updating the organizations a group belongs to after creation.
 
 ---
-# Foundry Group
+# Group
 
 ```terraform
 resource "foundry_group" "example-group" {

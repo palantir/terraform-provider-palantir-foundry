@@ -4,10 +4,10 @@
 page_title: "Palantir Foundry Group Membership"
 subcategory: "Groups"
 description: |-
-  Manages a Foundry Group's Members.
+  Manages a Group's Members.
 
 ---
-# Foundry Group
+# Group Membership
 
 ```terraform
 resource "foundry_group_membership" "example-group-membership" {

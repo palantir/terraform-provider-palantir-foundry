@@ -4,7 +4,7 @@
 page_title: "Palantir Foundry Organization"
 subcategory: ""
 description: |-
-  Manages a Foundry Organization.
+  Manages an Organization.
 
   The following operations are currently supported:
 
@@ -16,7 +16,7 @@ description: |-
     - Add or remove an organization's roles
 
 ---
-# Foundry Organization
+# Organization
 
 ```terraform
 resource "foundry_organization" "example-organization" {
