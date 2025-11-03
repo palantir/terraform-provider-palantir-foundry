@@ -16,10 +16,10 @@ package helper
 
 import (
 	"fmt"
-	"github.com/google/uuid"
 	"io"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
