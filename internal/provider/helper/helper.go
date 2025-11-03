@@ -15,6 +15,8 @@
 package helper
 
 import (
+	"fmt"
+	"github.com/google/uuid"
 	"io"
 	"net/http"
 
@@ -70,4 +72,16 @@ func HandleEmptyFieldString(field string) types.String {
 		return types.StringNull()
 	}
 	return types.StringValue(field)
+}
+
+func ConvertStringsToUUIDs(strings []string) ([]uuid.UUID, error) {
+	uuids := make([]uuid.UUID, 0, len(strings))
+	for _, s := range strings {
+		u, err := uuid.Parse(s)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse UUID %q: %w", s, err)
+		}
+		uuids = append(uuids, u)
+	}
+	return uuids, nil
 }

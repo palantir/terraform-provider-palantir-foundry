@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -221,7 +222,13 @@ func (r *groupResource) Read(ctx context.Context, req resource.ReadRequest, resp
 }
 
 func (r *groupResource) ReadGroup(ctx context.Context, resp *resource.ReadResponse, state *groupResourceModel) error {
-	httpResp, err := r.client.AdminGetGroup(ctx, state.ID.ValueString())
+	groupIdAsUUID, err := uuid.Parse(state.ID.ValueString())
+
+	if err != nil {
+		return fmt.Errorf("invalid UUID format for principal ID %s: %w", state.ID.ValueString(), err)
+	}
+
+	httpResp, err := r.client.AdminGetGroup(ctx, groupIdAsUUID)
 
 	if err != nil {
 		resp.Diagnostics.AddError("AdminGetGroup request failed", err.Error())
@@ -315,7 +322,14 @@ func (r *groupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 		return
 	}
 
-	httpResp, err := r.client.AdminDeleteGroup(ctx, state.ID.ValueString())
+	groupIdAsUUID, err := uuid.Parse(state.ID.ValueString())
+
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid UUID format for principal ID", fmt.Sprintf("The provided principal ID %s could not be parsed as a UUID: %s", state.ID.ValueString(), err.Error()))
+		return
+	}
+
+	httpResp, err := r.client.AdminDeleteGroup(ctx, groupIdAsUUID)
 
 	if err != nil {
 		resp.Diagnostics.AddError("Request failed", err.Error())
