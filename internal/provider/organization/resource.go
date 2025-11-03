@@ -148,13 +148,18 @@ func (r *organizationResource) Create(ctx context.Context, req resource.CreateRe
 	var adminPrincipalIDs []v2.CorePrincipalID
 	var nonAdminPrincipalIds []v2.CoreRoleAssignmentUpdate
 	for _, role := range allRoles {
-		principalID := role.PrincipalID
+		principalID, err := uuid.Parse(role.PrincipalID)
+		if err != nil {
+			resp.Diagnostics.AddError("Error creating the Organization. Please fix your plan if needed and re-apply", fmt.Sprintf("the principal ID %s is not a valid UUID: %s", role.PrincipalID, err.Error()))
+			return
+		}
+
 		if role.RoleID == constants.OrganizationAdministratorRoleID {
 			adminPrincipalIDs = append(adminPrincipalIDs, principalID)
 		} else {
 			nonAdminPrincipalIds = append(nonAdminPrincipalIds, v2.CoreRoleAssignmentUpdate{
 				RoleID:      role.RoleID,
-				PrincipalID: role.PrincipalID,
+				PrincipalID: principalID,
 			})
 		}
 	}
@@ -258,14 +263,7 @@ func (r *organizationResource) CreateOrganizationMembers(ctx context.Context, re
 		return fmt.Errorf("failed to convert planned group members to Go slice")
 	}
 
-	markingUUID, err := uuid.Parse(plan.MarkingID.ValueString())
-	if err != nil {
-		return fmt.Errorf("failed to parse marking UUID: %w", err)
-	}
-	previewMode := constants.PreviewMode
-
-	adminAddMarkingRoleAssignmentsParams := v2.AdminAddMarkingMembersParams{Preview: &previewMode}
-	httpResp, err := r.client.AdminAddMarkingMembers(ctx, markingUUID, &adminAddMarkingRoleAssignmentsParams, v2.AdminAddMarkingMembersJSONRequestBody{
+	httpResp, err := r.client.AdminAddMarkingMembers(ctx, plan.MarkingID.ValueString(), v2.AdminAddMarkingMembersJSONRequestBody{
 		PrincipalIds: &plannedOrganizationMembers,
 	})
 
@@ -398,15 +396,9 @@ func (r *organizationResource) ReadOrganization(ctx context.Context, resp *resou
 }
 
 func (r *organizationResource) ReadOrganizationMembers(ctx context.Context, state *organizationResourceModel) error {
-	markingUUID, err := uuid.Parse(state.MarkingID.ValueString())
-	if err != nil {
-		return fmt.Errorf("failed to parse marking UUID: %w", err)
-	}
-
-	previewMode := constants.PreviewMode
 	pageSize := constants.PageSize
-	adminListMarkingMembersParams := v2.AdminListMarkingMembersParams{Preview: &previewMode, PageSize: &pageSize}
-	httpResp, err := r.client.AdminListMarkingMembers(ctx, markingUUID, &adminListMarkingMembersParams)
+	adminListMarkingMembersParams := v2.AdminListMarkingMembersParams{PageSize: &pageSize}
+	httpResp, err := r.client.AdminListMarkingMembers(ctx, state.MarkingID.ValueString(), &adminListMarkingMembersParams)
 
 	if err != nil {
 		return fmt.Errorf("AdminListMarkingMembers request failed: %w", err)
@@ -611,18 +603,18 @@ func (r *organizationResource) UpdateOrganizationMembers(ctx context.Context, pl
 		}
 	}
 
-	previewMode := constants.PreviewMode
-
 	if !slices.Equal(oldMarkingMembers, newMarkingMembers) {
 		membersToAdd, membersToRemove := helper.FindStringSliceDiff(oldMarkingMembers, newMarkingMembers)
-		markingUUID, err := uuid.Parse(state.MarkingID.ValueString())
-		if err != nil {
-			return fmt.Errorf("error parsing marking UUID: %w", err)
-		}
 		if len(membersToAdd) != 0 {
-			adminAddMarkingRoleAssignmentsParams := v2.AdminAddMarkingMembersParams{Preview: &previewMode}
-			httpResp, err := r.client.AdminAddMarkingMembers(ctx, markingUUID, &adminAddMarkingRoleAssignmentsParams, v2.AdminAddMarkingMembersJSONRequestBody{
-				PrincipalIds: &membersToAdd,
+
+			uuidsToAdd, err := helper.ConvertStringsToUUIDs(membersToAdd)
+
+			if err != nil {
+				return fmt.Errorf("failed to convert members to add to UUIDs: %w", err)
+			}
+
+			httpResp, err := r.client.AdminAddMarkingMembers(ctx, state.MarkingID.ValueString(), v2.AdminAddMarkingMembersJSONRequestBody{
+				PrincipalIds: &uuidsToAdd,
 			})
 
 			if err != nil {
@@ -639,9 +631,15 @@ func (r *organizationResource) UpdateOrganizationMembers(ctx context.Context, pl
 			}
 		}
 		if len(membersToRemove) != 0 && !r.deletionsDisabled {
-			adminRemoveMarkingRoleAssignmentsParams := v2.AdminRemoveMarkingMembersParams{Preview: &previewMode}
-			httpResp, err := r.client.AdminRemoveMarkingMembers(ctx, markingUUID, &adminRemoveMarkingRoleAssignmentsParams, v2.AdminRemoveMarkingMembersJSONRequestBody{
-				PrincipalIds: &membersToRemove,
+
+			uuidsToRemove, err := helper.ConvertStringsToUUIDs(membersToRemove)
+
+			if err != nil {
+				return fmt.Errorf("failed to convert members to add to UUIDs: %w", err)
+			}
+
+			httpResp, err := r.client.AdminRemoveMarkingMembers(ctx, state.MarkingID.ValueString(), v2.AdminRemoveMarkingMembersJSONRequestBody{
+				PrincipalIds: &uuidsToRemove,
 			})
 
 			if err != nil {
@@ -700,9 +698,16 @@ func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan
 
 			roleUpdates := make([]v2.CoreRoleAssignmentUpdate, len(rolesToAdd))
 			for i, role := range rolesToAdd {
+
+				principalIDAsUUID, err := uuid.Parse(role.PrincipalID)
+
+				if err != nil {
+					return fmt.Errorf("invalid UUID format for principal ID %s: %w", role.PrincipalID, err)
+				}
+
 				roleUpdates[i] = v2.CoreRoleAssignmentUpdate{
 					RoleID:      role.RoleID,
-					PrincipalID: role.PrincipalID,
+					PrincipalID: principalIDAsUUID,
 				}
 			}
 
@@ -727,9 +732,16 @@ func (r *organizationResource) UpdateOrganizationRoles(ctx context.Context, plan
 		if len(rolesToRemove) != 0 && !r.deletionsDisabled {
 			roleUpdates := make([]v2.CoreRoleAssignmentUpdate, len(rolesToRemove))
 			for i, role := range rolesToRemove {
+
+				principalIDAsUUID, err := uuid.Parse(role.PrincipalID)
+
+				if err != nil {
+					return fmt.Errorf("invalid UUID format for principal ID %s: %w", role.PrincipalID, err)
+				}
+
 				roleUpdates[i] = v2.CoreRoleAssignmentUpdate{
 					RoleID:      role.RoleID,
-					PrincipalID: role.PrincipalID,
+					PrincipalID: principalIDAsUUID,
 				}
 			}
 

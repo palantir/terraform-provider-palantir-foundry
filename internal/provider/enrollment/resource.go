@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"slices"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -251,9 +252,15 @@ func (r *enrollmentResource) UpdateEnrollmentRoles(ctx context.Context, plan *en
 
 			roleUpdates := make([]v2.CoreRoleAssignmentUpdate, len(rolesToAdd))
 			for i, role := range rolesToAdd {
+				principalIDAsUUID, err := uuid.Parse(role.PrincipalID)
+
+				if err != nil {
+					return fmt.Errorf("invalid UUID format for principal ID %s: %w", role.PrincipalID, err)
+				}
+
 				roleUpdates[i] = v2.CoreRoleAssignmentUpdate{
 					RoleID:      role.RoleID,
-					PrincipalID: role.PrincipalID,
+					PrincipalID: principalIDAsUUID,
 				}
 			}
 			adminAddEnrollmentRoleAssignmentsParams := v2.AdminAddEnrollmentRoleAssignmentsParams{Preview: &previewMode}
@@ -277,9 +284,15 @@ func (r *enrollmentResource) UpdateEnrollmentRoles(ctx context.Context, plan *en
 		if len(rolesToRemove) != 0 && !r.deletionsDisabled {
 			roleUpdates := make([]v2.CoreRoleAssignmentUpdate, len(rolesToRemove))
 			for i, role := range rolesToRemove {
+				principalIDAsUUID, err := uuid.Parse(role.PrincipalID)
+
+				if err != nil {
+					return fmt.Errorf("invalid UUID format for principal ID %s: %w", role.PrincipalID, err)
+				}
+
 				roleUpdates[i] = v2.CoreRoleAssignmentUpdate{
 					RoleID:      role.RoleID,
-					PrincipalID: role.PrincipalID,
+					PrincipalID: principalIDAsUUID,
 				}
 			}
 

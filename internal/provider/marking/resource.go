@@ -153,9 +153,15 @@ func (r *markingResource) CreateMarking(ctx context.Context, resp *resource.Crea
 
 	var initialRoleAssignmentsBody []v2.AdminMarkingRoleUpdate
 	for _, item := range initialRoleAssignments {
+		principalIDAsUUID, err := uuid.Parse(item.PrincipalID)
+
+		if err != nil {
+			return fmt.Errorf("invalid UUID format for principal ID %s: %w", item.PrincipalID, err)
+		}
+
 		initialRoleAssignmentsBody = append(initialRoleAssignmentsBody, v2.AdminMarkingRoleUpdate{
 			Role:        v2.AdminMarkingRole(item.Role),
-			PrincipalID: item.PrincipalID,
+			PrincipalID: principalIDAsUUID,
 		})
 	}
 
@@ -166,13 +172,19 @@ func (r *markingResource) CreateMarking(ctx context.Context, resp *resource.Crea
 	adminCreateMarkingParams := v2.AdminCreateMarkingParams{Preview: &previewMode}
 	description := plan.Description.ValueString()
 
+	initialMembersAsUUIDs, err := helper.ConvertStringsToUUIDs(initialMembers)
+
+	if err != nil {
+		return fmt.Errorf("failed to convert members to add to UUIDs: %w", err)
+	}
+
 	httpResp, err := r.client.AdminCreateMarking(ctx,
 		&adminCreateMarkingParams,
 		v2.AdminCreateMarkingJSONRequestBody{
 			Name:                   plan.Name.ValueString(),
 			CategoryID:             plan.CategoryID.ValueString(),
 			Description:            &description,
-			InitialMembers:         &initialMembers,
+			InitialMembers:         &initialMembersAsUUIDs,
 			InitialRoleAssignments: &initialRoleAssignmentsBody,
 		})
 
@@ -231,12 +243,7 @@ func (r *markingResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	markingUUID, err := uuid.Parse(state.ID.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("error parsing ID", err.Error())
-	}
-
-	err = r.ReadMarking(ctx, resp, &state, markingUUID)
+	err := r.ReadMarking(ctx, resp, &state, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading the Marking", err.Error())
 		return
@@ -247,12 +254,12 @@ func (r *markingResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	err = r.ReadMarkingMembers(ctx, &state, markingUUID)
+	err = r.ReadMarkingMembers(ctx, &state, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading the Marking members", err.Error())
 	}
 
-	err = r.ReadMarkingRoles(ctx, &state, markingUUID)
+	err = r.ReadMarkingRoles(ctx, &state, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading the Marking roles", err.Error())
 	}
@@ -265,11 +272,11 @@ func (r *markingResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 }
 
-func (r *markingResource) ReadMarking(ctx context.Context, resp *resource.ReadResponse, state *markingResourceModel, markingUUID uuid.UUID) error {
+func (r *markingResource) ReadMarking(ctx context.Context, resp *resource.ReadResponse, state *markingResourceModel, markingId string) error {
 	previewMode := constants.PreviewMode
 	adminGetMarkingParams := v2.AdminGetMarkingParams{Preview: &previewMode}
 
-	httpResp, err := r.client.AdminGetMarking(ctx, markingUUID, &adminGetMarkingParams)
+	httpResp, err := r.client.AdminGetMarking(ctx, markingId, &adminGetMarkingParams)
 
 	if err != nil {
 		resp.Diagnostics.AddError("AdminGetMarking request failed", err.Error())
@@ -311,11 +318,10 @@ func (r *markingResource) ReadMarking(ctx context.Context, resp *resource.ReadRe
 	return nil
 }
 
-func (r *markingResource) ReadMarkingMembers(ctx context.Context, state *markingResourceModel, markingUUID uuid.UUID) error {
-	previewMode := constants.PreviewMode
+func (r *markingResource) ReadMarkingMembers(ctx context.Context, state *markingResourceModel, markingID string) error {
 	pageSize := constants.PageSize
-	adminListMarkingMembersParams := v2.AdminListMarkingMembersParams{Preview: &previewMode, PageSize: &pageSize}
-	httpResp, err := r.client.AdminListMarkingMembers(ctx, markingUUID, &adminListMarkingMembersParams)
+	adminListMarkingMembersParams := v2.AdminListMarkingMembersParams{PageSize: &pageSize}
+	httpResp, err := r.client.AdminListMarkingMembers(ctx, markingID, &adminListMarkingMembersParams)
 
 	if err != nil {
 		return fmt.Errorf("AdminListMarkingMembers request failed: %w", err)
@@ -351,11 +357,10 @@ func (r *markingResource) ReadMarkingMembers(ctx context.Context, state *marking
 	return nil
 }
 
-func (r *markingResource) ReadMarkingRoles(ctx context.Context, state *markingResourceModel, markingUUID uuid.UUID) error {
-	previewMode := constants.PreviewMode
+func (r *markingResource) ReadMarkingRoles(ctx context.Context, state *markingResourceModel, markingID string) error {
 	pageSize := constants.PageSize
-	adminListMarkingRoleAssignmentsParams := v2.AdminListMarkingRoleAssignmentsParams{Preview: &previewMode, PageSize: &pageSize}
-	httpResp, err := r.client.AdminListMarkingRoleAssignments(ctx, markingUUID, &adminListMarkingRoleAssignmentsParams)
+	adminListMarkingRoleAssignmentsParams := v2.AdminListMarkingRoleAssignmentsParams{PageSize: &pageSize}
+	httpResp, err := r.client.AdminListMarkingRoleAssignments(ctx, markingID, &adminListMarkingRoleAssignmentsParams)
 
 	if err != nil {
 		return fmt.Errorf("AdminListMarkingRoleAssignments request failed: %w", err)
@@ -450,12 +455,8 @@ func (r *markingResource) UpdateMarking(ctx context.Context, resp *resource.Upda
 	previewMode := constants.PreviewMode
 	adminReplaceMarkingParams := v2.AdminReplaceMarkingParams{Preview: &previewMode}
 	description := plan.Description.ValueString()
-	markingUUID, err := uuid.Parse(state.ID.ValueString())
-	if err != nil {
-		return fmt.Errorf("error parsing marking UUID: %w", err)
-	}
 
-	httpResp, err := r.client.AdminReplaceMarking(ctx, markingUUID, &adminReplaceMarkingParams, v2.AdminReplaceMarkingJSONRequestBody{
+	httpResp, err := r.client.AdminReplaceMarking(ctx, state.ID.ValueString(), &adminReplaceMarkingParams, v2.AdminReplaceMarkingJSONRequestBody{
 		Name:        plan.Name.ValueString(),
 		Description: &description,
 	})
@@ -517,18 +518,18 @@ func (r *markingResource) UpdateMarkingMembers(ctx context.Context, plan, state 
 		}
 	}
 
-	previewMode := constants.PreviewMode
-
 	if !slices.Equal(oldMarkingMembers, newMarkingMembers) {
 		membersToAdd, membersToRemove := helper.FindStringSliceDiff(oldMarkingMembers, newMarkingMembers)
-		markingUUID, err := uuid.Parse(state.ID.ValueString())
-		if err != nil {
-			return fmt.Errorf("error parsing marking UUID: %w", err)
-		}
+
 		if len(membersToAdd) != 0 {
-			params := v2.AdminAddMarkingMembersParams{Preview: &previewMode}
-			httpResp, err := r.client.AdminAddMarkingMembers(ctx, markingUUID, &params, v2.AdminAddMarkingMembersJSONRequestBody{
-				PrincipalIds: &membersToAdd,
+			uuidsToAdd, err := helper.ConvertStringsToUUIDs(membersToAdd)
+
+			if err != nil {
+				return fmt.Errorf("failed to convert members to add to UUIDs: %w", err)
+			}
+
+			httpResp, err := r.client.AdminAddMarkingMembers(ctx, state.ID.ValueString(), v2.AdminAddMarkingMembersJSONRequestBody{
+				PrincipalIds: &uuidsToAdd,
 			})
 			if err != nil {
 				return fmt.Errorf("AdminAddMarkingMembersParams request failed: %w", err)
@@ -542,9 +543,14 @@ func (r *markingResource) UpdateMarkingMembers(ctx context.Context, plan, state 
 			}
 		}
 		if len(membersToRemove) != 0 && !r.deletionsDisabled {
-			params := v2.AdminRemoveMarkingMembersParams{Preview: &previewMode}
-			httpResp, err := r.client.AdminRemoveMarkingMembers(ctx, markingUUID, &params, v2.AdminRemoveMarkingMembersJSONRequestBody{
-				PrincipalIds: &membersToRemove,
+			uuidsToRemove, err := helper.ConvertStringsToUUIDs(membersToRemove)
+
+			if err != nil {
+				return fmt.Errorf("failed to convert members to add to UUIDs: %w", err)
+			}
+
+			httpResp, err := r.client.AdminRemoveMarkingMembers(ctx, state.ID.ValueString(), v2.AdminRemoveMarkingMembersJSONRequestBody{
+				PrincipalIds: &uuidsToRemove,
 			})
 			if err != nil {
 				return fmt.Errorf("AdminRemoveMarkingMembers request failed: %w", err)
@@ -583,24 +589,23 @@ func (r *markingResource) UpdateMarkingRoles(ctx context.Context, plan, state *m
 		}
 	}
 
-	previewMode := constants.PreviewMode
 	if !slices.Equal(oldMarkingRoles, newMarkingRoles) {
 
 		rolesToAdd, rolesToRemove := FindMarkingRolesDiff(oldMarkingRoles, newMarkingRoles)
-		markingUUID, err := uuid.Parse(state.ID.ValueString())
-		if err != nil {
-			return fmt.Errorf("error parsing marking UUID: %w", err)
-		}
 		if len(rolesToAdd) != 0 {
 			roleUpdates := make([]v2.AdminMarkingRoleUpdate, len(rolesToAdd))
 			for i, role := range rolesToAdd {
+				principalIDAsUUID, err := uuid.Parse(role.PrincipalID)
+
+				if err != nil {
+					return fmt.Errorf("invalid UUID format for principal ID %s: %w", role.PrincipalID, err)
+				}
 				roleUpdates[i] = v2.AdminMarkingRoleUpdate{
 					Role:        v2.AdminMarkingRole(role.Role),
-					PrincipalID: role.PrincipalID,
+					PrincipalID: principalIDAsUUID,
 				}
 			}
-			params := v2.AdminAddMarkingRoleAssignmentsParams{Preview: &previewMode}
-			httpResp, err := r.client.AdminAddMarkingRoleAssignments(ctx, markingUUID, &params, v2.AdminAddMarkingRoleAssignmentsJSONRequestBody{
+			httpResp, err := r.client.AdminAddMarkingRoleAssignments(ctx, state.ID.ValueString(), v2.AdminAddMarkingRoleAssignmentsJSONRequestBody{
 				RoleAssignments: &roleUpdates,
 			})
 			if err != nil {
@@ -617,13 +622,18 @@ func (r *markingResource) UpdateMarkingRoles(ctx context.Context, plan, state *m
 		if len(rolesToRemove) != 0 && !r.deletionsDisabled {
 			roleUpdates := make([]v2.AdminMarkingRoleUpdate, len(rolesToRemove))
 			for i, role := range rolesToRemove {
+				principalIDAsUUID, err := uuid.Parse(role.PrincipalID)
+
+				if err != nil {
+					return fmt.Errorf("invalid UUID format for principal ID %s: %w", role.PrincipalID, err)
+				}
+
 				roleUpdates[i] = v2.AdminMarkingRoleUpdate{
 					Role:        v2.AdminMarkingRole(role.Role),
-					PrincipalID: role.PrincipalID,
+					PrincipalID: principalIDAsUUID,
 				}
 			}
-			params := v2.AdminRemoveMarkingRoleAssignmentsParams{Preview: &previewMode}
-			httpResp, err := r.client.AdminRemoveMarkingRoleAssignments(ctx, markingUUID, &params, v2.AdminRemoveMarkingRoleAssignmentsJSONRequestBody{
+			httpResp, err := r.client.AdminRemoveMarkingRoleAssignments(ctx, state.ID.ValueString(), v2.AdminRemoveMarkingRoleAssignmentsJSONRequestBody{
 				RoleAssignments: &roleUpdates,
 			})
 			if err != nil {
