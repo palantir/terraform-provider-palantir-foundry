@@ -482,7 +482,7 @@ func (r *projectResourceRolesResource) AddProjectResourceRoles(ctx context.Conte
 
 	for i, role := range rolesToAdd {
 		principal := v2.FilesystemResourceRolePrincipalIdentifier{}
-		if role.ResourceRolePrincipal.Type == "principalWithId" {
+		if role.ResourceRolePrincipal.Type == constants.PrincipalWithID {
 			principalIDAsUUID, err := uuid.Parse(role.ResourceRolePrincipal.PrincipalID)
 
 			if err != nil {
@@ -502,7 +502,7 @@ func (r *projectResourceRolesResource) AddProjectResourceRoles(ctx context.Conte
 			}
 		}
 
-		if role.ResourceRolePrincipal.Type == "everyone" {
+		if role.ResourceRolePrincipal.Type == constants.Everyone {
 			err := principal.FromFilesystemEveryone(v2.FilesystemEveryone{
 				Type: role.ResourceRolePrincipal.Type,
 			})
@@ -542,7 +542,7 @@ func (r *projectResourceRolesResource) RemoveProjectResourceRoles(ctx context.Co
 
 	for i, role := range rolesToRemove {
 		principal := v2.FilesystemResourceRolePrincipalIdentifier{}
-		if role.ResourceRolePrincipal.Type == "principalWithId" {
+		if role.ResourceRolePrincipal.Type == constants.PrincipalWithID {
 			principalIDAsUUID, err := uuid.Parse(role.ResourceRolePrincipal.PrincipalID)
 
 			if err != nil {
@@ -562,7 +562,7 @@ func (r *projectResourceRolesResource) RemoveProjectResourceRoles(ctx context.Co
 			}
 		}
 
-		if role.ResourceRolePrincipal.Type == "everyone" {
+		if role.ResourceRolePrincipal.Type == constants.Everyone {
 			err := principal.FromFilesystemEveryone(v2.FilesystemEveryone{
 				Type: role.ResourceRolePrincipal.Type,
 			})

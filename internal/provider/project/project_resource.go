@@ -192,7 +192,7 @@ func (r *projectResource) CreateProject(ctx context.Context, resp *resource.Crea
 			principal := v2.FilesystemPrincipalWithID{
 				PrincipalID:   principalIDAsUUID,
 				PrincipalType: v2.CorePrincipalType(principalObj.PrincipalType),
-				Type:          "principalWithId",
+				Type:          constants.PrincipalWithID,
 			}
 			principals = append(principals, principal)
 		}
