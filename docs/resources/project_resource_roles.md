@@ -5,7 +5,7 @@ page_title: "Palantir Foundry Project Roles"
 subcategory: "Projects"
 
 description: |-
-  Manages a Project's roles.
+  Manages a Project's Roles.
 
 ---
 # Project Roles
@@ -32,8 +32,6 @@ resource "foundry_project_resource_roles" "example-project-resource-roles" {
     },
     {
       resource_role_principal = {
-        principal_id = ""
-        principal_type = ""
         type = "everyone"
       }
       role_id: "example-project-role-id"
@@ -50,21 +48,24 @@ resource "foundry_project_resource_roles" "example-project-resource-roles" {
 
 ### Optional
 
-- `project_resource_roles` (Set of Object) Set of Role Grants applied to this Project. (see [below for nested schema](#nestedatt--project_resource_roles))
+- `project_resource_roles` (Attributes Set) Set of Roles applied to this Project. (see [below for nested schema](#nestedatt--project_resource_roles))
 
 <a id="nestedatt--project_resource_roles"></a>
 ### Nested Schema for `project_resource_roles`
 
-Optional:
+Required:
 
-- `resource_role_principal` (Object) (see [below for nested schema](#nestedobjatt--project_resource_roles--resource_role_principal))
-- `role_id` (String)
+- `resource_role_principal` (Attributes) (see [below for nested schema](#nestedatt--project_resource_roles--resource_role_principal))
+- `role_id` (String) The unique ID for a Role.
 
-<a id="nestedobjatt--project_resource_roles--resource_role_principal"></a>
+<a id="nestedatt--project_resource_roles--resource_role_principal"></a>
 ### Nested Schema for `project_resource_roles.resource_role_principal`
 
+Required:
+
+- `type` (String)
+
 Optional:
 
-- `principal_id` (String)
-- `principal_type` (String)
-- `type` (String)
+- `principal_id` (String) The ID of a Foundry Group or User.
+- `principal_type` (String) Enum values: USER, GROUP.

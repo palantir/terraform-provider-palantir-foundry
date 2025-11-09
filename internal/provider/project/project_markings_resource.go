@@ -88,7 +88,7 @@ func (r *projectMarkingsResource) Schema(_ context.Context, _ resource.SchemaReq
 			},
 			"project_markings": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "List of the IDs of the markings of this project.",
+				Description: "List of the IDs of the Markings directly applied to this Project.",
 				Optional:    true,
 			},
 		},

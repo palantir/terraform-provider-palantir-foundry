@@ -26,4 +26,4 @@ resource "foundry_project_organizations" "example-project-organizations" {
 
 ### Optional
 
-- `project_organizations` (Set of String) List of the RIDs of the organizations of this project.
+- `project_organizations` (Set of String) List of the RIDs of the Organizations directly applied to this Project.

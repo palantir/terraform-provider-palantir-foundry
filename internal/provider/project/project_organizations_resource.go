@@ -89,7 +89,7 @@ func (r *projectOrganizationsResource) Schema(_ context.Context, _ resource.Sche
 			},
 			"project_organizations": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "List of the RIDs of the organizations of this project.",
+				Description: "List of the RIDs of the Organizations directly applied to this Project.",
 				Optional:    true,
 			},
 		},

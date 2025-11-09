@@ -19,8 +19,6 @@ resource "foundry_project_resource_roles" "example-project-resource-roles" {
     },
     {
       resource_role_principal = {
-        principal_id = ""
-        principal_type = ""
         type = "everyone"
       }
       role_id: "example-project-role-id"

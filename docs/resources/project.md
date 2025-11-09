@@ -9,20 +9,20 @@ description: |-
 
   The following operations are currently supported:
 
-    - Create a project
-    - Update a project
-    - Delete a project
-    - Import a project
+    - Create a Project
+    - Update a Project
+    - Delete a Project
+    - Import a Project
 
 ---
 # Project
 
 ```terraform
 resource "foundry_project" "example-project" {
-  display_name = "Example project name"
+  display_name = "Example Project name"
   space_rid    = "ri.compass.main.folder.example-space-rid"
-  organizations = ["example-organization-rid"]
-  resource_roles = [
+  initial_organizations = ["example-organization-rid"]
+  initial_resource_roles = [
     {
       resource_role_principal = {
         principal_id = "example-group-id"
@@ -41,8 +41,6 @@ resource "foundry_project" "example-project" {
     },
     {
       resource_role_principal = {
-        principal_id = ""
-        principal_type = ""
         type = "everyone"
       }
       role_id: "example-project-role-id"
@@ -62,11 +60,30 @@ resource "foundry_project" "example-project" {
 ### Optional
 
 - `description` (String) Description of the Project.
-- `initial_default_roles` (Set of String) The initial Default Roles to be applied when creating the Project. Any changes to this field after Project creation will not be applied; instead, use the project_resource_roles resource to manage Default Roles using the'everyone' principal.
 - `initial_organizations` (Set of String) The initial list of Organizations to be applied when creating the Project. Any changes to this field after Project creation will not be applied; instead, use the project_organizations resource to manage Organizations.
-- `initial_resource_roles` (Map of List of Object) The initial set of Resource Roles to be applied when creating the Project. Any changes to this field after Project creation will not be applied; instead, use the project_resource_roles resource to manage Resource Roles.
+- `initial_resource_roles` (Attributes Set) The initial set of Roles to be applied when creating the Project. Any changes to this field after Project creation will not be applied; instead, use the project_resource_roles resource to manage Roles. (see [below for nested schema](#nestedatt--initial_resource_roles))
 
 ### Read-Only
 
 - `rid` (String) RID of the Project.
 - `trash_status` (String) Current trash status of the Project.
+
+<a id="nestedatt--initial_resource_roles"></a>
+### Nested Schema for `initial_resource_roles`
+
+Required:
+
+- `resource_role_principal` (Attributes) (see [below for nested schema](#nestedatt--initial_resource_roles--resource_role_principal))
+- `role_id` (String) The unique ID for a Role.
+
+<a id="nestedatt--initial_resource_roles--resource_role_principal"></a>
+### Nested Schema for `initial_resource_roles.resource_role_principal`
+
+Required:
+
+- `type` (String)
+
+Optional:
+
+- `principal_id` (String) The ID of a Foundry Group or User.
+- `principal_type` (String) Enum values: USER, GROUP.

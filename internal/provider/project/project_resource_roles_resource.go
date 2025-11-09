@@ -89,19 +89,31 @@ func (r *projectResourceRolesResource) Schema(_ context.Context, _ resource.Sche
 				Description: "RID of the Project.",
 				Required:    true,
 			},
-			"project_resource_roles": schema.SetAttribute{
-				Description: "Set of Role Grants applied to this Project.",
+			"project_resource_roles": schema.SetNestedAttribute{
+				Description: "Set of Roles applied to this Project.",
 				Optional:    true,
-				ElementType: types.ObjectType{
-					AttrTypes: map[string]attr.Type{
-						"resource_role_principal": types.ObjectType{
-							AttrTypes: map[string]attr.Type{
-								"type":           types.StringType,
-								"principal_id":   types.StringType,
-								"principal_type": types.StringType,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"resource_role_principal": schema.SingleNestedAttribute{
+							Required: true,
+							Attributes: map[string]schema.Attribute{
+								"type": schema.StringAttribute{
+									Required: true,
+								},
+								"principal_id": schema.StringAttribute{
+									Optional:    true,
+									Description: "The ID of a Foundry Group or User.",
+								},
+								"principal_type": schema.StringAttribute{
+									Optional:    true,
+									Description: "Enum values: USER, GROUP.",
+								},
 							},
 						},
-						"role_id": types.StringType,
+						"role_id": schema.StringAttribute{
+							Required:    true,
+							Description: "The unique ID for a Role.",
+						},
 					},
 				},
 			},
@@ -483,7 +495,10 @@ func (r *projectResourceRolesResource) AddProjectResourceRoles(ctx context.Conte
 	for i, role := range rolesToAdd {
 		principal := v2.FilesystemResourceRolePrincipalIdentifier{}
 		if role.ResourceRolePrincipal.Type == constants.PrincipalWithID {
-			principalIDAsUUID, err := uuid.Parse(role.ResourceRolePrincipal.PrincipalID)
+			if role.ResourceRolePrincipal.PrincipalID == nil {
+				return fmt.Errorf("principal ID must be provided for principal type %s", constants.PrincipalWithID)
+			}
+			principalIDAsUUID, err := uuid.Parse(*role.ResourceRolePrincipal.PrincipalID)
 
 			if err != nil {
 				return fmt.Errorf("invalid UUID format for principal ID %s: %w", role.ResourceRolePrincipal.PrincipalID, err)
@@ -543,7 +558,10 @@ func (r *projectResourceRolesResource) RemoveProjectResourceRoles(ctx context.Co
 	for i, role := range rolesToRemove {
 		principal := v2.FilesystemResourceRolePrincipalIdentifier{}
 		if role.ResourceRolePrincipal.Type == constants.PrincipalWithID {
-			principalIDAsUUID, err := uuid.Parse(role.ResourceRolePrincipal.PrincipalID)
+			if role.ResourceRolePrincipal.PrincipalID == nil {
+				return fmt.Errorf("principal ID must be provided for principal type %s", constants.PrincipalWithID)
+			}
+			principalIDAsUUID, err := uuid.Parse(*role.ResourceRolePrincipal.PrincipalID)
 
 			if err != nil {
 				return fmt.Errorf("invalid UUID format for principal ID %s: %w", role.ResourceRolePrincipal.PrincipalID, err)
@@ -603,7 +621,10 @@ func DiffResourceRoles(oldResourceRoles, newResourceRoles []ResourceRole) (added
 	// Helper to create a unique key for each RoleResource
 	makeKey := func(r ResourceRole) string {
 		p := r.ResourceRolePrincipal
-		return r.RoleID + "|" + p.Type + "|" + p.PrincipalID + "|" + p.PrincipalType
+		if p.PrincipalID == nil || p.PrincipalType == nil {
+			return r.RoleID + "|" + p.Type
+		}
+		return r.RoleID + "|" + p.Type + "|" + *p.PrincipalID + "|" + *p.PrincipalType
 	}
 
 	for _, r := range oldResourceRoles {

@@ -26,4 +26,4 @@ resource "foundry_project_markings" "example-project-markings" {
 
 ### Optional
 
-- `project_markings` (Set of String) List of the IDs of the markings of this project.
+- `project_markings` (Set of String) List of the IDs of the Markings directly applied to this Project.

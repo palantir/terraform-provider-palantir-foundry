@@ -24,8 +24,7 @@ type projectResourceModel struct {
 	SpaceRID             types.String `tfsdk:"space_rid"`
 	Description          types.String `tfsdk:"description"`
 	TrashStatus          types.String `tfsdk:"trash_status"`
-	InitialResourceRoles types.Map    `tfsdk:"initial_resource_roles"`
-	InitialDefaultRoles  types.Set    `tfsdk:"initial_default_roles"`
+	InitialResourceRoles types.Set    `tfsdk:"initial_resource_roles"`
 	InitialOrganizations types.Set    `tfsdk:"initial_organizations"`
 }
 
@@ -74,14 +73,9 @@ type listMarkingsResponseBody struct {
 
 type ResourceRole struct {
 	ResourceRolePrincipal struct {
-		Type          string `json:"type" tfsdk:"type"`
-		PrincipalID   string `json:"principalId" tfsdk:"principal_id"`
-		PrincipalType string `json:"principalType" tfsdk:"principal_type"`
+		Type          string  `json:"type" tfsdk:"type"`
+		PrincipalID   *string `json:"principalId" tfsdk:"principal_id"`
+		PrincipalType *string `json:"principalType" tfsdk:"principal_type"`
 	} `tfsdk:"resource_role_principal" json:"resourceRolePrincipal"`
 	RoleID string `json:"roleId" tfsdk:"role_id"`
-}
-
-type Principals struct {
-	PrincipalID   string `json:"principalId" tfsdk:"principal_id"`
-	PrincipalType string `json:"principalType" tfsdk:"principal_type"`
 }

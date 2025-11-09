@@ -21,7 +21,6 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -79,7 +78,7 @@ func (r *projectResource) Metadata(_ context.Context, req resource.MetadataReque
 // Schema defines the schema for the resource.
 func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a Foundry project.",
+		Description: "Manages a Foundry Project.",
 		Attributes: map[string]schema.Attribute{
 			"rid": schema.StringAttribute{
 				Description: "RID of the Project.",
@@ -101,27 +100,35 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: "Current trash status of the Project.",
 				Computed:    true,
 			},
-			"initial_resource_roles": schema.MapAttribute{
-				Description: "The initial set of Resource Roles to be applied when creating the Project. " +
+			"initial_resource_roles": schema.SetNestedAttribute{
+				Description: "The initial set of Roles to be applied when creating the Project. " +
 					"Any changes to this field after Project creation will not be applied; " +
-					"instead, use the project_resource_roles resource to manage Resource Roles.",
+					"instead, use the project_resource_roles resource to manage Roles.",
 				Optional: true,
-				ElementType: types.ListType{
-					ElemType: types.ObjectType{
-						AttrTypes: map[string]attr.Type{
-							"principal_id":   types.StringType,
-							"principal_type": types.StringType,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"resource_role_principal": schema.SingleNestedAttribute{
+							Required: true,
+							Attributes: map[string]schema.Attribute{
+								"type": schema.StringAttribute{
+									Required: true,
+								},
+								"principal_id": schema.StringAttribute{
+									Optional:    true,
+									Description: "The ID of a Foundry Group or User.",
+								},
+								"principal_type": schema.StringAttribute{
+									Optional:    true,
+									Description: "Enum values: USER, GROUP.",
+								},
+							},
+						},
+						"role_id": schema.StringAttribute{
+							Required:    true,
+							Description: "The unique ID for a Role.",
 						},
 					},
 				},
-			},
-			"initial_default_roles": schema.SetAttribute{
-				Description: "The initial Default Roles to be applied when creating the Project. " +
-					"Any changes to this field after Project creation will not be applied; " +
-					"instead, use the project_resource_roles resource to manage Default Roles using the" +
-					"'everyone' principal.",
-				Optional:    true,
-				ElementType: types.StringType,
 			},
 			"initial_organizations": schema.SetAttribute{
 				Description: "The initial list of Organizations to be applied when creating the Project. " +
@@ -163,11 +170,10 @@ func (r *projectResource) CreateProject(ctx context.Context, resp *resource.Crea
 	filesystemCreateProjectParams := v2.FilesystemCreateProjectParams{Preview: &previewMode}
 	description := plan.Description.ValueString()
 
-	//handle initial resource roles
+	resourceRoles := make(map[string][]v2.FilesystemPrincipalWithID)
+	defaultRoles := make([]v2.CoreRoleID, 0)
 
-	roleGrants := make(map[string][]v2.FilesystemPrincipalWithID)
-
-	initialResourceRoles := make(map[string][]Principals)
+	var initialResourceRoles []ResourceRole
 
 	diags := plan.InitialResourceRoles.ElementsAs(ctx, &initialResourceRoles, false)
 	if diags.HasError() {
@@ -176,14 +182,21 @@ func (r *projectResource) CreateProject(ctx context.Context, resp *resource.Crea
 
 	// Unmarshal the map into a generic map
 
-	// Iterate through each role
-	for roleID, principalsValue := range initialResourceRoles {
+	// Iterate through each role grant
+	for _, roleGrant := range initialResourceRoles {
 
-		// Step 4: Convert each object to FilesystemPrincipalWithID
-		var principals []v2.FilesystemPrincipalWithID
-		for _, principalObj := range principalsValue {
-
-			principalIDAsUUID, err := uuid.Parse(principalObj.PrincipalID)
+		//if type = everyone, pass into default roles
+		if roleGrant.ResourceRolePrincipal.Type == constants.Everyone {
+			defaultRoles = append(defaultRoles, roleGrant.RoleID)
+		}
+		if roleGrant.ResourceRolePrincipal.Type == constants.PrincipalWithID {
+			if roleGrant.ResourceRolePrincipal.PrincipalID == nil {
+				return fmt.Errorf("principal ID must be provided for principal type %s", constants.PrincipalWithID)
+			}
+			if roleGrant.ResourceRolePrincipal.PrincipalType == nil {
+				return fmt.Errorf("principal type must be provided for principal type %s", constants.PrincipalWithID)
+			}
+			principalIDAsUUID, err := uuid.Parse(*roleGrant.ResourceRolePrincipal.PrincipalID)
 
 			if err != nil {
 				return fmt.Errorf("invalid UUID format for principal ID %s: %w", principalIDAsUUID, err)
@@ -191,24 +204,11 @@ func (r *projectResource) CreateProject(ctx context.Context, resp *resource.Crea
 
 			principal := v2.FilesystemPrincipalWithID{
 				PrincipalID:   principalIDAsUUID,
-				PrincipalType: v2.CorePrincipalType(principalObj.PrincipalType),
-				Type:          constants.PrincipalWithID,
+				PrincipalType: v2.CorePrincipalType(*roleGrant.ResourceRolePrincipal.PrincipalType),
+				Type:          roleGrant.ResourceRolePrincipal.Type,
 			}
-			principals = append(principals, principal)
+			resourceRoles[roleGrant.RoleID] = append(resourceRoles[roleGrant.RoleID], principal)
 		}
-
-		tflog.Debug(ctx, fmt.Sprintf("Created principal objects for role id : %+v", roleID))
-
-		roleGrants[roleID] = principals
-	}
-	//handle initial default roles
-
-	var defaultRoles []v2.CoreRoleID
-	diags = plan.InitialDefaultRoles.ElementsAs(ctx, &defaultRoles, false)
-
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
-		return fmt.Errorf("failed to convert default roles to Go slice")
 	}
 
 	var organizations []string
@@ -225,7 +225,7 @@ func (r *projectResource) CreateProject(ctx context.Context, resp *resource.Crea
 			Description:      &description,
 			DisplayName:      plan.DisplayName.ValueString(),
 			SpaceRid:         plan.SpaceRID.ValueString(),
-			RoleGrants:       &roleGrants,
+			RoleGrants:       &resourceRoles,
 			DefaultRoles:     &defaultRoles,
 			OrganizationRids: &organizations,
 		})
@@ -372,18 +372,13 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	//three cases for errors here. We should throw an error here, as if we let the provider continue, it will throw an error due to discrepancy between plan (which has changed value) and state (which has not)
 	if !plan.InitialResourceRoles.Equal(state.InitialResourceRoles) {
-		resp.Diagnostics.AddError("Initial Resource Roles cannot be updated after creation. Any changes will not be applied.",
-			"Initial Resource Roles cannot be updated after creation. Any changes will not be applied.")
-	}
-
-	if !plan.InitialDefaultRoles.Equal(state.InitialDefaultRoles) {
-		resp.Diagnostics.AddError("Initial Default Roles cannot be updated after creation. Any changes will not be applied.",
-			"Initial Default Roles cannot be updated after creation. Any changes will not be applied.")
+		resp.Diagnostics.AddError("Initial Roles cannot be updated after creation. Any changes will not be applied.",
+			"Initial Roles cannot be updated after creation. Any changes will not be applied.")
 	}
 
 	if !plan.InitialOrganizations.Equal(state.InitialOrganizations) {
-		resp.Diagnostics.AddError("Initial organizations cannot be updated after creation. Any changes will not be applied.",
-			"Initial organizations cannot be updated after creation. Any changes will not be applied.")
+		resp.Diagnostics.AddError("Initial Organizations cannot be updated after creation. Any changes will not be applied.",
+			"Initial Organizations cannot be updated after creation. Any changes will not be applied.")
 	}
 
 	err := r.UpdateProject(ctx, resp, &plan, &state)
