@@ -501,7 +501,7 @@ func (r *projectResourceRolesResource) AddProjectResourceRoles(ctx context.Conte
 			principalIDAsUUID, err := uuid.Parse(*role.ResourceRolePrincipal.PrincipalID)
 
 			if err != nil {
-				return fmt.Errorf("invalid UUID format for principal ID %s: %w", role.ResourceRolePrincipal.PrincipalID, err)
+				return fmt.Errorf("invalid UUID format for principal ID %s: %w", *role.ResourceRolePrincipal.PrincipalID, err)
 			}
 
 			err = principal.FromFilesystemPrincipalIDOnly(v2.FilesystemPrincipalIDOnly{
@@ -564,7 +564,7 @@ func (r *projectResourceRolesResource) RemoveProjectResourceRoles(ctx context.Co
 			principalIDAsUUID, err := uuid.Parse(*role.ResourceRolePrincipal.PrincipalID)
 
 			if err != nil {
-				return fmt.Errorf("invalid UUID format for principal ID %s: %w", role.ResourceRolePrincipal.PrincipalID, err)
+				return fmt.Errorf("invalid UUID format for principal ID %s: %w", *role.ResourceRolePrincipal.PrincipalID, err)
 			}
 
 			err = principal.FromFilesystemPrincipalIDOnly(v2.FilesystemPrincipalIDOnly{
