@@ -1,8 +1,6 @@
-resource "foundry_project" "example-project" {
-  display_name = "Example Project name"
-  space_rid    = "ri.compass.main.folder.example-space-rid"
-  initial_organizations = ["example-organization-rid"]
-  initial_resource_roles = [
+resource "foundry_project_resource_roles" "example-project-resource-roles" {
+  project_rid = foundry_project.example-project.id
+  project_resource_roles = [
     {
       resource_role_principal = {
         principal_id = "example-group-id"
@@ -25,5 +23,4 @@ resource "foundry_project" "example-project" {
       }
       role_id: "example-project-role-id"
     }]
-  markings = ["example-marking-id"]
 }

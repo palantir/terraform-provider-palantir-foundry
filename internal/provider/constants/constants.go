@@ -23,4 +23,6 @@ const (
 	PageSize                        = v2.CorePageSize(10000)
 	OrganizationAdministratorRoleID = "organization:administrator"
 	EnrollmentAdministratorRoleID   = "enrollment:administrator"
+	PrincipalWithID                 = "principalWithId"
+	Everyone                        = "everyone"
 )
