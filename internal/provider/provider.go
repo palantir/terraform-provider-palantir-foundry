@@ -222,6 +222,7 @@ func (p *FoundryProvider) Resources(_ context.Context) []func() resource.Resourc
 		group.NewGroupMembershipResource,
 		marking.NewMarkingResource,
 		organization.NewOrganizationResource,
+		organization.NewOrganizationRoleAssignmentsResource,
 		project.NewProjectResource,
 		project.NewProjectMarkingsResource,
 		project.NewProjectResourceRolesResource,

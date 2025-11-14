@@ -8,32 +8,18 @@ description: |-
 
   The following operations are currently supported:
 
-    - Create an organization
-    - Update an organization
-    - Delete an organization
-    - Import an organization
-    - Add or remove an organization's members
-    - Add or remove an organization's roles
-
+    - Create an Organization
+    - Update an Organization
+    - Import an Organization
 ---
 # Organization
 
 ```terraform
 resource "foundry_organization" "example-organization" {
-  name         = "Example organization nmae"
+  name         = "Example organization name"
   description  = "An example organization in Foundry"
   host_name = "example.palantirfoundry.com"
-  organization_members = ["example-user-id", "example-group-id"]
-  organization_roles = [
-    {
-      "role_id" : "organization:example-role",
-      "principal_id" : "example-user-id",
-    },
-    {
-      "role_id" : "organization:example-role",
-      "principal_id" : "example-group-id",
-    },
-  ]
+  initial_administrators = ["example-user-id", "example-group-id"]
 }
 ```
 
@@ -42,23 +28,22 @@ resource "foundry_organization" "example-organization" {
 
 ### Required
 
+- `initial_administrators` (Set of Object) The initial set of administrator Role Assignments to be applied when creating this Organization. Any changes to this field after Organization creation will not be applied; instead, use the organization_role_assignments resource to manage the applied Role assignments. (see [below for nested schema](#nestedatt--initial_administrators))
 - `name` (String) Name of the Organization.
-- `organization_roles` (Set of Object) List of role assignments for this Organization. (see [below for nested schema](#nestedatt--organization_roles))
 
 ### Optional
 
 - `description` (String) Description of the Organization.
 - `enrollment_rid` (String) The RID of the Enrollment this Organization belongs to. This field required if the resource is created within Terraform, but not necessarily if created outside of Terraform and imported.
 - `host_name` (String) The primary host name of the Organization. This should be used when constructing URLs for users of this Organization.
-- `organization_members` (Set of String) List of the IDs of the members that belong to this Organization.
 
 ### Read-Only
 
 - `marking_id` (String) Marking ID of the Organization.
 - `rid` (String) RID of the Organization.
 
-<a id="nestedatt--organization_roles"></a>
-### Nested Schema for `organization_roles`
+<a id="nestedatt--initial_administrators"></a>
+### Nested Schema for `initial_administrators`
 
 Required:
 
