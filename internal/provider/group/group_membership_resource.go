@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"slices"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -136,13 +137,26 @@ func (r *groupMembershipResource) CreateGroupMembers(ctx context.Context, resp *
 		}
 	}
 
+	groupIdAsUUID, err := uuid.Parse(plan.GroupId.ValueString())
+
+	if err != nil {
+		return fmt.Errorf("invalid UUID format for principal ID %s: %w", plan.GroupId.ValueString(), err)
+	}
+
 	if !slices.Equal(oldGroupMembers, newGroupMembers) {
 		// Determine members to add or remove.
 		membersToAdd, membersToRemove := helper.FindStringSliceDiff(oldGroupMembers, newGroupMembers)
 		if len(membersToAdd) != 0 {
+
+			uuidsToAdd, err := helper.ConvertStringsToUUIDs(membersToAdd)
+
+			if err != nil {
+				return fmt.Errorf("failed to convert members to add to UUIDs: %w", err)
+			}
+
 			//create body
-			httpResp, err := r.client.AdminAddGroupMembers(ctx, plan.GroupId.ValueString(), v2.AdminAddGroupMembersJSONRequestBody{
-				PrincipalIds: &membersToAdd,
+			httpResp, err := r.client.AdminAddGroupMembers(ctx, groupIdAsUUID, v2.AdminAddGroupMembersJSONRequestBody{
+				PrincipalIds: &uuidsToAdd,
 			})
 
 			if err != nil {
@@ -159,7 +173,7 @@ func (r *groupMembershipResource) CreateGroupMembers(ctx context.Context, resp *
 			}
 		}
 		if len(membersToRemove) != 0 && !r.deletionsDisabled {
-			err := r.RemoveGroupMembers(ctx, membersToRemove, plan.GroupId.ValueString())
+			err := r.RemoveGroupMembers(ctx, membersToRemove, groupIdAsUUID)
 			if err != nil {
 				return err
 			}
@@ -196,7 +210,14 @@ func (r *groupMembershipResource) Read(ctx context.Context, req resource.ReadReq
 
 func (r *groupMembershipResource) ReadGroupMembers(ctx context.Context, resp *resource.ReadResponse, state *groupMembershipResourceModel) error {
 	pageSize := constants.PageSize
-	httpResp, err := r.client.AdminListGroupMembers(ctx, state.GroupId.ValueString(), &v2.AdminListGroupMembersParams{PageSize: &pageSize})
+
+	groupIdAsUUID, err := uuid.Parse(state.GroupId.ValueString())
+
+	if err != nil {
+		return fmt.Errorf("invalid UUID format for principal ID %s: %w", state.GroupId.ValueString(), err)
+	}
+
+	httpResp, err := r.client.AdminListGroupMembers(ctx, groupIdAsUUID, &v2.AdminListGroupMembersParams{PageSize: &pageSize})
 
 	if err != nil {
 		return fmt.Errorf("AdminListGroupMembers request failed: %w", err)
@@ -235,7 +256,14 @@ func (r *groupMembershipResource) ReadGroupMembers(ctx context.Context, resp *re
 
 func (r *groupMembershipResource) ReadGroupMembersOnCreation(ctx context.Context, resp *resource.CreateResponse, plan *groupMembershipResourceModel) ([]string, error) {
 	pageSize := constants.PageSize
-	httpResp, err := r.client.AdminListGroupMembers(ctx, plan.GroupId.ValueString(), &v2.AdminListGroupMembersParams{PageSize: &pageSize})
+
+	groupIdAsUUID, err := uuid.Parse(plan.GroupId.ValueString())
+
+	if err != nil {
+		return nil, fmt.Errorf("invalid UUID format for principal ID %s: %w", plan.GroupId.ValueString(), err)
+	}
+
+	httpResp, err := r.client.AdminListGroupMembers(ctx, groupIdAsUUID, &v2.AdminListGroupMembersParams{PageSize: &pageSize})
 
 	if err != nil {
 		return nil, fmt.Errorf("AdminListGroupMembers request failed: %w", err)
@@ -321,13 +349,25 @@ func (r *groupMembershipResource) UpdateGroupMembers(ctx context.Context, plan *
 		}
 	}
 
+	groupIdAsUUID, err := uuid.Parse(state.GroupId.ValueString())
+
+	if err != nil {
+		return fmt.Errorf("invalid UUID format for principal ID %s: %w", state.GroupId.ValueString(), err)
+	}
+
 	if !slices.Equal(oldGroupMembers, newGroupMembers) {
 		// Determine members to add or remove.
 		membersToAdd, membersToRemove := helper.FindStringSliceDiff(oldGroupMembers, newGroupMembers)
 		if len(membersToAdd) != 0 {
+			uuidsToAdd, err := helper.ConvertStringsToUUIDs(membersToAdd)
+
+			if err != nil {
+				return fmt.Errorf("failed to convert members to add to UUIDs: %w", err)
+			}
+
 			//create body
-			httpResp, err := r.client.AdminAddGroupMembers(ctx, state.GroupId.ValueString(), v2.AdminAddGroupMembersJSONRequestBody{
-				PrincipalIds: &membersToAdd,
+			httpResp, err := r.client.AdminAddGroupMembers(ctx, groupIdAsUUID, v2.AdminAddGroupMembersJSONRequestBody{
+				PrincipalIds: &uuidsToAdd,
 			})
 
 			if err != nil {
@@ -344,7 +384,7 @@ func (r *groupMembershipResource) UpdateGroupMembers(ctx context.Context, plan *
 			}
 		}
 		if len(membersToRemove) != 0 && !r.deletionsDisabled {
-			err := r.RemoveGroupMembers(ctx, membersToRemove, state.GroupId.ValueString())
+			err := r.RemoveGroupMembers(ctx, membersToRemove, groupIdAsUUID)
 			if err != nil {
 				return err
 			}
@@ -396,10 +436,16 @@ func (r *groupMembershipResource) ImportState(ctx context.Context, req resource.
 	// to refresh all the other attributes based on the RID
 }
 
-func (r *groupMembershipResource) RemoveGroupMembers(ctx context.Context, membersToRemove []string, id string) error {
+func (r *groupMembershipResource) RemoveGroupMembers(ctx context.Context, membersToRemove []string, id uuid.UUID) error {
+	uuidsToRemove, err := helper.ConvertStringsToUUIDs(membersToRemove)
+
+	if err != nil {
+		return fmt.Errorf("failed to convert members to add to UUIDs: %w", err)
+	}
+
 	//create body
 	httpResp, err := r.client.AdminRemoveGroupMembers(ctx, id, v2.AdminRemoveGroupMembersRequest{
-		PrincipalIds: &membersToRemove,
+		PrincipalIds: &uuidsToRemove,
 	})
 
 	if err != nil {
