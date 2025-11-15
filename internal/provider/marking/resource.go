@@ -351,9 +351,7 @@ func (r *markingResource) ReadMarkingMembers(ctx context.Context, state *marking
 		markingMembersIds = append(markingMembersIds, markingMember.PrincipalID)
 	}
 
-	if len(markingMembersIds) != 0 {
-		state.MarkingMembers, _ = types.SetValueFrom(ctx, types.StringType, markingMembersIds)
-	}
+	state.MarkingMembers, _ = types.SetValueFrom(ctx, types.StringType, markingMembersIds)
 	return nil
 }
 
@@ -404,9 +402,7 @@ func (r *markingResource) ReadMarkingRoles(ctx context.Context, state *markingRe
 		roleAssignments = append(roleAssignments, roleAssignment)
 	}
 
-	if len(roleAssignments) != 0 {
-		state.MarkingRoles, _ = types.SetValueFrom(ctx, roleAssignmentType, roleAssignments)
-	}
+	state.MarkingRoles, _ = types.SetValueFrom(ctx, roleAssignmentType, roleAssignments)
 	return nil
 }
 

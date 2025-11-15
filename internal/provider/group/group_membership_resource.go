@@ -248,9 +248,8 @@ func (r *groupMembershipResource) ReadGroupMembers(ctx context.Context, resp *re
 	for _, groupMember := range httpGroupMembersResponseBody.Data {
 		groupMemberIds = append(groupMemberIds, groupMember.PrincipalID)
 	}
-	if len(groupMemberIds) != 0 {
-		state.GroupMembers, _ = types.SetValueFrom(ctx, types.StringType, groupMemberIds)
-	}
+
+	state.GroupMembers, _ = types.SetValueFrom(ctx, types.StringType, groupMemberIds)
 	return nil
 }
 
@@ -294,10 +293,8 @@ func (r *groupMembershipResource) ReadGroupMembersOnCreation(ctx context.Context
 	for _, groupMember := range httpGroupMembersResponseBody.Data {
 		groupMemberIds = append(groupMemberIds, groupMember.PrincipalID)
 	}
-	if len(groupMemberIds) != 0 {
-		return groupMemberIds, nil
-	}
-	return nil, nil
+
+	return groupMemberIds, nil
 }
 
 // Update updates the resource and sets the updated Terraform state on success.

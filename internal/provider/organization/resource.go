@@ -427,9 +427,7 @@ func (r *organizationResource) ReadOrganizationMembers(ctx context.Context, stat
 		markingMembersIds = append(markingMembersIds, markingMember.PrincipalID)
 	}
 
-	if len(markingMembersIds) != 0 {
-		state.OrganizationMembers, _ = types.SetValueFrom(ctx, types.StringType, markingMembersIds)
-	}
+	state.OrganizationMembers, _ = types.SetValueFrom(ctx, types.StringType, markingMembersIds)
 	return nil
 }
 
@@ -481,9 +479,7 @@ func (r *organizationResource) ReadOrganizationRoles(ctx context.Context, state 
 		roleAssignments = append(roleAssignments, roleAssignment)
 	}
 
-	if len(roleAssignments) != 0 {
-		state.OrganizationRoles, _ = types.SetValueFrom(ctx, roleAssignmentType, roleAssignments)
-	}
+	state.OrganizationRoles, _ = types.SetValueFrom(ctx, roleAssignmentType, roleAssignments)
 	return nil
 }
 

@@ -208,9 +208,7 @@ func (r *projectMarkingsResource) ReadProjectMarkings(ctx context.Context, state
 
 	}
 
-	if len(httpListMarkingsResponseBody.Data) > 0 {
-		state.ProjectMarkings, _ = types.SetValueFrom(ctx, types.StringType, httpListMarkingsResponseBody.Data)
-	}
+	state.ProjectMarkings, _ = types.SetValueFrom(ctx, types.StringType, httpListMarkingsResponseBody.Data)
 	return nil
 }
 
@@ -248,10 +246,8 @@ func (r *projectMarkingsResource) ReadProjectMarkingsOnCreation(ctx context.Cont
 	for _, projectMarking := range httpListMarkingsResponseBody.Data {
 		projectMarkingIds = append(projectMarkingIds, projectMarking)
 	}
-	if len(projectMarkingIds) != 0 {
-		return projectMarkingIds, nil
-	}
-	return nil, nil
+
+	return projectMarkingIds, nil
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
