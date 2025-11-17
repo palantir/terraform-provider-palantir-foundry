@@ -244,9 +244,7 @@ func (r *organizationRoleAssignmentsResource) ReadOrganizationRoleAssignments(ct
 		roleAssignments = append(roleAssignments, roleAssignment)
 	}
 
-	if len(roleAssignments) != 0 {
-		state.OrganizationRoleAssignments, _ = types.SetValueFrom(ctx, roleAssignmentType, roleAssignments)
-	}
+	state.OrganizationRoleAssignments, _ = types.SetValueFrom(ctx, roleAssignmentType, roleAssignments)
 	return nil
 }
 
