@@ -361,6 +361,7 @@ func (r *organizationRoleAssignmentsResource) UpdateOrganizationRoleAssignments(
 			resp.Diagnostics.AddWarning("Found Role Assignments defined in the state that are not in the plan.",
 				"Since `deletions_disabled` is set to true, Role Assignments removal operations will not be applied.")
 		}
+		state.OrganizationRoleAssignments = plan.OrganizationRoleAssignments
 	}
 	return nil
 }
@@ -376,7 +377,7 @@ func (r *organizationRoleAssignmentsResource) Delete(ctx context.Context, req re
 	}
 
 	resp.Diagnostics.AddWarning("Called Delete on a organization role_assignments resource.",
-		fmt.Sprintf("The role_assignments resource for organization rid %s will be removed from state, but no role_assignments will be removed remotely.", state.OrganizationRID.ValueString()))
+		fmt.Sprintf("The role_assignments resource for organization rid %s will be removed from state, but no role assignments will be removed remotely.", state.OrganizationRID.ValueString()))
 
 }
 

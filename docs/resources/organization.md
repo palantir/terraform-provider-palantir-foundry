@@ -28,7 +28,6 @@ resource "foundry_organization" "example-organization" {
 
 ### Required
 
-- `initial_administrators` (Set of Object) The initial set of administrator Role Assignments to be applied when creating this Organization. Any changes to this field after Organization creation will not be applied; instead, use the organization_role_assignments resource to manage the applied Role assignments. (see [below for nested schema](#nestedatt--initial_administrators))
 - `name` (String) Name of the Organization.
 
 ### Optional
@@ -36,16 +35,9 @@ resource "foundry_organization" "example-organization" {
 - `description` (String) Description of the Organization.
 - `enrollment_rid` (String) The RID of the Enrollment this Organization belongs to. This field required if the resource is created within Terraform, but not necessarily if created outside of Terraform and imported.
 - `host_name` (String) The primary host name of the Organization. This should be used when constructing URLs for users of this Organization.
+- `initial_administrators` (Set of String) The initial set of principals to be assigned the Administrator Role when creating this Organization. Any changes to this field after Organization creation will not be applied; instead, use the organization_role_assignments resource to manage the applied Role Assignments.
 
 ### Read-Only
 
 - `marking_id` (String) Marking ID of the Organization.
 - `rid` (String) RID of the Organization.
-
-<a id="nestedatt--initial_administrators"></a>
-### Nested Schema for `initial_administrators`
-
-Required:
-
-- `principal_id` (String)
-- `role_id` (String)

@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -105,14 +104,9 @@ func (r *organizationResource) Schema(_ context.Context, _ resource.SchemaReques
 				Optional:    true,
 			},
 			"initial_administrators": schema.SetAttribute{
-				Description: "The initial set of administrator Role Assignments to be applied when creating this Organization. Any changes to this field after Organization creation will not be applied; instead, use the organization_role_assignments resource to manage the applied Role assignments.",
-				Required:    true,
-				ElementType: types.ObjectType{
-					AttrTypes: map[string]attr.Type{
-						"role_id":      types.StringType,
-						"principal_id": types.StringType,
-					},
-				},
+				Description: "The initial set of principals to be assigned the Administrator Role when creating this Organization. Any changes to this field after Organization creation will not be applied; instead, use the organization_role_assignments resource to manage the applied Role Assignments.",
+				Optional:    true,
+				ElementType: types.StringType,
 			},
 		},
 	}
@@ -149,10 +143,16 @@ func (r *organizationResource) CreateOrganization(ctx context.Context, resp *res
 	description := plan.Description.ValueString()
 	host := plan.HostName.ValueString()
 
-	var initialAdministrators []v2.CorePrincipalID
+	var initialAdministrators []string
 	diags := plan.InitialAdministrators.ElementsAs(ctx, &initialAdministrators, false)
 	if diags.HasError() {
 		return fmt.Errorf("failed to convert initial administrator roles to Go slice")
+	}
+
+	initialAdministratorsUUIDs, err := helper.ConvertStringsToUUIDs(initialAdministrators)
+
+	if err != nil {
+		return fmt.Errorf("failed to convert administrator ids to UUIDs: %w", err)
 	}
 
 	httpResp, err := r.client.AdminCreateOrganization(ctx,
@@ -160,7 +160,7 @@ func (r *organizationResource) CreateOrganization(ctx context.Context, resp *res
 		v2.AdminCreateOrganizationJSONRequestBody{
 			Name:           plan.Name.ValueString(),
 			Description:    &description,
-			Administrators: &initialAdministrators,
+			Administrators: &initialAdministratorsUUIDs,
 			EnrollmentRid:  plan.EnrollmentRID.ValueString(),
 			Host:           &host,
 		})
