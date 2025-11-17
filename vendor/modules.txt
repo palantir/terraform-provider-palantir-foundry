@@ -355,8 +355,8 @@ github.com/zclconf/go-cty/cty
 github.com/zclconf/go-cty/cty/ctymarks
 github.com/zclconf/go-cty/cty/ctystrings
 github.com/zclconf/go-cty/cty/set
-# go.abhg.dev/goldmark/frontmatter v0.2.0
-## explicit; go 1.20
+# go.abhg.dev/goldmark/frontmatter v0.3.0
+## explicit; go 1.24.0
 go.abhg.dev/goldmark/frontmatter
 # golang.org/x/crypto v0.44.0
 ## explicit; go 1.24.0
