@@ -246,10 +246,8 @@ func (r *projectOrganizationsResource) ReadProjectOrganizationsOnCreation(ctx co
 	for _, projectOrganization := range httpListOrganizationsResponseBody.Data {
 		projectOrganizationRids = append(projectOrganizationRids, projectOrganization)
 	}
-	if len(projectOrganizationRids) != 0 {
-		return projectOrganizationRids, nil
-	}
-	return nil, nil
+
+	return projectOrganizationRids, nil
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
