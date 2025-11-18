@@ -89,7 +89,7 @@ github.com/getkin/kin-openapi/openapi3
 # github.com/go-openapi/jsonpointer v0.22.3
 ## explicit; go 1.24.0
 github.com/go-openapi/jsonpointer
-# github.com/go-openapi/swag/jsonname v0.25.1
+# github.com/go-openapi/swag/jsonname v0.25.3
 ## explicit; go 1.24.0
 github.com/go-openapi/swag/jsonname
 # github.com/golang/protobuf v1.5.4
