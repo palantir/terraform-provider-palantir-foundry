@@ -20,12 +20,11 @@ import (
 
 // markingsResourceModel maps the resource schema data.
 type markingResourceModel struct {
-	ID             types.String `tfsdk:"id"`
-	CategoryID     types.String `tfsdk:"category_id"`
-	Name           types.String `tfsdk:"name"`
-	Description    types.String `tfsdk:"description"`
-	MarkingMembers types.Set    `tfsdk:"marking_members"`
-	MarkingRoles   types.Set    `tfsdk:"marking_roles"`
+	ID                     types.String `tfsdk:"id"`
+	CategoryID             types.String `tfsdk:"category_id"`
+	Name                   types.String `tfsdk:"name"`
+	Description            types.String `tfsdk:"description"`
+	InitialRoleAssignments types.Set    `tfsdk:"initial_role_assignments"`
 }
 
 // requestBody contains the schema for request body
@@ -46,8 +45,8 @@ type markingMembersEntry struct {
 	PrincipalType string `json:"principalType"`
 }
 
-type RolesRequestBodyEntry struct {
-	Role        string `json:"role" tfsdk:"role"`
+type markingRolesRequestBodyEntry struct {
+	Role        string `json:"role" tfsdk:"role_id"`
 	PrincipalID string `json:"principalId" tfsdk:"principal_id"`
 }
 
@@ -59,4 +58,14 @@ type markingRolesEntry struct {
 	PrincipalID   string `json:"principalId"`
 	PrincipalType string `json:"principalType"`
 	Role          string `json:"role"`
+}
+
+type markingMembershipResourceModel struct {
+	MarkingId      types.String `tfsdk:"marking_id"`
+	MarkingMembers types.Set    `tfsdk:"marking_members"`
+}
+
+type markingRoleAssignmentsResourceModel struct {
+	MarkingID              types.String `tfsdk:"marking_id"`
+	MarkingRoleAssignments types.Set    `tfsdk:"marking_role_assignments"`
 }

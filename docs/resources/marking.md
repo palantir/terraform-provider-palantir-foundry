@@ -8,29 +8,31 @@ description: |-
 
   The following operations are currently supported:
 
-    - Create a marking
-    - Update a marking
-    - Import a marking
-    - Add or remove a marking's members
-    - Add or remove a marking's roles
+    - Create a Marking
+    - Update a Marking
+    - Import a Marking
 
-    Note: the provider does not support deleting a marking. Additionally, a marking's categoryId is immutable after creation.
+    Note: the provider does not support deleting a Marking. Additionally, a Marking's categoryId is immutable after creation.
 
 ---
 # Marking
 
 ```terraform
 resource "foundry_marking" "example-marking" {
-  name = "Example marking name"
+  name = "Example Marking name"
+  description = "Example Marking description"
   category_id="example-marking-category-id"
-  marking_members = ["example-user-id", "example-group-id"]
-  marking_roles = [
+  initial_role_assignments = [
     {
-      role = "ADMINISTER"
+      role_id = "ADMINISTER"
       principal_id="example-user-id"
     },
     {
-      role = "USE"
+      role_id = "DECLASSIFY"
+      principal_id="example-user-id"
+    },
+    {
+      role_id = "USE"
       principal_id="example-group-id"
     }
   ]
@@ -43,22 +45,21 @@ resource "foundry_marking" "example-marking" {
 ### Required
 
 - `category_id` (String) The ID of a Marking Category. For user-created Categories, this will be a UUID. Markings associated with Organizations are placed in a category with ID "Organization". This field is immutable after creation.
-- `name` (String) Name of the marking.
+- `name` (String) Name of the Marking.
 
 ### Optional
 
-- `description` (String) Description of the marking.
-- `marking_members` (Set of String) List of the IDs of the members (Users or Groups) of this Marking.
-- `marking_roles` (Set of Object) List of role assignments for this Marking. (see [below for nested schema](#nestedatt--marking_roles))
+- `description` (String) Description of the Marking.
+- `initial_role_assignments` (Set of Object) The initial set of Role Assignments to be applied when creating the Marking. Any changes to this field after Marking creation will not be applied; instead, use the marking_role_assignments resource to manage Role Assignments. (see [below for nested schema](#nestedatt--initial_role_assignments))
 
 ### Read-Only
 
 - `id` (String) ID of the Marking.
 
-<a id="nestedatt--marking_roles"></a>
-### Nested Schema for `marking_roles`
+<a id="nestedatt--initial_role_assignments"></a>
+### Nested Schema for `initial_role_assignments`
 
 Optional:
 
 - `principal_id` (String)
-- `role` (String)
+- `role_id` (String)

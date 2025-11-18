@@ -1,8 +1,6 @@
-resource "foundry_marking" "example-marking" {
-  name = "Example Marking name"
-  description = "Example Marking description"
-  category_id="example-marking-category-id"
-  initial_role_assignments = [
+resource "foundry_marking_role_assignments" "example-marking-role-assignments" {
+  marking_id = foundry_marking.example-marking.id
+  marking_role_assignments = [
     {
       role_id = "ADMINISTER"
       principal_id="example-user-id"
