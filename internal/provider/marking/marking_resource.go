@@ -101,11 +101,12 @@ func (r *markingResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"initial_role_assignments": schema.SetAttribute{
 				Description: "The initial set of Role Assignments to be applied when creating the Marking. " +
 					"Any changes to this field after Marking creation will not be applied; " +
-					"instead, use the marking_role_assignments resource to manage Role Assignments.",
+					"instead, use the marking_role_assignments resource to manage Role Assignments. " +
+					"The following Roles can be assigned to a Marking: \n - ADMINISTER: The user can add and remove members from the Marking, update Marking Role Assignments, and change Marking metadata.\n - DECLASSIFY: The user can remove the Marking from resources in the platform and stop the propagation of the Marking during a transform.\n - USE: The user can apply the Marking to resources in the platform.",
 				Optional: true,
 				ElementType: types.ObjectType{
 					AttrTypes: map[string]attr.Type{
-						"role_id":      types.StringType,
+						"role":         types.StringType,
 						"principal_id": types.StringType,
 					},
 				},

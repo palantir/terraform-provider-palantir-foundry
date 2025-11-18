@@ -24,15 +24,15 @@ resource "foundry_marking" "example-marking" {
   category_id="example-marking-category-id"
   initial_role_assignments = [
     {
-      role_id = "ADMINISTER"
+      role = "ADMINISTER"
       principal_id = "example-user-id"
     },
     {
-      role_id = "DECLASSIFY"
+      role = "DECLASSIFY"
       principal_id = "example-user-id"
     },
     {
-      role_id = "USE"
+      role = "USE"
       principal_id = "example-group-id"
     }
   ]
@@ -50,7 +50,10 @@ resource "foundry_marking" "example-marking" {
 ### Optional
 
 - `description` (String) Description of the Marking.
-- `initial_role_assignments` (Set of Object) The initial set of Role Assignments to be applied when creating the Marking. Any changes to this field after Marking creation will not be applied; instead, use the marking_role_assignments resource to manage Role Assignments. (see [below for nested schema](#nestedatt--initial_role_assignments))
+- `initial_role_assignments` (Set of Object) The initial set of Role Assignments to be applied when creating the Marking. Any changes to this field after Marking creation will not be applied; instead, use the marking_role_assignments resource to manage Role Assignments. The following Roles can be assigned to a Marking: 
+ - ADMINISTER: The user can add and remove members from the Marking, update Marking Role Assignments, and change Marking metadata.
+ - DECLASSIFY: The user can remove the Marking from resources in the platform and stop the propagation of the Marking during a transform.
+ - USE: The user can apply the Marking to resources in the platform. (see [below for nested schema](#nestedatt--initial_role_assignments))
 
 ### Read-Only
 
@@ -62,4 +65,4 @@ resource "foundry_marking" "example-marking" {
 Optional:
 
 - `principal_id` (String)
-- `role_id` (String)
+- `role` (String)

@@ -89,11 +89,12 @@ func (r *markingRoleAssignmentsResource) Schema(_ context.Context, _ resource.Sc
 				Required:    true,
 			},
 			"marking_role_assignments": schema.SetAttribute{
-				Description: "List of Role Assignments for this Marking.",
-				Optional:    true,
+				Description: "Set of Role Assignments for this Marking. " +
+					"The following Roles can be assigned to a Marking: \n - ADMINISTER: The user can add and remove members from the Marking, update Marking Role Assignments, and change Marking metadata.\n - DECLASSIFY: The user can remove the Marking from resources in the platform and stop the propagation of the Marking during a transform.\n - USE: The user can apply the Marking to resources in the platform.",
+				Optional: true,
 				ElementType: types.ObjectType{
 					AttrTypes: map[string]attr.Type{
-						"role_id":      types.StringType,
+						"role":         types.StringType,
 						"principal_id": types.StringType,
 					},
 				},

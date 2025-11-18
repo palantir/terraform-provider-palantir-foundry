@@ -46,7 +46,7 @@ type markingMembersEntry struct {
 }
 
 type markingRolesRequestBodyEntry struct {
-	Role        string `json:"role" tfsdk:"role_id"`
+	Role        string `json:"role" tfsdk:"role"`
 	PrincipalID string `json:"principalId" tfsdk:"principal_id"`
 }
 
