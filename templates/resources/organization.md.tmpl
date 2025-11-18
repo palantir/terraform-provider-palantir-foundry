@@ -16,4 +16,8 @@ description: |-
 
 {{ tffile "examples/resources/organization/resource.tf" }}
 
+An Organization's guest membership can also be managed through the Foundry Provider through membership of the Organization's underlying Marking. This can be achieved through the 'foundry_marking_membership' resource, demonstrated below.
+
+{{ tffile "examples/resources/organization/guest_membership.tf" }}
+
 {{ .SchemaMarkdown | trimspace }}
