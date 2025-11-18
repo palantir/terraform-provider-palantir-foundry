@@ -18,6 +18,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -30,7 +32,6 @@ import (
 	providerError "github.com/palantir/terraform-provider-palantir-foundry/internal/provider/errors"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/helper"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/shared"
-	"net/http"
 )
 
 // Ensure the implementation satisfies the expected interfaces
