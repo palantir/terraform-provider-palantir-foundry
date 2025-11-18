@@ -5,15 +5,15 @@ resource "foundry_marking" "example-marking" {
   initial_role_assignments = [
     {
       role_id = "ADMINISTER"
-      principal_id="example-user-id"
+      principal_id = "example-user-id"
     },
     {
       role_id = "DECLASSIFY"
-      principal_id="example-user-id"
+      principal_id = "example-user-id"
     },
     {
       role_id = "USE"
-      principal_id="example-group-id"
+      principal_id = "example-group-id"
     }
   ]
 }
