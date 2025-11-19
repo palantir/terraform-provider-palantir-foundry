@@ -17,16 +17,15 @@ package marking
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
-	"slices"
 
 	"github.com/google/uuid"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	v2 "github.com/palantir/terraform-provider-palantir-foundry/gateway-client/v2"
@@ -82,14 +81,14 @@ func (r *markingResource) Metadata(_ context.Context, req resource.MetadataReque
 // Schema defines the schema for the resource.
 func (r *markingResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a Foundry marking.",
+		Description: "Manages a Foundry Marking.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "ID of the Marking.",
 				Computed:    true,
 			},
 			"name": schema.StringAttribute{
-				Description: "Name of the marking.",
+				Description: "Name of the Marking.",
 				Required:    true,
 			},
 			"category_id": schema.StringAttribute{
@@ -97,21 +96,26 @@ func (r *markingResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Required:    true,
 			},
 			"description": schema.StringAttribute{
-				Description: "Description of the marking.",
+				Description: "Description of the Marking.",
 				Optional:    true,
 			},
-			"marking_members": schema.SetAttribute{
-				ElementType: types.StringType,
-				Description: "List of the IDs of the members (Users or Groups) of this Marking.",
-				Optional:    true,
-			},
-			"marking_roles": schema.SetAttribute{
-				Description: "List of role assignments for this Marking.",
-				Optional:    true,
-				ElementType: types.ObjectType{
-					AttrTypes: map[string]attr.Type{
-						"role":         types.StringType,
-						"principal_id": types.StringType,
+			"initial_role_assignments": schema.SetNestedAttribute{
+				Description: "The initial set of Role Assignments to be applied when creating the Marking. " +
+					"Any changes to this field after Marking creation will not be applied; " +
+					"instead, use the marking_role_assignments resource to manage Role Assignments. " +
+					"The following Roles can be assigned to a Marking: \n - ADMINISTER: The user can add and remove members from the Marking, update Marking Role Assignments, and change Marking metadata.\n - DECLASSIFY: The user can remove the Marking from resources in the platform and stop the propagation of the Marking during a transform.\n - USE: The user can apply the Marking to resources in the platform.",
+				Optional: true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"role": schema.StringAttribute{
+							Required: true,
+							Validators: []validator.String{
+								stringvalidator.OneOf("ADMINISTER", "DECLASSIFY", "USE"),
+							},
+						},
+						"principal_id": schema.StringAttribute{
+							Required: true,
+						},
 					},
 				},
 			},
@@ -144,8 +148,13 @@ func (r *markingResource) Create(ctx context.Context, req resource.CreateRequest
 }
 
 func (r *markingResource) CreateMarking(ctx context.Context, resp *resource.CreateResponse, plan *markingResourceModel) error {
-	var initialRoleAssignments []RolesRequestBodyEntry
-	diags := plan.MarkingRoles.ElementsAs(context.Background(), &initialRoleAssignments, false)
+
+	previewMode := constants.PreviewMode
+	adminCreateMarkingParams := v2.AdminCreateMarkingParams{Preview: &previewMode}
+	description := plan.Description.ValueString()
+
+	var initialRoleAssignments []markingRolesRequestBodyEntry
+	diags := plan.InitialRoleAssignments.ElementsAs(context.Background(), &initialRoleAssignments, false)
 	if diags.HasError() {
 		resp.Diagnostics.Append(diags...)
 		return fmt.Errorf("failed to convert roles to Go slice")
@@ -165,26 +174,12 @@ func (r *markingResource) CreateMarking(ctx context.Context, resp *resource.Crea
 		})
 	}
 
-	var initialMembers []string
-	plan.MarkingMembers.ElementsAs(context.Background(), &initialMembers, false)
-
-	previewMode := constants.PreviewMode
-	adminCreateMarkingParams := v2.AdminCreateMarkingParams{Preview: &previewMode}
-	description := plan.Description.ValueString()
-
-	initialMembersAsUUIDs, err := helper.ConvertStringsToUUIDs(initialMembers)
-
-	if err != nil {
-		return fmt.Errorf("failed to convert members to add to UUIDs: %w", err)
-	}
-
 	httpResp, err := r.client.AdminCreateMarking(ctx,
 		&adminCreateMarkingParams,
 		v2.AdminCreateMarkingJSONRequestBody{
 			Name:                   plan.Name.ValueString(),
 			CategoryID:             plan.CategoryID.ValueString(),
 			Description:            &description,
-			InitialMembers:         &initialMembersAsUUIDs,
 			InitialRoleAssignments: &initialRoleAssignmentsBody,
 		})
 
@@ -254,16 +249,6 @@ func (r *markingResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	err = r.ReadMarkingMembers(ctx, &state, state.ID.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Error reading the Marking members", err.Error())
-	}
-
-	err = r.ReadMarkingRoles(ctx, &state, state.ID.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Error reading the Marking roles", err.Error())
-	}
-
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -318,94 +303,6 @@ func (r *markingResource) ReadMarking(ctx context.Context, resp *resource.ReadRe
 	return nil
 }
 
-func (r *markingResource) ReadMarkingMembers(ctx context.Context, state *markingResourceModel, markingID string) error {
-	pageSize := constants.PageSize
-	adminListMarkingMembersParams := v2.AdminListMarkingMembersParams{PageSize: &pageSize}
-	httpResp, err := r.client.AdminListMarkingMembers(ctx, markingID, &adminListMarkingMembersParams)
-
-	if err != nil {
-		return fmt.Errorf("AdminListMarkingMembers request failed: %w", err)
-	}
-
-	// Check the response status code
-	if httpResp.StatusCode != http.StatusOK {
-		returnString, err := providerError.FormatHTTPError(httpResp)
-		if err != nil {
-			return fmt.Errorf("failed to format error logging from AdminListMarkingMembers response: %w", err)
-		}
-		return errors.New(returnString)
-	}
-
-	bodyBytes, err := helper.ExtractBodyFromResponse(httpResp)
-	if err != nil {
-		return fmt.Errorf("failed to parse response from AdminListMarkingMembers: %w", err)
-	}
-
-	var httpMarkingMembersResponseBody markingMembersResponseBody
-	if err := json.Unmarshal(bodyBytes, &httpMarkingMembersResponseBody); err != nil {
-		return fmt.Errorf("error decoding response: %w", err)
-	}
-
-	markingMembersIds := make([]string, 0)
-	for _, markingMember := range httpMarkingMembersResponseBody.Data {
-		markingMembersIds = append(markingMembersIds, markingMember.PrincipalID)
-	}
-
-	state.MarkingMembers, _ = types.SetValueFrom(ctx, types.StringType, markingMembersIds)
-	return nil
-}
-
-func (r *markingResource) ReadMarkingRoles(ctx context.Context, state *markingResourceModel, markingID string) error {
-	pageSize := constants.PageSize
-	adminListMarkingRoleAssignmentsParams := v2.AdminListMarkingRoleAssignmentsParams{PageSize: &pageSize}
-	httpResp, err := r.client.AdminListMarkingRoleAssignments(ctx, markingID, &adminListMarkingRoleAssignmentsParams)
-
-	if err != nil {
-		return fmt.Errorf("AdminListMarkingRoleAssignments request failed: %w", err)
-	}
-
-	// Check the response status code
-	if httpResp.StatusCode != http.StatusOK {
-		returnString, err := providerError.FormatHTTPError(httpResp)
-		if err != nil {
-			return fmt.Errorf("failed to format error logging from AdminListMarkingRoleAssignments response: %w", err)
-		}
-		return errors.New(returnString)
-	}
-
-	bodyBytes, err := helper.ExtractBodyFromResponse(httpResp)
-	if err != nil {
-		return fmt.Errorf("failed to parse response from AdminListMarkingRoleAssignments: %w", err)
-	}
-
-	var httpMarkingRolesResponseBody markingRolesResponseBody
-	if err := json.Unmarshal(bodyBytes, &httpMarkingRolesResponseBody); err != nil {
-		return fmt.Errorf("error decoding response: %w", err)
-	}
-
-	roleAssignmentType := types.ObjectType{
-		AttrTypes: map[string]attr.Type{
-			"principal_id": types.StringType,
-			"role":         types.StringType,
-		},
-	}
-
-	roleAssignments := make([]attr.Value, 0)
-	for _, entry := range httpMarkingRolesResponseBody.Data {
-		roleAssignment, _ := types.ObjectValue(
-			roleAssignmentType.AttrTypes,
-			map[string]attr.Value{
-				"principal_id": types.StringValue(entry.PrincipalID),
-				"role":         types.StringValue(entry.Role),
-			},
-		)
-		roleAssignments = append(roleAssignments, roleAssignment)
-	}
-
-	state.MarkingRoles, _ = types.SetValueFrom(ctx, roleAssignmentType, roleAssignments)
-	return nil
-}
-
 func (r *markingResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan markingResourceModel
 	diags := req.Plan.Get(ctx, &plan)
@@ -421,20 +318,15 @@ func (r *markingResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
+	if !plan.InitialRoleAssignments.Equal(state.InitialRoleAssignments) {
+		resp.Diagnostics.AddError("Initial Role Assignments cannot be updated after creation. Any changes will not be applied.",
+			"Initial Role Assignments cannot be updated after creation. Any changes will not be applied.")
+	}
+
 	err := r.UpdateMarking(ctx, resp, &plan, &state)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating marking. Please fix your plan if needed and re-apply", err.Error())
 		return
-	}
-
-	err = r.UpdateMarkingMembers(ctx, &plan, &state, resp)
-	if err != nil {
-		resp.Diagnostics.AddError("Error updating marking members. Please fix your plan if needed and re-apply", err.Error())
-	}
-
-	err = r.UpdateMarkingRoles(ctx, &plan, &state, resp)
-	if err != nil {
-		resp.Diagnostics.AddError("Error updating marking roles. Please fix your plan if needed and re-apply", err.Error())
 	}
 
 	diags = resp.State.Set(ctx, state)
@@ -496,162 +388,6 @@ func (r *markingResource) UpdateMarking(ctx context.Context, resp *resource.Upda
 	return nil
 }
 
-func (r *markingResource) UpdateMarkingMembers(ctx context.Context, plan, state *markingResourceModel, resp *resource.UpdateResponse) error {
-	var oldMarkingMembers, newMarkingMembers []string
-
-	//only initialize if not null, otherwise ElementsAs will throw error instead of just handling as empty slice
-	if !state.MarkingMembers.IsNull() {
-		diags := state.MarkingMembers.ElementsAs(ctx, &oldMarkingMembers, false)
-		if diags.HasError() {
-			return fmt.Errorf("failed to convert marking members to Go slice")
-		}
-	}
-
-	if !plan.MarkingMembers.IsNull() {
-		diags := plan.MarkingMembers.ElementsAs(ctx, &newMarkingMembers, false)
-		if diags.HasError() {
-			return fmt.Errorf("failed to convert planned marking members to Go slice")
-		}
-	}
-
-	if !slices.Equal(oldMarkingMembers, newMarkingMembers) {
-		membersToAdd, membersToRemove := helper.FindStringSliceDiff(oldMarkingMembers, newMarkingMembers)
-
-		if len(membersToAdd) != 0 {
-			uuidsToAdd, err := helper.ConvertStringsToUUIDs(membersToAdd)
-
-			if err != nil {
-				return fmt.Errorf("failed to convert members to add to UUIDs: %w", err)
-			}
-
-			httpResp, err := r.client.AdminAddMarkingMembers(ctx, state.ID.ValueString(), v2.AdminAddMarkingMembersJSONRequestBody{
-				PrincipalIds: &uuidsToAdd,
-			})
-			if err != nil {
-				return fmt.Errorf("AdminAddMarkingMembersParams request failed: %w", err)
-			}
-			if httpResp.StatusCode != http.StatusNoContent {
-				returnString, err := providerError.FormatHTTPError(httpResp)
-				if err != nil {
-					return fmt.Errorf("failed to format error logging from AdminAddMarkingMembersParams response: %w", err)
-				}
-				return errors.New(returnString)
-			}
-		}
-		if len(membersToRemove) != 0 && !r.deletionsDisabled {
-			uuidsToRemove, err := helper.ConvertStringsToUUIDs(membersToRemove)
-
-			if err != nil {
-				return fmt.Errorf("failed to convert members to add to UUIDs: %w", err)
-			}
-
-			httpResp, err := r.client.AdminRemoveMarkingMembers(ctx, state.ID.ValueString(), v2.AdminRemoveMarkingMembersJSONRequestBody{
-				PrincipalIds: &uuidsToRemove,
-			})
-			if err != nil {
-				return fmt.Errorf("AdminRemoveMarkingMembers request failed: %w", err)
-			}
-			if httpResp.StatusCode != http.StatusNoContent {
-				returnString, err := providerError.FormatHTTPError(httpResp)
-				if err != nil {
-					return fmt.Errorf("failed to format error logging from AdminAddGroupMembers response: %w", err)
-				}
-				return errors.New(returnString)
-			}
-		} else if len(membersToRemove) != 0 {
-			resp.Diagnostics.AddWarning("Found marking members in the state that are not in the plan.",
-				"Since `deletions_disabled` is set to true, member-removal operations will not be applied.")
-		}
-		//if there was a change (and no error thrown), update state to equal plan
-		state.MarkingMembers = plan.MarkingMembers
-	}
-	return nil
-}
-
-func (r *markingResource) UpdateMarkingRoles(ctx context.Context, plan, state *markingResourceModel, resp *resource.UpdateResponse) error {
-	var oldMarkingRoles, newMarkingRoles []RolesRequestBodyEntry
-
-	if !state.MarkingRoles.IsNull() {
-		diags := state.MarkingRoles.ElementsAs(ctx, &oldMarkingRoles, false)
-		if diags.HasError() {
-			return fmt.Errorf("failed to convert marking roles to Go slice")
-		}
-	}
-
-	if !state.MarkingRoles.IsNull() {
-		diags := plan.MarkingRoles.ElementsAs(ctx, &newMarkingRoles, false)
-		if diags.HasError() {
-			return fmt.Errorf("failed to convert marking roles to Go slice")
-		}
-	}
-
-	if !slices.Equal(oldMarkingRoles, newMarkingRoles) {
-
-		rolesToAdd, rolesToRemove := FindMarkingRolesDiff(oldMarkingRoles, newMarkingRoles)
-		if len(rolesToAdd) != 0 {
-			roleUpdates := make([]v2.AdminMarkingRoleUpdate, len(rolesToAdd))
-			for i, role := range rolesToAdd {
-				principalIDAsUUID, err := uuid.Parse(role.PrincipalID)
-
-				if err != nil {
-					return fmt.Errorf("invalid UUID format for principal ID %s: %w", role.PrincipalID, err)
-				}
-				roleUpdates[i] = v2.AdminMarkingRoleUpdate{
-					Role:        v2.AdminMarkingRole(role.Role),
-					PrincipalID: principalIDAsUUID,
-				}
-			}
-			httpResp, err := r.client.AdminAddMarkingRoleAssignments(ctx, state.ID.ValueString(), v2.AdminAddMarkingRoleAssignmentsJSONRequestBody{
-				RoleAssignments: &roleUpdates,
-			})
-			if err != nil {
-				return fmt.Errorf("AdminAddMarkingRoleAssignments request failed: %w", err)
-			}
-			if httpResp.StatusCode != http.StatusNoContent {
-				returnString, err := providerError.FormatHTTPError(httpResp)
-				if err != nil {
-					return fmt.Errorf("failed to format error logging from AdminAddGroupMembers response: %w", err)
-				}
-				return errors.New(returnString)
-			}
-		}
-		if len(rolesToRemove) != 0 && !r.deletionsDisabled {
-			roleUpdates := make([]v2.AdminMarkingRoleUpdate, len(rolesToRemove))
-			for i, role := range rolesToRemove {
-				principalIDAsUUID, err := uuid.Parse(role.PrincipalID)
-
-				if err != nil {
-					return fmt.Errorf("invalid UUID format for principal ID %s: %w", role.PrincipalID, err)
-				}
-
-				roleUpdates[i] = v2.AdminMarkingRoleUpdate{
-					Role:        v2.AdminMarkingRole(role.Role),
-					PrincipalID: principalIDAsUUID,
-				}
-			}
-			httpResp, err := r.client.AdminRemoveMarkingRoleAssignments(ctx, state.ID.ValueString(), v2.AdminRemoveMarkingRoleAssignmentsJSONRequestBody{
-				RoleAssignments: &roleUpdates,
-			})
-			if err != nil {
-				return fmt.Errorf("AdminRemoveMarkingRoleAssignments request failed: %w", err)
-			}
-			if httpResp.StatusCode != http.StatusNoContent {
-				returnString, err := providerError.FormatHTTPError(httpResp)
-				if err != nil {
-					return fmt.Errorf("failed to format error logging from AdminRemoveMarkingRoleAssignments response: %w", err)
-				}
-				return errors.New(returnString)
-			}
-		} else if len(rolesToRemove) != 0 {
-			resp.Diagnostics.AddWarning("Found roles defined in the state that are not in the plan.",
-				"Since `deletions_disabled` is set to true, role-removal operations will not be applied.")
-		}
-		//if there was a change (and no error thrown), update state to equal plan
-		state.MarkingRoles = plan.MarkingRoles
-	}
-	return nil
-}
-
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *markingResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if r.deletionsDisabled {
@@ -684,36 +420,4 @@ func (r *markingResource) ImportState(ctx context.Context, req resource.ImportSt
 
 	// The Read method will be called automatically after ImportState
 	// to refresh all the other attributes based on the ID
-}
-
-func FindMarkingRolesDiff(oldSlice, newSlice []RolesRequestBodyEntry) (added, removed []RolesRequestBodyEntry) {
-	// Create maps for quick lookup
-	oldMap := make(map[string]RolesRequestBodyEntry)
-	newMap := make(map[string]RolesRequestBodyEntry)
-
-	// Populate the maps with elements from the slices
-	for _, item := range oldSlice {
-		key := item.PrincipalID + "|" + item.Role
-		oldMap[key] = item
-	}
-	for _, item := range newSlice {
-		key := item.PrincipalID + "|" + item.Role
-		newMap[key] = item
-	}
-
-	// Find added elements (in newSlice but not in oldSlice)
-	for key, item := range newMap {
-		if _, exists := oldMap[key]; !exists {
-			added = append(added, item)
-		}
-	}
-
-	// Find removed elements (in oldSlice but not in newSlice)
-	for key, item := range oldMap {
-		if _, exists := newMap[key]; !exists {
-			removed = append(removed, item)
-		}
-	}
-
-	return added, removed
 }
