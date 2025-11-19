@@ -19,14 +19,13 @@ import (
 )
 
 type organizationResourceModel struct {
-	RID                 types.String `tfsdk:"rid"`
-	Name                types.String `tfsdk:"name"`
-	MarkingID           types.String `tfsdk:"marking_id"`
-	EnrollmentRID       types.String `tfsdk:"enrollment_rid"`
-	Description         types.String `tfsdk:"description"`
-	HostName            types.String `tfsdk:"host_name"`
-	OrganizationMembers types.Set    `tfsdk:"organization_members"`
-	OrganizationRoles   types.Set    `tfsdk:"organization_roles"`
+	RID                   types.String `tfsdk:"rid"`
+	Name                  types.String `tfsdk:"name"`
+	MarkingID             types.String `tfsdk:"marking_id"`
+	EnrollmentRID         types.String `tfsdk:"enrollment_rid"`
+	Description           types.String `tfsdk:"description"`
+	HostName              types.String `tfsdk:"host_name"`
+	InitialAdministrators types.Set    `tfsdk:"initial_administrators"`
 }
 
 // requestBody contains the schema for request body
@@ -36,16 +35,6 @@ type responseBody struct {
 	Description string `json:"description"`
 	MarkingID   string `json:"markingId"`
 	Host        string `json:"host"`
-}
-
-type markingMembersResponseBody struct {
-	Data []markingMembersEntry `json:"data"`
-}
-
-// this is the same interface as group members, should refactor at some point
-type markingMembersEntry struct {
-	PrincipalID   string `json:"principalId"`
-	PrincipalType string `json:"principalType"`
 }
 
 type organizationRolesRequestBodyEntry struct {
@@ -61,4 +50,9 @@ type organizationRoleEntry struct {
 	PrincipalID   string `json:"principalId"`
 	PrincipalType string `json:"principalType"`
 	RoleID        string `json:"roleId"`
+}
+
+type organizationRoleAssignmentsResourceModel struct {
+	OrganizationRID             types.String `tfsdk:"organization_rid"`
+	OrganizationRoleAssignments types.Set    `tfsdk:"organization_role_assignments"`
 }

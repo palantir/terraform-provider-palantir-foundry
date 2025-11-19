@@ -8,16 +8,16 @@ description: |-
 
   The following operations are currently supported:
 
-    - Create an organization
-    - Update an organization
-    - Delete an organization
-    - Import an organization
-    - Add or remove an organization's members
-    - Add or remove an organization's roles
-
+    - Create an Organization
+    - Update an Organization
+    - Import an Organization
 ---
 # Organization
 
 {{ tffile "examples/resources/organization/resource.tf" }}
+
+An Organization's guest membership can also be managed through the Foundry Provider through membership of the Organization's underlying Marking. This can be achieved through the 'foundry_marking_membership' resource, demonstrated below.
+
+{{ tffile "examples/resources/organization/guest_membership.tf" }}
 
 {{ .SchemaMarkdown | trimspace }}
