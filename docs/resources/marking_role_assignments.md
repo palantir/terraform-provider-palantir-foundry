@@ -37,7 +37,7 @@ resource "foundry_marking_role_assignments" "example-marking-role-assignments" {
 
 ### Optional
 
-- `marking_role_assignments` (Set of Object) Set of Role Assignments for this Marking. The following Roles can be assigned to a Marking: 
+- `marking_role_assignments` (Attributes Set) Set of Role Assignments for this Marking. The following Roles can be assigned to a Marking: 
  - ADMINISTER: The user can add and remove members from the Marking, update Marking Role Assignments, and change Marking metadata.
  - DECLASSIFY: The user can remove the Marking from resources in the platform and stop the propagation of the Marking during a transform.
  - USE: The user can apply the Marking to resources in the platform. (see [below for nested schema](#nestedatt--marking_role_assignments))
@@ -45,7 +45,7 @@ resource "foundry_marking_role_assignments" "example-marking-role-assignments" {
 <a id="nestedatt--marking_role_assignments"></a>
 ### Nested Schema for `marking_role_assignments`
 
-Optional:
+Required:
 
 - `principal_id` (String)
 - `role` (String)

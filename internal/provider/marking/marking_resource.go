@@ -21,10 +21,11 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	v2 "github.com/palantir/terraform-provider-palantir-foundry/gateway-client/v2"
@@ -98,16 +99,23 @@ func (r *markingResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: "Description of the Marking.",
 				Optional:    true,
 			},
-			"initial_role_assignments": schema.SetAttribute{
+			"initial_role_assignments": schema.SetNestedAttribute{
 				Description: "The initial set of Role Assignments to be applied when creating the Marking. " +
 					"Any changes to this field after Marking creation will not be applied; " +
 					"instead, use the marking_role_assignments resource to manage Role Assignments. " +
 					"The following Roles can be assigned to a Marking: \n - ADMINISTER: The user can add and remove members from the Marking, update Marking Role Assignments, and change Marking metadata.\n - DECLASSIFY: The user can remove the Marking from resources in the platform and stop the propagation of the Marking during a transform.\n - USE: The user can apply the Marking to resources in the platform.",
 				Optional: true,
-				ElementType: types.ObjectType{
-					AttrTypes: map[string]attr.Type{
-						"role":         types.StringType,
-						"principal_id": types.StringType,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"role": schema.StringAttribute{
+							Required: true,
+							Validators: []validator.String{
+								stringvalidator.OneOf("ADMINISTER", "DECLASSIFY", "USE"),
+							},
+						},
+						"principal_id": schema.StringAttribute{
+							Required: true,
+						},
 					},
 				},
 			},
