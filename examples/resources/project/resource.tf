@@ -25,5 +25,4 @@ resource "foundry_project" "example-project" {
       }
       role_id: "example-project-role-id"
     }]
-  markings = ["example-marking-id"]
 }
