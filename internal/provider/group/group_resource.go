@@ -198,19 +198,19 @@ func (r *groupResource) CreateOrPreregisterGroup(ctx context.Context, resp *reso
 			resp.Diagnostics.AddError("Failed to format error logging from API response", err.Error())
 			return fmt.Errorf("failed to format error logging from API response: %w", err)
 		}
-		resp.Diagnostics.AddError("API request unsuccessful", returnString)
-		return fmt.Errorf("API request unsuccessful: %s", returnString)
+		resp.Diagnostics.AddError("API request unsuccessful for CreateOrPreregisterGroup", returnString)
+		return fmt.Errorf("API request unsuccessful for CreateOrPreregisterGroup: %s", returnString)
 	}
 
 	bodyBytes, err := helper.ExtractBodyFromResponse(httpResp)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse response body", err.Error())
-		return fmt.Errorf("failed to parse response body: %w", err)
+		resp.Diagnostics.AddError("Failed to parse response body for CreateOrPreregisterGroup", err.Error())
+		return fmt.Errorf("failed to parse response body for CreateOrPreregisterGroup: %w", err)
 	}
 
 	var httpResponseBody responseBody
 
-	if hasAuthProvider {
+	if hasAuthProvider && hasEnrollment {
 		var groupID string
 		if err := json.Unmarshal(bodyBytes, &groupID); err != nil {
 			resp.Diagnostics.AddError(
@@ -352,7 +352,7 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	if plan.AuthenticationProviderRID != state.AuthenticationProviderRID {
 		resp.Diagnostics.AddError(
 			"Cannot change authentication_provider_rid",
-			"The authentication_provider_rid field cannot be modified after creation (cannot go from external -> internal group). Please recreate the resource if you need to change this field.",
+			"The authentication_provider_rid field cannot be modified after creation (cannot go from external -> internal group, or to another provider). Please recreate the resource if you need to change this field.",
 		)
 		return
 	}
