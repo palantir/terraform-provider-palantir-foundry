@@ -35,7 +35,9 @@ resource "foundry_group" "example-group" {
 
 ### Optional
 
+- `authentication_provider_rid` (String) The RID of the Authentication Provider (required to preregister a group).
 - `description` (String) Description of the Group.
+- `enrollment_rid` (String) The RID of the Enrollment (required to preregister a group).
 
 ### Read-Only
 
