@@ -357,6 +357,14 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
+	if plan.EnrollmentRID != state.EnrollmentRID {
+		resp.Diagnostics.AddError(
+			"Cannot change enrollment_rid",
+			"The enrollment_rid field cannot be modified after creation. Please recreate the resource if you need to change this field.",
+		)
+		return
+	}
+
 	//TODO (epanjwani): remove this temporary check preventing updates to a group's name, description or organizations once upstream endpoint is available
 
 	if (plan.Name != state.Name) || (plan.Description != state.Description) || !plan.Organizations.Equal(state.Organizations) {
