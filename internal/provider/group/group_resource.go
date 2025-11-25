@@ -162,6 +162,14 @@ func (r *groupResource) CreateOrPreregisterGroup(ctx context.Context, resp *reso
 		return fmt.Errorf("both authentication_provider_rid and enrollment_rid must be provided together to preregister a group, or both must be omitted to create an internal group")
 	}
 
+	if hasAuthProvider && hasEnrollment && !plan.Description.IsNull() {
+		resp.Diagnostics.AddError(
+			"Invalid configuration",
+			"The description field cannot be set when pre-registering a group (when authentication_provider_rid and enrollment_rid are provided). Pre-registered groups do not support descriptions.",
+		)
+		return fmt.Errorf("description cannot be set when pre-registering a group")
+	}
+
 	// Make the appropriate API call based on authentication provider
 	if hasAuthProvider && hasEnrollment {
 		httpResp, err = r.client.AdminPreregisterGroup(
@@ -208,8 +216,6 @@ func (r *groupResource) CreateOrPreregisterGroup(ctx context.Context, resp *reso
 		return fmt.Errorf("failed to parse response body for CreateOrPreregisterGroup: %w", err)
 	}
 
-	var httpResponseBody responseBody
-
 	if hasAuthProvider && hasEnrollment {
 		var groupID string
 		if err := json.Unmarshal(bodyBytes, &groupID); err != nil {
@@ -220,15 +226,10 @@ func (r *groupResource) CreateOrPreregisterGroup(ctx context.Context, resp *reso
 			return fmt.Errorf("error decoding AdminPreregisterGroup response: %w", err)
 		}
 
-		// Preregistered groups only return ID, populate other fields from plan
-		var orgs []string
-		plan.Organizations.ElementsAs(ctx, &orgs, false)
-
-		httpResponseBody.ID = groupID
-		httpResponseBody.Name = plan.Name.ValueString()
-		httpResponseBody.Description = plan.Description.ValueString()
-		httpResponseBody.Organizations = orgs
+		plan.ID = types.StringValue(groupID)
+		return nil
 	} else {
+		var httpResponseBody responseBody
 		if err := json.Unmarshal(bodyBytes, &httpResponseBody); err != nil {
 			resp.Diagnostics.AddError(
 				"Error decoding AdminCreateGroup response",
@@ -236,18 +237,18 @@ func (r *groupResource) CreateOrPreregisterGroup(ctx context.Context, resp *reso
 			)
 			return fmt.Errorf("error decoding AdminCreateGroup response: %w", err)
 		}
+
+		if httpResponseBody.ID == "" {
+			tflog.Error(ctx, "ID was not populated in response")
+			resp.Diagnostics.AddError("ID returned as empty", "ID was not populated in response")
+			return fmt.Errorf("ID returned as empty")
+		}
+
+		plan.ID = types.StringValue(httpResponseBody.ID)
+		plan.Realm = types.StringValue(httpResponseBody.Realm)
+
+		return nil
 	}
-
-	if httpResponseBody.ID == "" {
-		tflog.Error(ctx, "ID was not populated in response, resource likely was not properly created")
-		resp.Diagnostics.AddError("ID returned as empty", "ID was not populated in response, resource likely was not properly created")
-		return fmt.Errorf("ID returned as empty")
-	}
-
-	plan.ID = types.StringValue(httpResponseBody.ID)
-	plan.Realm = types.StringValue(httpResponseBody.Realm)
-
-	return nil
 }
 
 // Read refreshes the Terraform state with the latest data.
@@ -361,6 +362,14 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		resp.Diagnostics.AddError(
 			"Cannot change enrollment_rid",
 			"The enrollment_rid field cannot be modified after creation. Please recreate the resource if you need to change this field.",
+		)
+		return
+	}
+
+	if !state.AuthenticationProviderRID.IsNull() && !plan.Description.IsNull() && plan.Description != state.Description {
+		resp.Diagnostics.AddError(
+			"Cannot set description on pre-registered group",
+			"Pre-registered groups (groups with authentication_provider_rid set) do not support descriptions. You cannot add or modify the description field for this group.",
 		)
 		return
 	}
