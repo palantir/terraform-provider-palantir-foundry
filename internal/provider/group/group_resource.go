@@ -174,13 +174,13 @@ func (r *groupResource) CreateOrPreregisterGroup(ctx context.Context, resp *reso
 	if hasAuthProvider && hasEnrollment {
 		httpResp, err = r.client.AdminPreregisterGroup(
 			ctx,
-			v2.CoreEnrollmentRid(plan.EnrollmentRID.ValueString()),
-			v2.AdminAuthenticationProviderRid(plan.AuthenticationProviderRID.ValueString()),
+			plan.EnrollmentRID.ValueString(),
+			plan.AuthenticationProviderRID.ValueString(),
 			&v2.AdminPreregisterGroupParams{
 				Preview: &previewMode,
 			},
 			v2.AdminPreregisterGroupJSONRequestBody{
-				Name:          v2.AdminGroupName(plan.Name.ValueString()),
+				Name:          plan.Name.ValueString(),
 				Organizations: &organizationsGoSlice,
 			},
 		)
