@@ -19,11 +19,13 @@ import (
 )
 
 type groupResourceModel struct {
-	ID            types.String `tfsdk:"id"`
-	Name          types.String `tfsdk:"name"`
-	Description   types.String `tfsdk:"description"`
-	Realm         types.String `tfsdk:"realm"`
-	Organizations types.List   `tfsdk:"organizations"`
+	ID                        types.String `tfsdk:"id"`
+	Name                      types.String `tfsdk:"name"`
+	Description               types.String `tfsdk:"description"`
+	Realm                     types.String `tfsdk:"realm"`
+	Organizations             types.List   `tfsdk:"organizations"`
+	EnrollmentRID             types.String `tfsdk:"enrollment_rid"`
+	AuthenticationProviderRID types.String `tfsdk:"authentication_provider_rid"`
 }
 
 type groupMembershipResourceModel struct {

@@ -27,6 +27,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	v2 "github.com/palantir/terraform-provider-palantir-foundry/gateway-client/v2"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/constants"
 	providerError "github.com/palantir/terraform-provider-palantir-foundry/internal/provider/errors"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/helper"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/shared"
@@ -101,6 +102,14 @@ func (r *groupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				Description: "Realm of the Group.",
 				Computed:    true,
 			},
+			"enrollment_rid": schema.StringAttribute{
+				Description: "The RID of the Enrollment (required to preregister a group).",
+				Optional:    true,
+			},
+			"authentication_provider_rid": schema.StringAttribute{
+				Description: "The RID of the Authentication Provider (required to preregister a group).",
+				Optional:    true,
+			},
 		},
 	}
 }
@@ -115,7 +124,7 @@ func (r *groupResource) Create(ctx context.Context, req resource.CreateRequest, 
 		return
 	}
 
-	err := r.CreateGroup(ctx, resp, &plan)
+	err := r.CreateOrPreregisterGroup(ctx, resp, &plan)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating the Group. Please fix your plan if needed and re-apply.", err.Error())
 		return
@@ -128,68 +137,119 @@ func (r *groupResource) Create(ctx context.Context, req resource.CreateRequest, 
 	}
 }
 
-func (r *groupResource) CreateGroup(ctx context.Context, resp *resource.CreateResponse, plan *groupResourceModel) error {
+func (r *groupResource) CreateOrPreregisterGroup(ctx context.Context, resp *resource.CreateResponse, plan *groupResourceModel) error {
 	var organizationsGoSlice []v2.CoreOrganizationRid
-	diags := plan.Organizations.ElementsAs(context.Background(), &organizationsGoSlice, false)
+	diags := plan.Organizations.ElementsAs(ctx, &organizationsGoSlice, false)
 	if diags.HasError() {
 		resp.Diagnostics.Append(diags...)
 		return fmt.Errorf("error converting fields from Go to Terraform")
 	}
 
 	description := plan.Description.ValueString()
+	previewMode := constants.PreviewMode
+	var httpResp *http.Response
+	var err error
 
-	httpResp, err := r.client.AdminCreateGroup(ctx, v2.AdminCreateGroupJSONRequestBody{
-		Name:          plan.Name.ValueString(),
-		Description:   &description,
-		Organizations: &organizationsGoSlice,
-	})
+	// Validate that both auth provider and enrollment RID are present or both absent
+	hasAuthProvider := !plan.AuthenticationProviderRID.IsNull()
+	hasEnrollment := !plan.EnrollmentRID.IsNull()
 
-	if err != nil {
-		resp.Diagnostics.AddError("AdminCreateGroup request failed", err.Error())
-		return fmt.Errorf("AdminCreateGroup request failed: %w", err)
+	if hasAuthProvider != hasEnrollment {
+		resp.Diagnostics.AddError(
+			"Invalid configuration",
+			"Both authentication_provider_rid and enrollment_rid must be provided together to preregister a group, or both must be omitted to create an internal group",
+		)
+		return fmt.Errorf("both authentication_provider_rid and enrollment_rid must be provided together to preregister a group, or both must be omitted to create an internal group")
 	}
 
-	// Check the response status code
+	if hasAuthProvider && hasEnrollment && !plan.Description.IsNull() {
+		resp.Diagnostics.AddError(
+			"Invalid configuration",
+			"The description field cannot be set when pre-registering a group (when authentication_provider_rid and enrollment_rid are provided). Pre-registered groups do not support descriptions.",
+		)
+		return fmt.Errorf("description cannot be set when pre-registering a group")
+	}
+
+	// Make the appropriate API call based on authentication provider
+	if hasAuthProvider && hasEnrollment {
+		httpResp, err = r.client.AdminPreregisterGroup(
+			ctx,
+			plan.EnrollmentRID.ValueString(),
+			plan.AuthenticationProviderRID.ValueString(),
+			&v2.AdminPreregisterGroupParams{
+				Preview: &previewMode,
+			},
+			v2.AdminPreregisterGroupJSONRequestBody{
+				Name:          plan.Name.ValueString(),
+				Organizations: &organizationsGoSlice,
+			},
+		)
+		if err != nil {
+			resp.Diagnostics.AddError("AdminPreregisterGroup request failed", err.Error())
+			return fmt.Errorf("AdminPreregisterGroup request failed: %w", err)
+		}
+	} else {
+		httpResp, err = r.client.AdminCreateGroup(ctx, v2.AdminCreateGroupJSONRequestBody{
+			Name:          plan.Name.ValueString(),
+			Description:   &description,
+			Organizations: &organizationsGoSlice,
+		})
+		if err != nil {
+			resp.Diagnostics.AddError("AdminCreateGroup request failed", err.Error())
+			return fmt.Errorf("AdminCreateGroup request failed: %w", err)
+		}
+	}
+
 	if httpResp.StatusCode != http.StatusOK {
 		returnString, err := providerError.FormatHTTPError(httpResp)
 		if err != nil {
-			resp.Diagnostics.AddError("Failed to format error logging from AdminCreateGroup response", err.Error())
-			return fmt.Errorf("failed to format error logging from AdminCreateGroup response: %w", err)
+			resp.Diagnostics.AddError("Failed to format error logging from API response", err.Error())
+			return fmt.Errorf("failed to format error logging from API response: %w", err)
 		}
-		resp.Diagnostics.AddError("Response from AdminCreateGroup was unsuccessful: ", returnString)
-		return fmt.Errorf("response from AdminCreateGroup was unsuccessful: %s", returnString)
+		resp.Diagnostics.AddError("API request unsuccessful for CreateOrPreregisterGroup", returnString)
+		return fmt.Errorf("API request unsuccessful for CreateOrPreregisterGroup: %s", returnString)
 	}
-
-	//read body and then close
-	var httpResponseBody responseBody
 
 	bodyBytes, err := helper.ExtractBodyFromResponse(httpResp)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse response from AdminCreateGroup", err.Error())
-		return fmt.Errorf("failed to parse response from AdminCreateGroup: %w", err)
+		resp.Diagnostics.AddError("Failed to parse response body for CreateOrPreregisterGroup", err.Error())
+		return fmt.Errorf("failed to parse response body for CreateOrPreregisterGroup: %w", err)
 	}
 
-	if err := json.Unmarshal(bodyBytes, &httpResponseBody); err != nil {
-		resp.Diagnostics.AddError("Error decoding response",
-			fmt.Sprintf("... details ... %s", err))
-		return fmt.Errorf("error decoding response: %w", err)
+	if hasAuthProvider && hasEnrollment {
+		var groupID string
+		if err := json.Unmarshal(bodyBytes, &groupID); err != nil {
+			resp.Diagnostics.AddError(
+				"Error decoding AdminPreregisterGroup response",
+				fmt.Sprintf("Could not decode response body: %s", err),
+			)
+			return fmt.Errorf("error decoding AdminPreregisterGroup response: %w", err)
+		}
+
+		plan.ID = types.StringValue(groupID)
+		plan.Realm = types.StringValue("")
+		return nil
+	} else {
+		var httpResponseBody responseBody
+		if err := json.Unmarshal(bodyBytes, &httpResponseBody); err != nil {
+			resp.Diagnostics.AddError(
+				"Error decoding AdminCreateGroup response",
+				fmt.Sprintf("Could not decode response body: %s", err),
+			)
+			return fmt.Errorf("error decoding AdminCreateGroup response: %w", err)
+		}
+
+		if httpResponseBody.ID == "" {
+			tflog.Error(ctx, "ID was not populated in response")
+			resp.Diagnostics.AddError("ID returned as empty", "ID was not populated in response")
+			return fmt.Errorf("ID returned as empty")
+		}
+
+		plan.ID = types.StringValue(httpResponseBody.ID)
+		plan.Realm = types.StringValue(httpResponseBody.Realm)
+
+		return nil
 	}
-
-	//CREATE - do not save state if id is not saved
-	if httpResponseBody.ID == "" {
-		tflog.Error(ctx, "ID was not populated in response, "+
-			"so Terraform best practice is NOT to update state as resource likely was not properly created")
-		resp.Diagnostics.AddError("ID returned as empty",
-			"ID was not populated in response, "+
-				"so Terraform best practice is NOT to update state as resource likely was not properly created")
-		return fmt.Errorf("ID returned as empty: %s", httpResponseBody.ID)
-	}
-
-	//update state for computed values
-
-	plan.ID = types.StringValue(httpResponseBody.ID)
-	plan.Realm = types.StringValue(httpResponseBody.Realm)
-	return nil
 }
 
 // Read refreshes the Terraform state with the latest data.
@@ -288,6 +348,30 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	diags = req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if plan.AuthenticationProviderRID != state.AuthenticationProviderRID {
+		resp.Diagnostics.AddError(
+			"Cannot change authentication_provider_rid",
+			"The authentication_provider_rid field cannot be modified after creation (cannot go from external -> internal group, or to another provider). Please recreate the resource if you need to change this field.",
+		)
+		return
+	}
+
+	if plan.EnrollmentRID != state.EnrollmentRID {
+		resp.Diagnostics.AddError(
+			"Cannot change enrollment_rid",
+			"The enrollment_rid field cannot be modified after creation. Please recreate the resource if you need to change this field.",
+		)
+		return
+	}
+
+	if !state.AuthenticationProviderRID.IsNull() && !plan.Description.IsNull() && plan.Description != state.Description {
+		resp.Diagnostics.AddError(
+			"Cannot set description on pre-registered group",
+			"Pre-registered groups (groups with authentication_provider_rid set) do not support descriptions. You cannot add or modify the description field for this group.",
+		)
 		return
 	}
 

@@ -17,6 +17,16 @@ description: |-
 ---
 # Group
 
+## Creating Groups
+
 {{ tffile "examples/resources/group/resource.tf" }}
+
+## Preregistering Groups
+
+To preregister a group with an external authentication provider, both `enrollment_rid` and `authentication_provider_rid` must be specified together:
+
+{{ tffile "examples/resources/group/preregistered_group.tf" }}
+
+Note: When preregistering a group, the `description` field is not supported by the API.
 
 {{ .SchemaMarkdown | trimspace }}
