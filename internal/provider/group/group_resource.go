@@ -227,6 +227,7 @@ func (r *groupResource) CreateOrPreregisterGroup(ctx context.Context, resp *reso
 		}
 
 		plan.ID = types.StringValue(groupID)
+		plan.Realm = types.StringValue("")
 		return nil
 	} else {
 		var httpResponseBody responseBody
