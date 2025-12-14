@@ -1,3 +1,17 @@
+// Copyright 2025 Palantir Technologies, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package services
 
 import (
@@ -10,7 +24,9 @@ func TestResolveUrlsServiceDiscovery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(serviceDiscoveryFile.Name())
+	defer func() {
+		_ = os.Remove(serviceDiscoveryFile.Name())
+	}()
 
 	serviceDiscoveryContent := `
 api_gateway:
@@ -23,8 +39,10 @@ multipass:
 		t.Fatalf("Failed to write to temp file: %v", err)
 	}
 
-	os.Setenv("FOUNDRY_SERVICE_DISCOVERY_V2", serviceDiscoveryFile.Name())
-	defer os.Unsetenv("FOUNDRY_SERVICE_DISCOVERY_V2")
+	_ = os.Setenv("FOUNDRY_SERVICE_DISCOVERY_V2", serviceDiscoveryFile.Name())
+	defer func() {
+		_ = os.Unsetenv("FOUNDRY_SERVICE_DISCOVERY_V2")
+	}()
 
 	urls := ResolveUrls("")
 
@@ -57,8 +75,10 @@ func TestResolveUrlsConfigHost(t *testing.T) {
 
 func TestResolveUrlsEnvBaseHostname(t *testing.T) {
 	baseHostname := "https://env.host/foundry/"
-	os.Setenv("BASE_HOSTNAME", baseHostname)
-	defer os.Unsetenv("BASE_HOSTNAME")
+	_ = os.Setenv("BASE_HOSTNAME", baseHostname)
+	defer func() {
+		_ = os.Unsetenv("BASE_HOSTNAME")
+	}()
 
 	urls := ResolveUrls("")
 
@@ -74,8 +94,8 @@ func TestResolveUrlsEnvBaseHostname(t *testing.T) {
 }
 
 func TestResolveUrlsNoConfig(t *testing.T) {
-	os.Unsetenv("BASE_HOSTNAME")
-	os.Unsetenv("FOUNDRY_SERVICE_DISCOVERY_V2")
+	_ = os.Unsetenv("BASE_HOSTNAME")
+	_ = os.Unsetenv("FOUNDRY_SERVICE_DISCOVERY_V2")
 
 	urls := ResolveUrls("")
 
