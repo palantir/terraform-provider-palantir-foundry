@@ -1,4 +1,4 @@
-package provider
+package services
 
 import (
 	"os"
@@ -16,8 +16,8 @@ type serviceDiscovery struct {
 	ApiGateway []string `yaml:"api_gateway"`
 }
 
-func ResolveUrls(config foundryProviderModel) *ResolvedServiceUrls {
-	host := config.Host.ValueString()
+func ResolveUrls(configHost string) *ResolvedServiceUrls {
+	host := configHost
 	if host == "" {
 		host = os.Getenv("BASE_HOSTNAME")
 	}

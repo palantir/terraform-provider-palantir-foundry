@@ -32,6 +32,7 @@ import (
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/marking"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/organization"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/project"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/services"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/shared"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/space"
 )
@@ -140,7 +141,7 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 		clientSecret = os.Getenv("CLIENT_SECRET")
 	}
 
-	configUrls := ResolveUrls(config)
+	configUrls := services.ResolveUrls(config.Host.ValueString())
 	if configUrls == nil {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("host"),
