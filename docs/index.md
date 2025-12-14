@@ -25,7 +25,7 @@ terraform {
 provider "foundry" {
     client_id = "your-client-id-here"                 # may be specified with CLIENT_ID environment variable
     client_secret = "your-client-secret-here"         # may be specified with CLIENT_SECRET environment variable
-    host = "https://example.palantirfoundry.com/"     # may be specified with BASE_HOSTNAME environment variable
+    host = "https://example.palantirfoundry.com/"     # may be specified with BASE_HOSTNAME environment variable or omitted entirely when running as a Foundry build inside the targeted enrollment
 }
 ```
 
@@ -34,7 +34,7 @@ provider "foundry" {
 
 ### Optional
 
-- `client_id` (String)
-- `client_secret` (String, Sensitive)
+- `client_id` (String) The Client ID of a [Foundry OAuth client](https://www.palantir.com/docs/foundry/ontology-sdk/oauth-clients/). If no value is set here, the provider will look for the `CLIENT_ID` environment variable.
+- `client_secret` (String, Sensitive) The Client Secret of a [Foundry OAuth client](https://www.palantir.com/docs/foundry/ontology-sdk/oauth-clients/). If no value is set here, the provider will look for the `CLIENT_SECRET` environment variable.
 - `deletions_disabled` (Boolean) An experimental provider-level flag to fully disable deletions of resources as well as the removal of resources' associated roles, members, etc.. This puts the provider a sort of `safe-mode`, preventing the removal of existing infra which can be subject to change outside the scope of your IAC management. In this mode, drift between the actual external infrastructure state and terraform's state is accepted, and applied plans might not map 1:1 with reality. As such, this flag must be used with caution. When a deletion operation is initiated on an otherwise deletable object (currently space, group, or project) and this flag is set to true then we will not remove the remote resource but will still remove remove the resource from state. On non-deletable resources, this flag being set to true will allow said resources to be removed from state while keeping the remote resource intact.
-- `host` (String)
+- `host` (String) The base URL for the Foundry enrollment. Example: `https://example.palantirfoundry.com/`. If no value is set here, the provider will look for the `BASE_HOSTNAME` environment variable. When running terraform as a build from inside the targeted Foundry enrollment, this may be omitted entirely and the provider will infer the correct host automatically.

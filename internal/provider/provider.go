@@ -61,14 +61,17 @@ func (p *FoundryProvider) Schema(_ context.Context, _ provider.SchemaRequest, re
 		Description: "Interact with Foundry.",
 		Attributes: map[string]schema.Attribute{
 			"host": schema.StringAttribute{
-				Optional: true,
+				Optional:    true,
+				Description: "The base URL for the Foundry enrollment. Example: `https://example.palantirfoundry.com/`. If no value is set here, the provider will look for the `BASE_HOSTNAME` environment variable. When running terraform as a build from inside the targeted Foundry enrollment, this may be omitted entirely and the provider will infer the correct host automatically.",
 			},
 			"client_id": schema.StringAttribute{
-				Optional: true,
+				Optional:    true,
+				Description: "The Client ID of a [Foundry OAuth client](https://www.palantir.com/docs/foundry/ontology-sdk/oauth-clients/). If no value is set here, the provider will look for the `CLIENT_ID` environment variable.",
 			},
 			"client_secret": schema.StringAttribute{
-				Optional:  true,
-				Sensitive: true,
+				Optional:    true,
+				Sensitive:   true,
+				Description: "The Client Secret of a [Foundry OAuth client](https://www.palantir.com/docs/foundry/ontology-sdk/oauth-clients/). If no value is set here, the provider will look for the `CLIENT_SECRET` environment variable.",
 			},
 			"deletions_disabled": schema.BoolAttribute{
 				Optional:    true,
