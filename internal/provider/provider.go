@@ -32,6 +32,7 @@ import (
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/marking"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/organization"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/project"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/services"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/shared"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/space"
 )
@@ -60,14 +61,17 @@ func (p *FoundryProvider) Schema(_ context.Context, _ provider.SchemaRequest, re
 		Description: "Interact with Foundry.",
 		Attributes: map[string]schema.Attribute{
 			"host": schema.StringAttribute{
-				Optional: true,
+				Optional:    true,
+				Description: "The base URL for the Foundry enrollment. Example: `https://example.palantirfoundry.com/`. If no value is set here, the provider will look for the `BASE_HOSTNAME` environment variable. When running terraform as a build from inside the targeted Foundry enrollment, this may be omitted entirely and the provider will infer the correct host automatically.",
 			},
 			"client_id": schema.StringAttribute{
-				Optional: true,
+				Optional:    true,
+				Description: "The Client ID of a [Foundry OAuth client](https://www.palantir.com/docs/foundry/ontology-sdk/oauth-clients/). If no value is set here, the provider will look for the `CLIENT_ID` environment variable.",
 			},
 			"client_secret": schema.StringAttribute{
-				Optional:  true,
-				Sensitive: true,
+				Optional:    true,
+				Sensitive:   true,
+				Description: "The Client Secret of a [Foundry OAuth client](https://www.palantir.com/docs/foundry/ontology-sdk/oauth-clients/). If no value is set here, the provider will look for the `CLIENT_SECRET` environment variable.",
 			},
 			"deletions_disabled": schema.BoolAttribute{
 				Optional:    true,
@@ -120,12 +124,8 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 		return
 	}
 
-	// Default values to environment variables, but override
-	// with Terraform configuration value if set.
-
-	host := os.Getenv("BASE_HOSTNAME")
-	clientID := os.Getenv("CLIENT_ID")
-	clientSecret := os.Getenv("CLIENT_SECRET")
+	clientID := config.ClientID.ValueString()
+	clientSecret := config.ClientSecret.ValueString()
 
 	// If no deletionsDisabled flag provided, default to false.
 	var deletionsDisabled bool
@@ -135,22 +135,17 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 		deletionsDisabled = config.DeletionsDisabled.ValueBool()
 	}
 
-	if !config.Host.IsNull() {
-		host = config.Host.ValueString()
+	// Fallback to environment variables if values not set in config
+	if clientID == "" {
+		clientID = os.Getenv("CLIENT_ID")
 	}
 
-	if !config.ClientID.IsNull() {
-		clientID = config.ClientID.ValueString()
+	if clientSecret == "" {
+		clientSecret = os.Getenv("CLIENT_SECRET")
 	}
 
-	if !config.ClientSecret.IsNull() {
-		clientSecret = config.ClientSecret.ValueString()
-	}
-
-	// If any of the expected configurations are missing, return
-	// errors with provider-specific guidance.
-
-	if host == "" {
+	configUrls := services.ResolveUrls(config.Host.ValueString())
+	if configUrls == nil {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("host"),
 			"Missing Foundry API Host", "Please provide the API host for Foundry in the provider configuration.")
@@ -158,13 +153,13 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 
 	if clientID == "" {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("host"),
+			path.Root("clientId"),
 			"Missing Foundry API clientID", "Please provide the API clientID for Foundry in the provider configuration.")
 	}
 
 	if clientSecret == "" {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("host"),
+			path.Root("clientSecret"),
 			"Missing Foundry API clientSecret", "Please provide the API clientSecret for Foundry in the provider configuration.")
 	}
 
@@ -172,7 +167,7 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 		return
 	}
 
-	tokenString, err := auth.GetAuthToken(host, clientID, clientSecret)
+	tokenString, err := auth.GetAuthToken(configUrls.MultipassUrl, clientID, clientSecret)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to retrieve Foundry API Token",
@@ -188,7 +183,7 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 		)
 		return
 	}
-	client, err := v2.NewClientWithResponses(host+"api", v2.WithRequestEditorFn(token.Intercept))
+	client, err := v2.NewClientWithResponses(configUrls.ApiGatewayUrl, v2.WithRequestEditorFn(token.Intercept))
 
 	if err != nil {
 		resp.Diagnostics.AddError(

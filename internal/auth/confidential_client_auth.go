@@ -29,7 +29,7 @@ type OAuth2TokenResponse struct {
 	AccessToken string `json:"access_token"`
 }
 
-func GetAuthToken(hostname string, clientID string, clientSecret string) (string, error) {
+func GetAuthToken(multipassApiUrl string, clientID string, clientSecret string) (string, error) {
 
 	//get the token itself
 	formData := url.Values{}
@@ -39,7 +39,7 @@ func GetAuthToken(hostname string, clientID string, clientSecret string) (string
 
 	encodedData := formData.Encode()
 
-	endpoint := fmt.Sprintf("%smultipass/api/oauth2/token", hostname)
+	endpoint := fmt.Sprintf("%s/oauth2/token", multipassApiUrl)
 
 	req, err := http.NewRequest("POST", endpoint, bytes.NewBufferString(encodedData))
 	if err != nil {
