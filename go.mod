@@ -1,6 +1,6 @@
 module github.com/palantir/terraform-provider-palantir-foundry
 
-go 1.25.0
+go 1.25.5
 
 tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
 
