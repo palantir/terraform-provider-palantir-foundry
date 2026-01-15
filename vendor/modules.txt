@@ -247,8 +247,8 @@ github.com/hashicorp/terraform-plugin-log/tfsdklog
 # github.com/hashicorp/terraform-registry-address v0.4.0
 ## explicit; go 1.23.0
 github.com/hashicorp/terraform-registry-address
-# github.com/hashicorp/terraform-svchost v0.1.1
-## explicit; go 1.19
+# github.com/hashicorp/terraform-svchost v0.2.0
+## explicit; go 1.24.0
 github.com/hashicorp/terraform-svchost
 # github.com/hashicorp/yamux v0.1.2
 ## explicit; go 1.20
