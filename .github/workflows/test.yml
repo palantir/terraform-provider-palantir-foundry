@@ -36,8 +36,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version-file: 'go.mod'
-          cache: true
+          go-version: 'stable'
         id: go
       - name: verify
         run: |
