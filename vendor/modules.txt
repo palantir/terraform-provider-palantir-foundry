@@ -425,7 +425,7 @@ golang.org/x/tools/internal/gopathwalk
 golang.org/x/tools/internal/imports
 golang.org/x/tools/internal/modindex
 golang.org/x/tools/internal/stdlib
-# google.golang.org/genproto/googleapis/rpc v0.0.0-20260217200457-a2cb2272a1e9
+# google.golang.org/genproto/googleapis/rpc v0.0.0-20260217215200-42d3e9bedb6d
 ## explicit; go 1.25.0
 google.golang.org/genproto/googleapis/rpc/status
 # google.golang.org/grpc v1.79.1
