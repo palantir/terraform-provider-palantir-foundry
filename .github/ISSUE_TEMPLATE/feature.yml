@@ -1,0 +1,42 @@
+name: Feature request
+description: Request additional functionality or improvements
+title: "[FR] "
+labels: ["feature", "needs triage"]
+projects: []
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for your interest in improving the Foundry Terraform provider!
+        
+        The Terraform provider is built on top of the [public Foundry REST API](https://www.palantir.com/docs/foundry/api/v2/), so any requested features must be supported by existing endpoints.
+        If your feature would not be possible to implement using the existing public API endpoints, please submit a feature request for new API endpoints at https://community.palantir.com.
+        
+        If you have an urgent feature request or want to discuss your use case in more detail, please reach out to your Palantir representative.
+  - type: checkboxes
+    id: public-api
+    attributes:
+      label: Public API Ack
+      options:
+        - label: My feature is achievable using the currently available public API endpoints
+          required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Feature request details
+      value: |
+        **What are you trying to achieve?**
+
+        **Proposed changes or additions**
+
+    validations:
+      required: true
+  - type: checkboxes
+    id: sensitive-information
+    attributes:
+      label: Sensitive information
+      description: If your feature request needs to include sensitive information or context, please submit it through the Foundry Issues app in your enrollment instead of this form
+      options:
+        - label: The content that I am submitting does not include any sensitive or confidential information
+          required: true

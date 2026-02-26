@@ -74,6 +74,15 @@ func HandleEmptyFieldString(field string) types.String {
 	return types.StringValue(field)
 }
 
+// HandleOptionalString converts an optional string pointer to a types.String
+// Returns StringNull() if the pointer is nil, otherwise returns StringValue of the dereferenced pointer
+func HandleOptionalString(field *string) types.String {
+	if field == nil {
+		return types.StringNull()
+	}
+	return types.StringValue(*field)
+}
+
 func ConvertStringsToUUIDs(strings []string) ([]uuid.UUID, error) {
 	uuids := make([]uuid.UUID, 0, len(strings))
 	for _, s := range strings {

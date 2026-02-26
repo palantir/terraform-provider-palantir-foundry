@@ -1,0 +1,47 @@
+name: Bug report
+description: Report incorrect behavior or unexpected results
+title: "[Bug] "
+labels: ["bug", "needs triage"]
+projects: []
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for filling out this bug report!
+  - type: input
+    id: provider-version
+    attributes:
+      label: Provider version
+      description: What version of the Foundry Terraform provider are you using?
+    validations:
+      required: false
+  - type: input
+    id: terraform-version
+    attributes:
+      label: Terraform version
+      description: What version of Terraform or OpenTofu are you using?
+    validations:
+      required: false
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Please include any relevant logs (redacted if necessary) and a minimal reproduction if possible.
+      value: |
+        **Expected behavior**
+
+        **Actual behavior**
+
+        **How to reproduce**
+
+    validations:
+      required: true
+  - type: checkboxes
+    id: sensitive-information
+    attributes:
+      label: Sensitive information
+      description: If your bug report needs to include sensitive information or context, please submit it through the Foundry Issues app in your enrollment instead of this form
+      options:
+        - label: The content that I am submitting does not include any sensitive or confidential information
+          required: true

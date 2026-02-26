@@ -17,6 +17,8 @@ package services
 import (
 	"os"
 	"testing"
+
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/env"
 )
 
 func TestResolveUrlsServiceDiscovery(t *testing.T) {
@@ -39,9 +41,9 @@ multipass:
 		t.Fatalf("Failed to write to temp file: %v", err)
 	}
 
-	_ = os.Setenv("FOUNDRY_SERVICE_DISCOVERY_V2", serviceDiscoveryFile.Name())
+	_ = os.Setenv(env.FOUNDRY_SERVICE_DISCOVERY, serviceDiscoveryFile.Name())
 	defer func() {
-		_ = os.Unsetenv("FOUNDRY_SERVICE_DISCOVERY_V2")
+		_ = os.Unsetenv(env.FOUNDRY_SERVICE_DISCOVERY)
 	}()
 
 	urls := ResolveUrls("")
@@ -75,9 +77,9 @@ func TestResolveUrlsConfigHost(t *testing.T) {
 
 func TestResolveUrlsEnvBaseHostname(t *testing.T) {
 	baseHostname := "https://env.host/foundry/"
-	_ = os.Setenv("BASE_HOSTNAME", baseHostname)
+	_ = os.Setenv(env.HOSTNAME_ENV_VAR, baseHostname)
 	defer func() {
-		_ = os.Unsetenv("BASE_HOSTNAME")
+		_ = os.Unsetenv(env.HOSTNAME_ENV_VAR)
 	}()
 
 	urls := ResolveUrls("")
@@ -94,8 +96,8 @@ func TestResolveUrlsEnvBaseHostname(t *testing.T) {
 }
 
 func TestResolveUrlsNoConfig(t *testing.T) {
-	_ = os.Unsetenv("BASE_HOSTNAME")
-	_ = os.Unsetenv("FOUNDRY_SERVICE_DISCOVERY_V2")
+	_ = os.Unsetenv(env.HOSTNAME_ENV_VAR)
+	_ = os.Unsetenv(env.FOUNDRY_SERVICE_DISCOVERY)
 
 	urls := ResolveUrls("")
 

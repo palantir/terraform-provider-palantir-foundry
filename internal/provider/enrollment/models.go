@@ -18,9 +18,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type enrollmentResourceModel struct {
-	RID             types.String `tfsdk:"rid"`
-	EnrollmentRoles types.Set    `tfsdk:"enrollment_roles"`
+type enrollmentRoleAssignmentsResourceModel struct {
+	EnrollmentRID             types.String `tfsdk:"enrollment_rid"`
+	EnrollmentRoleAssignments types.Set    `tfsdk:"enrollment_role_assignments"`
 }
 
 type enrollmentRolesRequestBodyEntry struct {
@@ -36,4 +36,9 @@ type enrollmentRoleEntry struct {
 	PrincipalID   string `json:"principalId"`
 	PrincipalType string `json:"principalType"`
 	RoleID        string `json:"roleId"`
+}
+
+type enrollmentResponseBody struct {
+	RID  string `json:"rid"`
+	Name string `json:"name"`
 }

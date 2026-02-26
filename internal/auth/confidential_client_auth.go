@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/url"
 
+	http2 "github.com/palantir/terraform-provider-palantir-foundry/internal/http"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/helper"
 )
 
@@ -49,6 +50,7 @@ func GetAuthToken(multipassApiUrl string, clientID string, clientSecret string) 
 
 	// 4. Set the Content-Type header to application/x-www-form-urlencoded.
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("User-Agent", http2.CreateUserAgent())
 
 	// 5. Create an HTTP client and send the request.
 	client := &http.Client{}
