@@ -16,6 +16,7 @@ package provider
 
 import (
 	"context"
+	"net/http"
 	"os"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -27,7 +28,10 @@ import (
 	"github.com/oapi-codegen/oapi-codegen/v2/pkg/securityprovider"
 	v2 "github.com/palantir/terraform-provider-palantir-foundry/gateway-client/v2"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/auth"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/env"
+	http2 "github.com/palantir/terraform-provider-palantir-foundry/internal/http"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/enrollment"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/generated"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/group"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/marking"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/organization"
@@ -62,16 +66,16 @@ func (p *FoundryProvider) Schema(_ context.Context, _ provider.SchemaRequest, re
 		Attributes: map[string]schema.Attribute{
 			"host": schema.StringAttribute{
 				Optional:    true,
-				Description: "The base URL for the Foundry enrollment. Example: `https://example.palantirfoundry.com/`. If no value is set here, the provider will look for the `BASE_HOSTNAME` environment variable. When running terraform as a build from inside the targeted Foundry enrollment, this may be omitted entirely and the provider will infer the correct host automatically.",
+				Description: "The base URL for the Foundry enrollment. Example: `https://example.palantirfoundry.com/`. If no value is set here, the provider will look for the `PLTR_HOSTNAME` environment variable. When running terraform as a build from inside the targeted Foundry enrollment, this may be omitted entirely and the provider will infer the correct host automatically.",
 			},
 			"client_id": schema.StringAttribute{
 				Optional:    true,
-				Description: "The Client ID of a [Foundry OAuth client](https://www.palantir.com/docs/foundry/ontology-sdk/oauth-clients/). If no value is set here, the provider will look for the `CLIENT_ID` environment variable.",
+				Description: "The Client ID of a [Foundry OAuth client](https://www.palantir.com/docs/foundry/ontology-sdk/oauth-clients/). If no value is set here, the provider will look for the `PLTR_CLIENT_ID` environment variable.",
 			},
 			"client_secret": schema.StringAttribute{
 				Optional:    true,
 				Sensitive:   true,
-				Description: "The Client Secret of a [Foundry OAuth client](https://www.palantir.com/docs/foundry/ontology-sdk/oauth-clients/). If no value is set here, the provider will look for the `CLIENT_SECRET` environment variable.",
+				Description: "The Client Secret of a [Foundry OAuth client](https://www.palantir.com/docs/foundry/ontology-sdk/oauth-clients/). If no value is set here, the provider will look for the `PLTR_CLIENT_SECRET` environment variable.",
 			},
 			"deletions_disabled": schema.BoolAttribute{
 				Optional:    true,
@@ -137,11 +141,11 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 
 	// Fallback to environment variables if values not set in config
 	if clientID == "" {
-		clientID = os.Getenv("CLIENT_ID")
+		clientID = os.Getenv(env.CLIENT_ID_ENV_VAR)
 	}
 
 	if clientSecret == "" {
-		clientSecret = os.Getenv("CLIENT_SECRET")
+		clientSecret = os.Getenv(env.CLIENT_SECRET_ENV_VAR)
 	}
 
 	configUrls := services.ResolveUrls(config.Host.ValueString())
@@ -183,7 +187,14 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 		)
 		return
 	}
-	client, err := v2.NewClientWithResponses(configUrls.ApiGatewayUrl, v2.WithRequestEditorFn(token.Intercept))
+
+	userAgent := http2.CreateUserAgent()
+	addUserAgentHeader := func(ctx context.Context, req *http.Request) error {
+		req.Header.Set("User-Agent", userAgent)
+		return nil
+	}
+
+	client, err := v2.NewClientWithResponses(configUrls.ApiGatewayUrl, v2.WithRequestEditorFn(token.Intercept), v2.WithRequestEditorFn(addUserAgentHeader))
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -206,18 +217,19 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 
 // DataSources defines the data sources implemented in the provider.
 func (p *FoundryProvider) DataSources(_ context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{}
+	return generated.DataSources()
 }
 
 // Resources defines the resources implemented in the provider.
 func (p *FoundryProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		enrollment.NewEnrollmentResource,
+		enrollment.NewEnrollmentRoleAssignmentsResource,
 		group.NewGroupResource,
 		group.NewGroupMembershipResource,
 		marking.NewMarkingResource,
 		marking.NewMarkingMembershipResource,
 		marking.NewMarkingRoleAssignmentsResource,
+		marking.NewMarkingCategoryResource,
 		organization.NewOrganizationResource,
 		organization.NewOrganizationRoleAssignmentsResource,
 		project.NewProjectResource,

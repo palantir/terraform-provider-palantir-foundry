@@ -17,6 +17,7 @@ package services
 import (
 	"os"
 
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/env"
 	"gopkg.in/yaml.v2"
 )
 
@@ -33,7 +34,7 @@ type serviceDiscovery struct {
 func ResolveUrls(configHost string) *ResolvedServiceUrls {
 	host := configHost
 	if host == "" {
-		host = os.Getenv("BASE_HOSTNAME")
+		host = os.Getenv(env.HOSTNAME_ENV_VAR)
 	}
 
 	if host != "" {
@@ -43,7 +44,7 @@ func ResolveUrls(configHost string) *ResolvedServiceUrls {
 		}
 	}
 
-	serviceDiscoveryPath := os.Getenv("FOUNDRY_SERVICE_DISCOVERY_V2")
+	serviceDiscoveryPath := os.Getenv(env.FOUNDRY_SERVICE_DISCOVERY)
 	if serviceDiscoveryPath != "" {
 		yamlFile, err := os.ReadFile(serviceDiscoveryPath)
 		if err != nil {

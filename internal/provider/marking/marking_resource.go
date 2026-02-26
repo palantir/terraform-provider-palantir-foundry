@@ -29,7 +29,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	v2 "github.com/palantir/terraform-provider-palantir-foundry/gateway-client/v2"
-	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/constants"
 	providerError "github.com/palantir/terraform-provider-palantir-foundry/internal/provider/errors"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/helper"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/shared"
@@ -148,9 +147,6 @@ func (r *markingResource) Create(ctx context.Context, req resource.CreateRequest
 }
 
 func (r *markingResource) CreateMarking(ctx context.Context, resp *resource.CreateResponse, plan *markingResourceModel) error {
-
-	previewMode := constants.PreviewMode
-	adminCreateMarkingParams := v2.AdminCreateMarkingParams{Preview: &previewMode}
 	description := plan.Description.ValueString()
 
 	var initialRoleAssignments []markingRolesRequestBodyEntry
@@ -175,7 +171,6 @@ func (r *markingResource) CreateMarking(ctx context.Context, resp *resource.Crea
 	}
 
 	httpResp, err := r.client.AdminCreateMarking(ctx,
-		&adminCreateMarkingParams,
 		v2.AdminCreateMarkingJSONRequestBody{
 			Name:                   plan.Name.ValueString(),
 			CategoryID:             plan.CategoryID.ValueString(),
@@ -258,10 +253,7 @@ func (r *markingResource) Read(ctx context.Context, req resource.ReadRequest, re
 }
 
 func (r *markingResource) ReadMarking(ctx context.Context, resp *resource.ReadResponse, state *markingResourceModel, markingId string) error {
-	previewMode := constants.PreviewMode
-	adminGetMarkingParams := v2.AdminGetMarkingParams{Preview: &previewMode}
-
-	httpResp, err := r.client.AdminGetMarking(ctx, markingId, &adminGetMarkingParams)
+	httpResp, err := r.client.AdminGetMarking(ctx, markingId)
 
 	if err != nil {
 		resp.Diagnostics.AddError("AdminGetMarking request failed", err.Error())
@@ -340,11 +332,9 @@ func (r *markingResource) UpdateMarking(ctx context.Context, resp *resource.Upda
 	if plan.CategoryID != state.CategoryID {
 		return fmt.Errorf("you may not change the category ID of a marking once it has been created. Please revert your plan to the existing category ID and re-apply")
 	}
-	previewMode := constants.PreviewMode
-	adminReplaceMarkingParams := v2.AdminReplaceMarkingParams{Preview: &previewMode}
 	description := plan.Description.ValueString()
 
-	httpResp, err := r.client.AdminReplaceMarking(ctx, state.ID.ValueString(), &adminReplaceMarkingParams, v2.AdminReplaceMarkingJSONRequestBody{
+	httpResp, err := r.client.AdminReplaceMarking(ctx, state.ID.ValueString(), v2.AdminReplaceMarkingJSONRequestBody{
 		Name:        plan.Name.ValueString(),
 		Description: &description,
 	})

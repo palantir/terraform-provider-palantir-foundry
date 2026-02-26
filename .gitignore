@@ -40,3 +40,4 @@ tmp/
 node_modules/
 
 terraform-provider-foundry
+out/
