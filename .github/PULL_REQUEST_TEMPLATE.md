@@ -1,8 +1,11 @@
-# !!! THIS PULL REQUEST WILL BE CLOSED WITHOUT REVIEW OR MERGE !!!
+## Before this PR
+<!-- What's wrong with the current state of the world and why change it now? -->
 
-Development of this repository is done internally at Palantir and changes are periodically released to this repository.
-Pull requests from external contributors will be closed without review or merge.
-Bug reports or feature requests can be submitted as issues where they will be triaged by a member of our team.
-If you have an urgent need for a feature or bug fix, please reach out to your Palantir representative.
+## After this PR
+<!-- User-facing outcomes this PR delivers go below -->
+==COMMIT_MSG==
+==COMMIT_MSG==
 
-# !!! THIS PULL REQUEST WILL BE CLOSED WITHOUT REVIEW OR MERGE !!!
+## Possible downsides?
+<!-- Please describe any way users could be negatively affected by this PR. -->
+
