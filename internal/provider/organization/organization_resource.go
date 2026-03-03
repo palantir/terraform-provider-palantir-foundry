@@ -138,6 +138,14 @@ func (r *organizationResource) Create(ctx context.Context, req resource.CreateRe
 
 func (r *organizationResource) CreateOrganization(ctx context.Context, resp *resource.CreateResponse, plan *organizationResourceModel) error {
 
+	if plan.EnrollmentRID.IsNull() || plan.EnrollmentRID.IsUnknown() {
+		resp.Diagnostics.AddError(
+			"enrollment_rid is required",
+			"enrollment_rid must be set when creating an Organization. It is only optional when importing.",
+		)
+		return fmt.Errorf("enrollment_rid must be set when creating an Organization")
+	}
+
 	previewMode := constants.PreviewMode
 	adminCreateOrganizationParams := v2.AdminCreateOrganizationParams{Preview: &previewMode}
 	description := plan.Description.ValueString()

@@ -12,7 +12,7 @@ description: |-
 
 ```terraform
 resource "foundry_project_resource_roles" "example-project-resource-roles" {
-  project_rid = foundry_project.example-project.id
+  project_rid = foundry_project.example-project.rid
   project_resource_roles = [
     {
       resource_role_principal = {
