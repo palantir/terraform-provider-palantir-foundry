@@ -24,6 +24,7 @@ import (
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/organization"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/project"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/space"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/user"
 )
 
 // DataSources returns all data source constructors for the provider.
@@ -44,5 +45,7 @@ func DataSources() []func() datasource.DataSource {
 		project.NewProjectOrganizationsDataSource,
 		project.NewProjectResourceRolesDataSource,
 		space.NewSpaceDataSource,
+		user.NewCurrentUserDataSource,
+		user.NewUserDataSource,
 	}
 }
