@@ -27,16 +27,8 @@ data "foundry_marking" "example" {
 
 - `category_id` (String) The ID of a Marking Category. For user-created Categories, this will be a UUID. Markings associated with Organizations are placed in a category with ID "Organization". This field is immutable after creation.
 - `description` (String) Description of the Marking.
-- `initial_role_assignments` (Attributes Set) The initial set of Role Assignments to be applied when creating the Marking. Any changes to this field after Marking creation will not be applied; instead, use the marking_role_assignments resource to manage Role Assignments. The following Roles can be assigned to a Marking: 
+- `initial_role_assignments` (Map of Set of String) Map of Role to set of Principal IDs for the initial role assignments. Any changes to this field after Marking creation will not be applied; instead, use the marking_role_assignments resource to manage Role Assignments. The following Roles can be assigned to a Marking: 
  - ADMINISTER: The user can add and remove members from the Marking, update Marking Role Assignments, and change Marking metadata.
  - DECLASSIFY: The user can remove the Marking from resources in the platform and stop the propagation of the Marking during a transform.
- - USE: The user can apply the Marking to resources in the platform. (see [below for nested schema](#nestedatt--initial_role_assignments))
+ - USE: The user can apply the Marking to resources in the platform.
 - `name` (String) Name of the Marking.
-
-<a id="nestedatt--initial_role_assignments"></a>
-### Nested Schema for `initial_role_assignments`
-
-Read-Only:
-
-- `principal_id` (String)
-- `role` (String)

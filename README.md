@@ -38,6 +38,8 @@ provider "foundry" {
     host = "https://example.palantirfoundry.com/"
     # OPTIONAL - If true, disabled deletions for all resources, defaults to false
     deletions_disabled = false
+    # OPTIONAL -
+    
 }
 
 # Configure a resource

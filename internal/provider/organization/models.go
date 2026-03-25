@@ -54,5 +54,5 @@ type organizationRoleEntry struct {
 
 type organizationRoleAssignmentsResourceModel struct {
 	OrganizationRID             types.String `tfsdk:"organization_rid"`
-	OrganizationRoleAssignments types.Set    `tfsdk:"organization_role_assignments"`
+	OrganizationRoleAssignments types.Map    `tfsdk:"organization_role_assignments"`
 }

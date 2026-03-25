@@ -3,48 +3,30 @@
 # template basis poached from https://github.com/hashicorp/terraform-plugin-docs/blob/main/internal/provider/template.go#L246
 page_title: "Palantir Foundry Project"
 subcategory: "Projects"
-
-description: |-
-  Manages a Project.
-
-  The following operations are currently supported:
-
-    - Create a Project
-    - Update a Project
-    - Delete a Project
-    - Import a Project
-
 ---
 # Project
+
+Manages a [Project](https://www.palantir.com/docs/foundry/security/projects-and-roles/).
+The following operations are currently supported:
+
+- Create a Project
+- Update a Project
+- Delete a Project
+- Import a Project
+
+This resource respects the `delete_mode` provider-level flag.
 
 ```terraform
 resource "foundry_project" "example-project" {
   display_name = "Example Project name"
   space_rid    = "ri.compass.main.folder.example-space-rid"
   initial_organizations = ["example-organization-rid"]
-  initial_resource_roles = [
-    {
-      resource_role_principal = {
-        principal_id = "example-group-id"
-        principal_type = "GROUP"
-        type = "principalWithId"
-      }
-      role_id: "example-project-role-id"
-    },
-    {
-      resource_role_principal = {
-        principal_id = "example-user-id"
-        principal_type = "USER"
-        type = "principalWithId"
-      }
-      role_id: "example-project-role-id"
-    },
-    {
-      resource_role_principal = {
-        type = "everyone"
-      }
-      role_id: "example-project-role-id"
-    }]
+  initial_principal_roles = {
+    "example-project-role-id" = {
+      groups = ["example-group-id"]
+      users  = ["example-user-id"]
+    }
+  }
 }
 ```
 
@@ -60,29 +42,17 @@ resource "foundry_project" "example-project" {
 
 - `description` (String) Description of the Project.
 - `initial_organizations` (Set of String) The initial list of Organizations to be applied when creating the Project. Any changes to this field after Project creation will not be applied; instead, use the project_organizations resource to manage Organizations.
-- `initial_resource_roles` (Attributes Set) The initial set of Roles to be applied when creating the Project. Any changes to this field after Project creation will not be applied; instead, use the project_resource_roles resource to manage Roles. (see [below for nested schema](#nestedatt--initial_resource_roles))
+- `initial_principal_roles` (Attributes Map) The initial map of principal Role assignments to be applied when creating the Project. Keys are Role IDs, values are objects with groups and users sets. Any changes to this field after Project creation will not be applied; instead, use the project_resource_roles resource to manage Roles. (see [below for nested schema](#nestedatt--initial_principal_roles))
 
 ### Read-Only
 
 - `rid` (String) RID of the Project.
 - `trash_status` (String) Current trash status of the Project.
 
-<a id="nestedatt--initial_resource_roles"></a>
-### Nested Schema for `initial_resource_roles`
-
-Required:
-
-- `resource_role_principal` (Attributes) (see [below for nested schema](#nestedatt--initial_resource_roles--resource_role_principal))
-- `role_id` (String) The unique ID for a Role.
-
-<a id="nestedatt--initial_resource_roles--resource_role_principal"></a>
-### Nested Schema for `initial_resource_roles.resource_role_principal`
-
-Required:
-
-- `type` (String)
+<a id="nestedatt--initial_principal_roles"></a>
+### Nested Schema for `initial_principal_roles`
 
 Optional:
 
-- `principal_id` (String) The ID of a Foundry Group or User.
-- `principal_type` (String) Enum values: USER, GROUP.
+- `groups` (Set of String) Set of Group IDs assigned to this role.
+- `users` (Set of String) Set of User IDs assigned to this role.

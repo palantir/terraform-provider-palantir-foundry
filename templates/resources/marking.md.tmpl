@@ -3,8 +3,10 @@
 # template basis poached from https://github.com/hashicorp/terraform-plugin-docs/blob/main/internal/provider/template.go#L246
 page_title: "Palantir Foundry Marking"
 subcategory: "Markings"
-description: |-
-  Manages a Marking.
+---
+# Marking
+
+Manages a [Marking](https://www.palantir.com/docs/foundry/security/markings/).
 
   The following operations are currently supported:
 
@@ -13,9 +15,6 @@ description: |-
     - Import a Marking
 
     Note: the provider does not support deleting a Marking. Additionally, a Marking's categoryId is immutable after creation.
-
----
-# Marking
 
 {{ tffile "examples/resources/marking/resource.tf" }}
 

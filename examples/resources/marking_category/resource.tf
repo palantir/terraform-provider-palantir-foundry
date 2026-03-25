@@ -6,15 +6,9 @@ resource "foundry_marking_category" "example-marking-category" {
     organization_rids = [
       "ri.multipass..organization.example-organization-id"
     ]
-    roles = [
-      {
-        role         = "ADMINISTER"
-        principal_id = "example-user-id"
-      },
-      {
-        role         = "VIEW"
-        principal_id = "example-group-id"
-      }
-    ]
+    roles = {
+      "ADMINISTER" = ["example-user-id"]
+      "VIEW"       = ["example-group-id"]
+    }
   }
 }

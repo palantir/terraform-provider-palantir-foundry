@@ -3,19 +3,18 @@
 # template basis poached from https://github.com/hashicorp/terraform-plugin-docs/blob/main/internal/provider/template.go#L246
 page_title: "Palantir Foundry Project"
 subcategory: "Projects"
-
-description: |-
-  Manages a Project.
-
-  The following operations are currently supported:
-
-    - Create a Project
-    - Update a Project
-    - Delete a Project
-    - Import a Project
-
 ---
 # Project
+
+Manages a [Project](https://www.palantir.com/docs/foundry/security/projects-and-roles/).
+The following operations are currently supported:
+
+- Create a Project
+- Update a Project
+- Delete a Project
+- Import a Project
+
+This resource respects the `delete_mode` provider-level flag.
 
 {{ tffile "examples/resources/project/resource.tf" }}
 

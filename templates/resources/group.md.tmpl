@@ -3,19 +3,18 @@
 # template basis poached from https://github.com/hashicorp/terraform-plugin-docs/blob/main/internal/provider/template.go#L246
 page_title: "Palantir Foundry Group"
 subcategory: "Groups"
-description: |-
-  Manages a Group."
-
-  The following operations are currently supported:
-
-    - Create a group
-    - Delete a group
-    - Import a group
-
-    Note: currently, the provider does not have the ability to update its name or description. Additionally, the provider does not have support for updating the organizations a group belongs to after creation.
-
 ---
 # Group
+
+Manages a [Group](https://www.palantir.com/docs/foundry/platform-security-management/manage-groups/).
+
+The following operations are currently supported:
+
+- Create a group
+- Delete a group
+- Import a group
+
+Note: currently, the provider does not have the ability to update its name or description. Additionally, the provider does not have support for updating the organizations a group belongs to after creation.
 
 ## Creating Groups
 

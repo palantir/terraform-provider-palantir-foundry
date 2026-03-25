@@ -3,24 +3,18 @@
 # template basis poached from https://github.com/hashicorp/terraform-plugin-docs/blob/main/internal/provider/template.go#L246
 page_title: "Palantir Foundry Enrollment Role Assignments"
 subcategory: "Enrollments"
-description: |-
-  Manages an Enrollment's Role Assignments.
 ---
 # Enrollment Role Assignments
+
+Manages an [Enrollment's Role Assignments](https://www.palantir.com/docs/foundry/administration/enrollments-and-organizations-permissions/).
 
 ```terraform
 resource "foundry_enrollment_role_assignments" "example-enrollment-role-assignments" {
   enrollment_rid = data.foundry_enrollment.example.id
-  enrollment_roles = [
-    {
-      "role_id" : "enrollment:example-role",
-      "principal_id" : "example-user-id",
-    },
-    {
-      "role_id" : "enrollment:example-role",
-      "principal_id" : "example-group-id",
-    },
-  ]
+  enrollment_role_assignments = {
+    "enrollment:example-role" = ["example-user-id", "example-group-id"],
+    "enrollment:second-example-role" = ["example-group-id"],
+  }
 }
 ```
 
@@ -30,13 +24,5 @@ resource "foundry_enrollment_role_assignments" "example-enrollment-role-assignme
 ### Required
 
 - `enrollment_rid` (String) RID of the Enrollment.
-- `enrollment_role_assignments` (Set of Object) List of Role Assignments for this Enrollment. (see [below for nested schema](#nestedatt--enrollment_role_assignments))
-
-<a id="nestedatt--enrollment_role_assignments"></a>
-### Nested Schema for `enrollment_role_assignments`
-
-Required:
-
-- `principal_id` (String)
-- `role_id` (String)
+- `enrollment_role_assignments` (Map of Set of String) Map of Role ID to set of Principal IDs for this Enrollment.
 

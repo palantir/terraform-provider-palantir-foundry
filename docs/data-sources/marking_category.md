@@ -40,12 +40,4 @@ Read-Only:
 
 - `is_public` (Boolean) If true, all users who are members of at least one of the Organizations from organization_rids can view the Markings in the category. If false, only users who are explicitly granted the VIEW role can view the Markings in the category.
 - `organization_rids` (Set of String) The RIDs of the organizations that have access to this Marking Category.
-- `roles` (Attributes Set) The initial set of Role Assignments to be applied when creating the Marking Category. At least one role assignment with the ADMINISTER role must be provided. The following Roles can be assigned: ADMINISTER (can manage the category) or VIEW (can view markings in the category). (see [below for nested schema](#nestedatt--initial_permissions--roles))
-
-<a id="nestedatt--initial_permissions--roles"></a>
-### Nested Schema for `initial_permissions.roles`
-
-Read-Only:
-
-- `principal_id` (String) The ID of the principal (user or group) to assign the role to.
-- `role` (String) The role to assign. Must be either ADMINISTER or VIEW.
+- `roles` (Map of Set of String) Map of Role to set of Principal IDs for initial role assignments. At least one role assignment with the ADMINISTER role must be provided. The following Roles can be assigned: ADMINISTER (can manage the category) or VIEW (can view markings in the category).

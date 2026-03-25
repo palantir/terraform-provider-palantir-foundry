@@ -21,6 +21,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -36,8 +37,9 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces
 var (
-	_ resource.Resource              = &markingResource{}
-	_ resource.ResourceWithConfigure = &markingResource{}
+	_ resource.Resource                 = &markingResource{}
+	_ resource.ResourceWithConfigure    = &markingResource{}
+	_ resource.ResourceWithUpgradeState = &markingResource{}
 )
 
 // NewMarkingResource is a helper function to simplify provider implementation.
@@ -79,8 +81,17 @@ func (r *markingResource) Metadata(_ context.Context, req resource.MetadataReque
 
 // Schema defines the schema for the resource.
 func (r *markingResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	initialRoleAssignmentsSchema := helper.RoleAssignmentMapSchema("Map of Role to set of Principal IDs for the initial role assignments. " +
+		"Any changes to this field after Marking creation will not be applied; " +
+		"instead, use the marking_role_assignments resource to manage Role Assignments. " +
+		"The following Roles can be assigned to a Marking: \n - ADMINISTER: The user can add and remove members from the Marking, update Marking Role Assignments, and change Marking metadata.\n - DECLASSIFY: The user can remove the Marking from resources in the platform and stop the propagation of the Marking during a transform.\n - USE: The user can apply the Marking to resources in the platform.")
+	initialRoleAssignmentsSchema.Validators = []validator.Map{
+		mapvalidator.KeysAre(stringvalidator.OneOf("ADMINISTER", "DECLASSIFY", "USE")),
+	}
+
 	resp.Schema = schema.Schema{
 		Description: "Manages a Foundry Marking.",
+		Version:     1,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "ID of the Marking.",
@@ -98,26 +109,7 @@ func (r *markingResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: "Description of the Marking.",
 				Optional:    true,
 			},
-			"initial_role_assignments": schema.SetNestedAttribute{
-				Description: "The initial set of Role Assignments to be applied when creating the Marking. " +
-					"Any changes to this field after Marking creation will not be applied; " +
-					"instead, use the marking_role_assignments resource to manage Role Assignments. " +
-					"The following Roles can be assigned to a Marking: \n - ADMINISTER: The user can add and remove members from the Marking, update Marking Role Assignments, and change Marking metadata.\n - DECLASSIFY: The user can remove the Marking from resources in the platform and stop the propagation of the Marking during a transform.\n - USE: The user can apply the Marking to resources in the platform.",
-				Optional: true,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"role": schema.StringAttribute{
-							Required: true,
-							Validators: []validator.String{
-								stringvalidator.OneOf("ADMINISTER", "DECLASSIFY", "USE"),
-							},
-						},
-						"principal_id": schema.StringAttribute{
-							Required: true,
-						},
-					},
-				},
-			},
+			"initial_role_assignments": initialRoleAssignmentsSchema,
 		},
 	}
 }
@@ -149,15 +141,17 @@ func (r *markingResource) Create(ctx context.Context, req resource.CreateRequest
 func (r *markingResource) CreateMarking(ctx context.Context, resp *resource.CreateResponse, plan *markingResourceModel) error {
 	description := plan.Description.ValueString()
 
-	var initialRoleAssignments []markingRolesRequestBodyEntry
-	diags := plan.InitialRoleAssignments.ElementsAs(context.Background(), &initialRoleAssignments, false)
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
-		return fmt.Errorf("failed to convert roles to Go slice")
+	if !helper.MapHasRole(plan.InitialRoleAssignments, "ADMINISTER") {
+		return fmt.Errorf("initial_role_assignments must contain at least one ADMINISTER role assignment")
+	}
+
+	roleEntries, err := helper.FlattenRoleAssignmentMap(ctx, plan.InitialRoleAssignments)
+	if err != nil {
+		return fmt.Errorf("failed to convert roles to Go slice: %w", err)
 	}
 
 	var initialRoleAssignmentsBody []v2.AdminMarkingRoleUpdate
-	for _, item := range initialRoleAssignments {
+	for _, item := range roleEntries {
 		principalIDAsUUID, err := uuid.Parse(item.PrincipalID)
 
 		if err != nil {
@@ -165,7 +159,7 @@ func (r *markingResource) CreateMarking(ctx context.Context, resp *resource.Crea
 		}
 
 		initialRoleAssignmentsBody = append(initialRoleAssignmentsBody, v2.AdminMarkingRoleUpdate{
-			Role:        v2.AdminMarkingRole(item.Role),
+			Role:        v2.AdminMarkingRole(item.RoleIdentifier),
 			PrincipalID: principalIDAsUUID,
 		})
 	}

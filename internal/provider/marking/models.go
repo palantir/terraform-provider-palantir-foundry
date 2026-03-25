@@ -24,7 +24,7 @@ type markingResourceModel struct {
 	CategoryID             types.String `tfsdk:"category_id"`
 	Name                   types.String `tfsdk:"name"`
 	Description            types.String `tfsdk:"description"`
-	InitialRoleAssignments types.Set    `tfsdk:"initial_role_assignments"`
+	InitialRoleAssignments types.Map    `tfsdk:"initial_role_assignments"`
 }
 
 // requestBody contains the schema for request body
@@ -67,7 +67,7 @@ type markingMembershipResourceModel struct {
 
 type markingRoleAssignmentsResourceModel struct {
 	MarkingID              types.String `tfsdk:"marking_id"`
-	MarkingRoleAssignments types.Set    `tfsdk:"marking_role_assignments"`
+	MarkingRoleAssignments types.Map    `tfsdk:"marking_role_assignments"`
 }
 
 // markingCategoryResourceModel maps the marking category resource schema data.
@@ -86,11 +86,5 @@ type markingCategoryResourceModel struct {
 type markingCategoryInitialPermissionsModel struct {
 	IsPublic         types.Bool `tfsdk:"is_public"`
 	OrganizationRids types.Set  `tfsdk:"organization_rids"`
-	Roles            types.Set  `tfsdk:"roles"`
-}
-
-// markingCategoryRoleAssignment maps the role assignment nested object.
-type markingCategoryRoleAssignment struct {
-	Role        string `tfsdk:"role"`
-	PrincipalID string `tfsdk:"principal_id"`
+	Roles            types.Map  `tfsdk:"roles"`
 }

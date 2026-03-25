@@ -248,10 +248,7 @@ func (r *organizationResource) Read(ctx context.Context, req resource.ReadReques
 }
 
 func (r *organizationResource) ReadOrganization(ctx context.Context, resp *resource.ReadResponse, state *organizationResourceModel) error {
-	previewMode := constants.PreviewMode
-	adminGetOrganizationParams := v2.AdminGetOrganizationParams{Preview: &previewMode}
-
-	httpResp, err := r.client.AdminGetOrganization(ctx, state.RID.ValueString(), &adminGetOrganizationParams)
+	httpResp, err := r.client.AdminGetOrganization(ctx, state.RID.ValueString())
 
 	if err != nil {
 		resp.Diagnostics.AddError("AdminGetOrganization request failed", err.Error())
@@ -333,13 +330,10 @@ func (r *organizationResource) UpdateOrganization(ctx context.Context, resp *res
 	if state.EnrollmentRID != plan.EnrollmentRID {
 		return fmt.Errorf("you may not change the Enrollment RID of an Organization once it has been created. Please revert your plan to the existing Enrollment RID and re-apply")
 	}
-	previewMode := constants.PreviewMode
-
-	adminReplaceOrganizationParams := v2.AdminReplaceOrganizationParams{Preview: &previewMode}
 	description := plan.Description.ValueString()
 	host := plan.HostName.ValueString()
 
-	httpResp, err := r.client.AdminReplaceOrganization(ctx, state.RID.ValueString(), &adminReplaceOrganizationParams, v2.AdminReplaceOrganizationJSONRequestBody{
+	httpResp, err := r.client.AdminReplaceOrganization(ctx, state.RID.ValueString(), v2.AdminReplaceOrganizationJSONRequestBody{
 		Name:        plan.Name.ValueString(),
 		Description: &description,
 		Host:        &host,

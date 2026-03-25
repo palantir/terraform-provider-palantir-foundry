@@ -3,16 +3,16 @@
 # template basis poached from https://github.com/hashicorp/terraform-plugin-docs/blob/main/internal/provider/template.go#L246
 page_title: "Palantir Foundry Organization"
 subcategory: "Organizations"
-description: |-
-  Manages an Organization.
-
-  The following operations are currently supported:
-
-    - Create an Organization
-    - Update an Organization
-    - Import an Organization
 ---
 # Organization
+
+Manages an [Organization](https://www.palantir.com/docs/foundry/security/orgs-and-spaces/).
+
+The following operations are currently supported:
+
+- Create an Organization
+- Update an Organization
+- Import an Organization
 
 ```terraform
 resource "foundry_organization" "example-organization" {

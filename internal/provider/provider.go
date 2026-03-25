@@ -19,11 +19,13 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/oapi-codegen/oapi-codegen/v2/pkg/securityprovider"
 	v2 "github.com/palantir/terraform-provider-palantir-foundry/gateway-client/v2"
@@ -31,6 +33,7 @@ import (
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/env"
 	http2 "github.com/palantir/terraform-provider-palantir-foundry/internal/http"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/enrollment"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/folder"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/generated"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/group"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/marking"
@@ -79,7 +82,14 @@ func (p *FoundryProvider) Schema(_ context.Context, _ provider.SchemaRequest, re
 			},
 			"deletions_disabled": schema.BoolAttribute{
 				Optional:    true,
-				Description: "An experimental provider-level flag to fully disable deletions of resources as well as the removal of resources' associated roles, members, etc.. This puts the provider a sort of `safe-mode`, preventing the removal of existing infra which can be subject to change outside the scope of your IAC management. In this mode, drift between the actual external infrastructure state and terraform's state is accepted, and applied plans might not map 1:1 with reality. As such, this flag must be used with caution. When a deletion operation is initiated on an otherwise deletable object (currently space, group, or project) and this flag is set to true then we will not remove the remote resource but will still remove remove the resource from state. On non-deletable resources, this flag being set to true will allow said resources to be removed from state while keeping the remote resource intact.",
+				Description: "Fully disable the deletion of resources as well as the removal of resources' associated roles, members, etc.. This puts the provider a sort of `safe-mode`, preventing the removal of existing infra which can be subject to change outside the scope of your IAC management. In this mode, drift between the actual external infrastructure state and terraform's state is accepted, and applied plans might not map 1:1 with reality. As such, this flag must be used with caution. When a deletion operation is initiated on an otherwise deletable object (currently space, group, or project) and this flag is set to true then we will not remove the remote resource but will still remove remove the resource from state. On non-deletable resources, this flag being set to true will allow said resources to be removed from state while keeping the remote resource intact.",
+			},
+			"delete_mode": schema.StringAttribute{
+				Optional:    true,
+				Description: "Controls the deletion behavior for filesystem resources. Accepted values are \"TRASH\" (default) and \"PERMANENTLY_DELETE\". When set to \"TRASH\", a destroy will only trash the resource. When set to \"PERMANENTLY_DELETE\", a destroy will permanently delete it. Defaults to \"TRASH\" if not set.",
+				Validators: []validator.String{
+					stringvalidator.OneOf(shared.DeleteModes[:]...),
+				},
 			},
 		},
 	}
@@ -90,6 +100,7 @@ type foundryProviderModel struct {
 	ClientID          types.String `tfsdk:"client_id"`
 	ClientSecret      types.String `tfsdk:"client_secret"`
 	DeletionsDisabled types.Bool   `tfsdk:"deletions_disabled"`
+	DeleteMode        types.String `tfsdk:"delete_mode"`
 }
 
 // Configure prepares a Foundry API client for data sources and resources.
@@ -123,6 +134,11 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 			path.Root("host"),
 			"Unknown Deletions Disabled Flag", "Please provide the Deletions Disabled Flag in the provider configuration.")
 	}
+	if config.DeleteMode.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("delete_mode"),
+			"Unknown Delete Mode", "Please provide the Delete Mode in the provider configuration.")
+	}
 
 	if resp.Diagnostics.HasError() {
 		return
@@ -137,6 +153,20 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 		deletionsDisabled = false
 	} else {
 		deletionsDisabled = config.DeletionsDisabled.ValueBool()
+	}
+
+	// If no deleteMode provided, default to "TRASH".
+	deleteMode := shared.DeleteModeDefault
+	if !config.DeleteMode.IsNull() {
+		deleteMode = config.DeleteMode.ValueString()
+		if deleteMode != shared.DeleteModeTrash && deleteMode != shared.DeleteModePermanentlyDelete {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("delete_mode"),
+				"Invalid Delete Mode",
+				"delete_mode must be either \"TRASH\" or \"PERMANENTLY_DELETE\".",
+			)
+			return
+		}
 	}
 
 	// Fallback to environment variables if values not set in config
@@ -208,6 +238,7 @@ func (p *FoundryProvider) Configure(ctx context.Context, req provider.ConfigureR
 		Client: client,
 		Flags: &shared.Flags{
 			DeletionsDisabled: deletionsDisabled,
+			DeleteMode:        deleteMode,
 		},
 	}
 
@@ -224,6 +255,7 @@ func (p *FoundryProvider) DataSources(_ context.Context) []func() datasource.Dat
 func (p *FoundryProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		enrollment.NewEnrollmentRoleAssignmentsResource,
+		folder.NewFolderResource,
 		group.NewGroupResource,
 		group.NewGroupMembershipResource,
 		marking.NewMarkingResource,

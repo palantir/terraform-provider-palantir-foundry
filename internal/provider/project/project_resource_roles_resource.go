@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"slices"
+	"sort"
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -39,8 +39,9 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces
 var (
-	_ resource.Resource              = &projectResourceRolesResource{}
-	_ resource.ResourceWithConfigure = &projectResourceRolesResource{}
+	_ resource.Resource                 = &projectResourceRolesResource{}
+	_ resource.ResourceWithConfigure    = &projectResourceRolesResource{}
+	_ resource.ResourceWithUpgradeState = &projectResourceRolesResource{}
 )
 
 // NewProjectResourceRolesResource is a helper function to simplify provider implementation.
@@ -84,38 +85,19 @@ func (r *projectResourceRolesResource) Metadata(_ context.Context, req resource.
 func (r *projectResourceRolesResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Manages a Foundry Project's Resource Roles.",
+		Version:     1,
 		Attributes: map[string]schema.Attribute{
 			"project_rid": schema.StringAttribute{
 				Description: "RID of the Project.",
 				Required:    true,
 			},
-			"project_resource_roles": schema.SetNestedAttribute{
-				Description: "Set of Roles applied to this Project.",
+			"principal_roles": principalRolesMapSchema(
+				"Map of Role ID to groups and users for this Project. " +
+					"Only applies to roles assigned to specific users or groups (principalWithId)."),
+			"default_roles": schema.SetAttribute{
+				Description: "Set of Role IDs applied to everyone for this Project.",
 				Optional:    true,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"resource_role_principal": schema.SingleNestedAttribute{
-							Required: true,
-							Attributes: map[string]schema.Attribute{
-								"type": schema.StringAttribute{
-									Required: true,
-								},
-								"principal_id": schema.StringAttribute{
-									Optional:    true,
-									Description: "The ID of a Foundry Group or User.",
-								},
-								"principal_type": schema.StringAttribute{
-									Optional:    true,
-									Description: "Enum values: USER, GROUP.",
-								},
-							},
-						},
-						"role_id": schema.StringAttribute{
-							Required:    true,
-							Description: "The unique ID for a Role.",
-						},
-					},
-				},
+				ElementType: types.StringType,
 			},
 		},
 	}
@@ -127,15 +109,12 @@ func (r *projectResourceRolesResource) Create(ctx context.Context, req resource.
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
-		resp.Diagnostics.Append(diags...)
 		return
 	}
 
-	if !plan.ProjectResourceRoles.IsNull() {
-		err := r.CreateProjectResourceRoles(ctx, resp, &plan)
-		if err != nil {
-			resp.Diagnostics.AddError("Error creating the Project Resource Roles. Please fix your plan if needed and re-apply.", err.Error())
-		}
+	err := r.CreateProjectResourceRoles(ctx, resp, &plan)
+	if err != nil {
+		resp.Diagnostics.AddError("Error creating the Project Resource Roles. Please fix your plan if needed and re-apply.", err.Error())
 	}
 
 	diags = resp.State.Set(ctx, plan)
@@ -146,38 +125,62 @@ func (r *projectResourceRolesResource) Create(ctx context.Context, req resource.
 }
 
 func (r *projectResourceRolesResource) CreateProjectResourceRoles(ctx context.Context, resp *resource.CreateResponse, plan *projectResourceRolesResourceModel) error {
-	var newResourceRoles []ResourceRole
-	diags := plan.ProjectResourceRoles.ElementsAs(context.Background(), &newResourceRoles, false)
-
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert planned resource_roles to Go slice")
-	}
-
-	oldResourceRoles, err := r.ReadProjectResourceRolesOnCreation(ctx, plan)
-
+	oldPrincipalEntries, oldDefaultRoles, err := r.readResourceRolesRaw(ctx, plan.ProjectRid.ValueString())
 	if err != nil {
-		return fmt.Errorf("failed to read project orgs on creation: %w", err)
+		return fmt.Errorf("failed to read project roles on creation: %w", err)
 	}
 
-	if !slices.Equal(oldResourceRoles, newResourceRoles) {
-		// Determine orgs to add and remove
-		rolesToAdd, rolesToRemove := DiffResourceRoles(oldResourceRoles, newResourceRoles)
-		if len(rolesToAdd) != 0 {
-			err := r.AddProjectResourceRoles(ctx, rolesToAdd, plan.ProjectRid.ValueString())
+	// Handle principal roles
+	if !plan.PrincipalRoles.IsNull() {
+		newPrincipalEntries, err := flattenPrincipalRolesMap(ctx, plan.PrincipalRoles)
+		if err != nil {
+			return fmt.Errorf("failed to convert planned principal_roles: %w", err)
+		}
+
+		toAdd, toRemove := findPrincipalRolesDiff(oldPrincipalEntries, newPrincipalEntries)
+		if len(toAdd) != 0 {
+			err := r.AddProjectResourceRoles(ctx, principalEntriesToResourceRoles(toAdd), plan.ProjectRid.ValueString())
 			if err != nil {
 				return err
 			}
 		}
-		if len(rolesToRemove) != 0 && !r.deletionsDisabled {
-			err := r.RemoveProjectResourceRoles(ctx, rolesToRemove, plan.ProjectRid.ValueString())
+		if len(toRemove) != 0 && !r.deletionsDisabled {
+			err := r.RemoveProjectResourceRoles(ctx, principalEntriesToResourceRoles(toRemove), plan.ProjectRid.ValueString())
 			if err != nil {
 				return err
 			}
-		} else if len(rolesToRemove) != 0 {
+		} else if len(toRemove) != 0 {
 			resp.Diagnostics.AddWarning("Found Resource Roles defined in the state that are not in the plan.",
 				"Since `deletions_disabled` is set to true, Resource Roles removal operations will not be applied.")
 		}
 	}
+
+	// Handle default roles
+	if !plan.DefaultRoles.IsNull() {
+		var newDefaultRoles []string
+		diags := plan.DefaultRoles.ElementsAs(ctx, &newDefaultRoles, false)
+		if diags.HasError() {
+			return fmt.Errorf("failed to convert planned default_roles")
+		}
+
+		defaultToAdd, defaultToRemove := diffStringSlices(oldDefaultRoles, newDefaultRoles)
+		if len(defaultToAdd) != 0 {
+			err := r.AddProjectResourceRoles(ctx, defaultRolesToResourceRoles(defaultToAdd), plan.ProjectRid.ValueString())
+			if err != nil {
+				return err
+			}
+		}
+		if len(defaultToRemove) != 0 && !r.deletionsDisabled {
+			err := r.RemoveProjectResourceRoles(ctx, defaultRolesToResourceRoles(defaultToRemove), plan.ProjectRid.ValueString())
+			if err != nil {
+				return err
+			}
+		} else if len(defaultToRemove) != 0 {
+			resp.Diagnostics.AddWarning("Found default Resource Roles defined in the state that are not in the plan.",
+				"Since `deletions_disabled` is set to true, Resource Roles removal operations will not be applied.")
+		}
+	}
+
 	return nil
 }
 
@@ -205,179 +208,75 @@ func (r *projectResourceRolesResource) Read(ctx context.Context, req resource.Re
 }
 
 func (r *projectResourceRolesResource) ReadProjectResourceRoles(ctx context.Context, state *projectResourceRolesResourceModel) error {
-	pageSize := constants.PageSize
-	filesystemListResourceRolesParams := v2.FilesystemListResourceRolesParams{PageSize: &pageSize}
-	httpResp, err := r.client.FilesystemListResourceRoles(ctx, state.ProjectRid.ValueString(), &filesystemListResourceRolesParams)
-
+	principalEntries, defaultRoles, err := r.readResourceRolesRaw(ctx, state.ProjectRid.ValueString())
 	if err != nil {
-		return fmt.Errorf("FilesystemListResourceRoles request failed: %w", err)
+		return err
 	}
 
-	// Check the response status code
-	if httpResp.StatusCode != http.StatusOK {
-		returnString, err := providerError.FormatHTTPError(httpResp)
-		if err != nil {
-			return fmt.Errorf("failed to format error logging from FilesystemListResourceRoles response: %w", err)
-		}
-		return errors.New(returnString)
-	}
-
-	bodyBytes, err := helper.ExtractBodyFromResponse(httpResp)
+	roleMap, err := buildPrincipalRolesMap(principalEntries)
 	if err != nil {
-		return fmt.Errorf("failed to parse response from FilesystemListResourceRoles: %w", err)
+		return fmt.Errorf("failed to build principal roles map: %w", err)
 	}
+	state.PrincipalRoles = roleMap
 
-	var httpListResourceRoles ResourceRolesResponse
-	if err := json.Unmarshal(bodyBytes, &httpListResourceRoles); err != nil {
-		return fmt.Errorf("error decoding response: %w", err)
+	defaultRoleValues := make([]attr.Value, len(defaultRoles))
+	for i, roleID := range defaultRoles {
+		defaultRoleValues[i] = types.StringValue(roleID)
 	}
-	// Build a slice of attr.Value for the set
-	var resourceRolesValues []attr.Value
-	for _, role := range httpListResourceRoles.Roles {
-		// Build the inner object
-		principalObj, _ := types.ObjectValue(
-			map[string]attr.Type{
-				"type":           types.StringType,
-				"principal_id":   types.StringType,
-				"principal_type": types.StringType,
-			},
-			map[string]attr.Value{
-				"type":           types.StringValue(role.ResourceRolePrincipal.Type),
-				"principal_id":   types.StringValue(role.ResourceRolePrincipal.PrincipalID),
-				"principal_type": types.StringValue(role.ResourceRolePrincipal.PrincipalType),
-			},
-		)
-
-		// Build the outer object
-		roleObj, _ := types.ObjectValue(
-			map[string]attr.Type{
-				"resource_role_principal": types.ObjectType{
-					AttrTypes: map[string]attr.Type{
-						"type":           types.StringType,
-						"principal_id":   types.StringType,
-						"principal_type": types.StringType,
-					},
-				},
-				"role_id": types.StringType,
-			},
-			map[string]attr.Value{
-				"resource_role_principal": principalObj,
-				"role_id":                 types.StringValue(role.RoleID),
-			},
-		)
-		resourceRolesValues = append(resourceRolesValues, roleObj)
+	defaultRolesSet, diags := types.SetValue(types.StringType, defaultRoleValues)
+	if diags.HasError() {
+		return fmt.Errorf("failed to build default roles set")
 	}
+	state.DefaultRoles = defaultRolesSet
 
-	// Create the set from the slice of attr.Value
-	resourceRolesSet, _ := types.SetValue(
-		types.ObjectType{
-			AttrTypes: map[string]attr.Type{
-				"resource_role_principal": types.ObjectType{
-					AttrTypes: map[string]attr.Type{
-						"type":           types.StringType,
-						"principal_id":   types.StringType,
-						"principal_type": types.StringType,
-					},
-				},
-				"role_id": types.StringType,
-			},
-		},
-		resourceRolesValues,
-	)
-
-	// Update the state
-	if len(resourceRolesValues) > 0 {
-		state.ProjectResourceRoles = resourceRolesSet
-	}
 	return nil
 }
 
-func (r *projectResourceRolesResource) ReadProjectResourceRolesOnCreation(ctx context.Context, plan *projectResourceRolesResourceModel) ([]ResourceRole, error) {
+// readResourceRolesRaw fetches resource roles from the API and separates them into
+// principal entries (for principalWithId) and default role IDs (for everyone).
+func (r *projectResourceRolesResource) readResourceRolesRaw(ctx context.Context, projectRid string) ([]principalRoleEntry, []string, error) {
 	pageSize := constants.PageSize
 	filesystemListResourceRolesParams := v2.FilesystemListResourceRolesParams{PageSize: &pageSize}
-	httpResp, err := r.client.FilesystemListResourceRoles(ctx, plan.ProjectRid.ValueString(), &filesystemListResourceRolesParams)
+	httpResp, err := r.client.FilesystemListResourceRoles(ctx, projectRid, &filesystemListResourceRolesParams)
 
 	if err != nil {
-		return nil, fmt.Errorf("FilesystemListResourceRoles request failed: %w", err)
+		return nil, nil, fmt.Errorf("FilesystemListResourceRoles request failed: %w", err)
 	}
 
-	// Check the response status code
 	if httpResp.StatusCode != http.StatusOK {
 		returnString, err := providerError.FormatHTTPError(httpResp)
 		if err != nil {
-			return nil, fmt.Errorf("failed to format error logging from FilesystemListResourceRoles response: %w", err)
+			return nil, nil, fmt.Errorf("failed to format error logging from FilesystemListResourceRoles response: %w", err)
 		}
-		return nil, errors.New(returnString)
+		return nil, nil, errors.New(returnString)
 	}
 
 	bodyBytes, err := helper.ExtractBodyFromResponse(httpResp)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse response from FilesystemListResourceRoles: %w", err)
+		return nil, nil, fmt.Errorf("failed to parse response from FilesystemListResourceRoles: %w", err)
 	}
 
-	var httpListResourceRoles ResourceRolesResponse
+	var httpListResourceRoles resourceRolesResponse
 	if err := json.Unmarshal(bodyBytes, &httpListResourceRoles); err != nil {
-		return nil, fmt.Errorf("error decoding response: %w", err)
+		return nil, nil, fmt.Errorf("error decoding response: %w", err)
 	}
-	// Build a slice of attr.Value for the set
-	var resourceRolesValues []attr.Value
+
+	var principalEntries []principalRoleEntry
+	var defaultRoles []string
+
 	for _, role := range httpListResourceRoles.Roles {
-		// Build the inner object
-		principalObj, _ := types.ObjectValue(
-			map[string]attr.Type{
-				"type":           types.StringType,
-				"principal_id":   types.StringType,
-				"principal_type": types.StringType,
-			},
-			map[string]attr.Value{
-				"type":           types.StringValue(role.ResourceRolePrincipal.Type),
-				"principal_id":   types.StringValue(role.ResourceRolePrincipal.PrincipalID),
-				"principal_type": types.StringValue(role.ResourceRolePrincipal.PrincipalType),
-			},
-		)
-
-		// Build the outer object
-		roleObj, _ := types.ObjectValue(
-			map[string]attr.Type{
-				"resource_role_principal": types.ObjectType{
-					AttrTypes: map[string]attr.Type{
-						"type":           types.StringType,
-						"principal_id":   types.StringType,
-						"principal_type": types.StringType,
-					},
-				},
-				"role_id": types.StringType,
-			},
-			map[string]attr.Value{
-				"resource_role_principal": principalObj,
-				"role_id":                 types.StringValue(role.RoleID),
-			},
-		)
-		resourceRolesValues = append(resourceRolesValues, roleObj)
+		if role.ResourceRolePrincipal.Type == constants.PrincipalWithID {
+			principalEntries = append(principalEntries, principalRoleEntry{
+				RoleID:        role.RoleID,
+				PrincipalID:   role.ResourceRolePrincipal.PrincipalID,
+				PrincipalType: role.ResourceRolePrincipal.PrincipalType,
+			})
+		} else if role.ResourceRolePrincipal.Type == constants.Everyone {
+			defaultRoles = append(defaultRoles, role.RoleID)
+		}
 	}
 
-	resourceRolesSet, _ := types.SetValue(
-		types.ObjectType{
-			AttrTypes: map[string]attr.Type{
-				"resource_role_principal": types.ObjectType{
-					AttrTypes: map[string]attr.Type{
-						"type":           types.StringType,
-						"principal_id":   types.StringType,
-						"principal_type": types.StringType,
-					},
-				},
-				"role_id": types.StringType,
-			},
-		},
-		resourceRolesValues,
-	)
-	var rolesToReturn []ResourceRole
-	diags := resourceRolesSet.ElementsAs(context.Background(), &rolesToReturn, false)
-	if diags.HasError() {
-		return nil, fmt.Errorf("failed to convert resource roles to Go slice")
-	}
-
-	return rolesToReturn, nil
+	return principalEntries, defaultRoles, nil
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
@@ -411,43 +310,71 @@ func (r *projectResourceRolesResource) Update(ctx context.Context, req resource.
 }
 
 func (r *projectResourceRolesResource) UpdateProjectResourceRoles(ctx context.Context, plan *projectResourceRolesResourceModel, state *projectResourceRolesResourceModel, resp *resource.UpdateResponse) error {
-	var oldResourceRoles []ResourceRole
-
-	if !state.ProjectResourceRoles.IsNull() {
-		diags := state.ProjectResourceRoles.ElementsAs(ctx, &oldResourceRoles, false)
-		if diags.HasError() {
-			return fmt.Errorf("failed to convert project roles to Go slice")
+	// Handle principal roles
+	if !plan.PrincipalRoles.Equal(state.PrincipalRoles) {
+		oldEntries, err := flattenPrincipalRolesMap(ctx, state.PrincipalRoles)
+		if err != nil {
+			return fmt.Errorf("failed to convert state principal roles: %w", err)
 		}
-	}
-
-	var newResourceRoles []ResourceRole
-	if !plan.ProjectResourceRoles.IsNull() {
-		diags := plan.ProjectResourceRoles.ElementsAs(ctx, &newResourceRoles, false)
-		if diags.HasError() {
-			return fmt.Errorf("failed to convert project roles to Go slice")
+		newEntries, err := flattenPrincipalRolesMap(ctx, plan.PrincipalRoles)
+		if err != nil {
+			return fmt.Errorf("failed to convert plan principal roles: %w", err)
 		}
-	}
 
-	if !slices.Equal(oldResourceRoles, newResourceRoles) {
-		// Determine members to add and remove
-		rolesToAdd, rolesToRemove := DiffResourceRoles(oldResourceRoles, newResourceRoles)
-		if len(rolesToAdd) != 0 {
-			err := r.AddProjectResourceRoles(ctx, rolesToAdd, plan.ProjectRid.ValueString())
+		toAdd, toRemove := findPrincipalRolesDiff(oldEntries, newEntries)
+		if len(toAdd) != 0 {
+			err := r.AddProjectResourceRoles(ctx, principalEntriesToResourceRoles(toAdd), plan.ProjectRid.ValueString())
 			if err != nil {
 				return err
 			}
 		}
-		if len(rolesToRemove) != 0 && !r.deletionsDisabled {
-			err := r.RemoveProjectResourceRoles(ctx, rolesToRemove, plan.ProjectRid.ValueString())
+		if len(toRemove) != 0 && !r.deletionsDisabled {
+			err := r.RemoveProjectResourceRoles(ctx, principalEntriesToResourceRoles(toRemove), plan.ProjectRid.ValueString())
 			if err != nil {
 				return err
 			}
-		} else if len(rolesToRemove) != 0 {
-			resp.Diagnostics.AddWarning("Found organization members defined in the state that are not in the plan.",
-				"Since `deletions_disabled` is set to true, organization-member-removal operations will not be applied.")
+		} else if len(toRemove) != 0 {
+			resp.Diagnostics.AddWarning("Found Resource Roles defined in the state that are not in the plan.",
+				"Since `deletions_disabled` is set to true, Resource Roles removal operations will not be applied.")
 		}
-		state.ProjectResourceRoles = plan.ProjectResourceRoles
+		state.PrincipalRoles = plan.PrincipalRoles
 	}
+
+	// Handle default roles
+	if !plan.DefaultRoles.Equal(state.DefaultRoles) {
+		var oldDefaults, newDefaults []string
+		if !state.DefaultRoles.IsNull() {
+			diags := state.DefaultRoles.ElementsAs(ctx, &oldDefaults, false)
+			if diags.HasError() {
+				return fmt.Errorf("failed to convert state default roles")
+			}
+		}
+		if !plan.DefaultRoles.IsNull() {
+			diags := plan.DefaultRoles.ElementsAs(ctx, &newDefaults, false)
+			if diags.HasError() {
+				return fmt.Errorf("failed to convert plan default roles")
+			}
+		}
+
+		defaultToAdd, defaultToRemove := diffStringSlices(oldDefaults, newDefaults)
+		if len(defaultToAdd) != 0 {
+			err := r.AddProjectResourceRoles(ctx, defaultRolesToResourceRoles(defaultToAdd), plan.ProjectRid.ValueString())
+			if err != nil {
+				return err
+			}
+		}
+		if len(defaultToRemove) != 0 && !r.deletionsDisabled {
+			err := r.RemoveProjectResourceRoles(ctx, defaultRolesToResourceRoles(defaultToRemove), plan.ProjectRid.ValueString())
+			if err != nil {
+				return err
+			}
+		} else if len(defaultToRemove) != 0 {
+			resp.Diagnostics.AddWarning("Found default Resource Roles defined in the state that are not in the plan.",
+				"Since `deletions_disabled` is set to true, Resource Roles removal operations will not be applied.")
+		}
+		state.DefaultRoles = plan.DefaultRoles
+	}
+
 	return nil
 }
 
@@ -489,44 +416,50 @@ func (r *projectResourceRolesResource) ImportState(ctx context.Context, req reso
 	// to refresh all the other attributes based on the RID
 }
 
-func (r *projectResourceRolesResource) AddProjectResourceRoles(ctx context.Context, rolesToAdd []ResourceRole, id string) error {
-	roleUpdates := make([]v2.FilesystemResourceRoleIdentifier, len(rolesToAdd))
+// resourceRolePayload is used internally to build API request payloads.
+type resourceRolePayload struct {
+	principalType string // "principalWithId" or "everyone"
+	principalID   *string
+	roleID        string
+}
 
-	for i, role := range rolesToAdd {
+func (r *projectResourceRolesResource) AddProjectResourceRoles(ctx context.Context, roles []resourceRolePayload, id string) error {
+	roleUpdates := make([]v2.FilesystemResourceRoleIdentifier, len(roles))
+
+	for i, role := range roles {
 		principal := v2.FilesystemResourceRolePrincipalIdentifier{}
-		if role.ResourceRolePrincipal.Type == constants.PrincipalWithID {
-			if role.ResourceRolePrincipal.PrincipalID == nil {
+		if role.principalType == constants.PrincipalWithID {
+			if role.principalID == nil {
 				return fmt.Errorf("principal ID must be provided for principal type %s", constants.PrincipalWithID)
 			}
-			principalIDAsUUID, err := uuid.Parse(*role.ResourceRolePrincipal.PrincipalID)
-
+			principalIDAsUUID, err := uuid.Parse(*role.principalID)
 			if err != nil {
-				return fmt.Errorf("invalid UUID format for principal ID %s: %w", *role.ResourceRolePrincipal.PrincipalID, err)
+				return fmt.Errorf("invalid UUID format for principal ID %s: %w", *role.principalID, err)
 			}
 
 			err = principal.FromFilesystemPrincipalIDOnly(v2.FilesystemPrincipalIDOnly{
 				PrincipalID: principalIDAsUUID,
-				Type:        role.ResourceRolePrincipal.Type,
+				Type:        role.principalType,
 			})
-			roleUpdates[i] = v2.FilesystemResourceRoleIdentifier{
-				ResourceRolePrincipal: principal,
-				RoleID:                role.RoleID,
-			}
 			if err != nil {
 				return fmt.Errorf("FilesystemPrincipalWithID request failed: %w", err)
+			}
+			roleUpdates[i] = v2.FilesystemResourceRoleIdentifier{
+				ResourceRolePrincipal: principal,
+				RoleID:                role.roleID,
 			}
 		}
 
-		if role.ResourceRolePrincipal.Type == constants.Everyone {
+		if role.principalType == constants.Everyone {
 			err := principal.FromFilesystemEveryone(v2.FilesystemEveryone{
-				Type: role.ResourceRolePrincipal.Type,
+				Type: role.principalType,
 			})
+			if err != nil {
+				return fmt.Errorf("FilesystemEveryone request failed: %w", err)
+			}
 			roleUpdates[i] = v2.FilesystemResourceRoleIdentifier{
 				ResourceRolePrincipal: principal,
-				RoleID:                role.RoleID,
-			}
-			if err != nil {
-				return fmt.Errorf("FilesystemPrincipalWithID request failed: %w", err)
+				RoleID:                role.roleID,
 			}
 		}
 	}
@@ -551,45 +484,44 @@ func (r *projectResourceRolesResource) AddProjectResourceRoles(ctx context.Conte
 	return nil
 }
 
-func (r *projectResourceRolesResource) RemoveProjectResourceRoles(ctx context.Context, rolesToRemove []ResourceRole, id string) error {
+func (r *projectResourceRolesResource) RemoveProjectResourceRoles(ctx context.Context, roles []resourceRolePayload, id string) error {
 
-	roleUpdates := make([]v2.FilesystemResourceRoleIdentifier, len(rolesToRemove))
+	roleUpdates := make([]v2.FilesystemResourceRoleIdentifier, len(roles))
 
-	for i, role := range rolesToRemove {
+	for i, role := range roles {
 		principal := v2.FilesystemResourceRolePrincipalIdentifier{}
-		if role.ResourceRolePrincipal.Type == constants.PrincipalWithID {
-			if role.ResourceRolePrincipal.PrincipalID == nil {
+		if role.principalType == constants.PrincipalWithID {
+			if role.principalID == nil {
 				return fmt.Errorf("principal ID must be provided for principal type %s", constants.PrincipalWithID)
 			}
-			principalIDAsUUID, err := uuid.Parse(*role.ResourceRolePrincipal.PrincipalID)
-
+			principalIDAsUUID, err := uuid.Parse(*role.principalID)
 			if err != nil {
-				return fmt.Errorf("invalid UUID format for principal ID %s: %w", *role.ResourceRolePrincipal.PrincipalID, err)
+				return fmt.Errorf("invalid UUID format for principal ID %s: %w", *role.principalID, err)
 			}
 
 			err = principal.FromFilesystemPrincipalIDOnly(v2.FilesystemPrincipalIDOnly{
 				PrincipalID: principalIDAsUUID,
-				Type:        role.ResourceRolePrincipal.Type,
+				Type:        role.principalType,
 			})
-			roleUpdates[i] = v2.FilesystemResourceRoleIdentifier{
-				ResourceRolePrincipal: principal,
-				RoleID:                role.RoleID,
-			}
 			if err != nil {
 				return fmt.Errorf("FilesystemPrincipalWithID request failed: %w", err)
+			}
+			roleUpdates[i] = v2.FilesystemResourceRoleIdentifier{
+				ResourceRolePrincipal: principal,
+				RoleID:                role.roleID,
 			}
 		}
 
-		if role.ResourceRolePrincipal.Type == constants.Everyone {
+		if role.principalType == constants.Everyone {
 			err := principal.FromFilesystemEveryone(v2.FilesystemEveryone{
-				Type: role.ResourceRolePrincipal.Type,
+				Type: role.principalType,
 			})
+			if err != nil {
+				return fmt.Errorf("FilesystemEveryone request failed: %w", err)
+			}
 			roleUpdates[i] = v2.FilesystemResourceRoleIdentifier{
 				ResourceRolePrincipal: principal,
-				RoleID:                role.RoleID,
-			}
-			if err != nil {
-				return fmt.Errorf("FilesystemPrincipalWithID request failed: %w", err)
+				RoleID:                role.roleID,
 			}
 		}
 	}
@@ -614,36 +546,66 @@ func (r *projectResourceRolesResource) RemoveProjectResourceRoles(ctx context.Co
 	return nil
 }
 
-func DiffResourceRoles(oldResourceRoles, newResourceRoles []ResourceRole) (added, removed []ResourceRole) {
-	oldMap := make(map[string]ResourceRole)
-	newMap := make(map[string]ResourceRole)
-
-	// Helper to create a unique key for each RoleResource
-	makeKey := func(r ResourceRole) string {
-		p := r.ResourceRolePrincipal
-		if p.PrincipalID == nil || p.PrincipalType == nil {
-			return r.RoleID + "|" + p.Type
-		}
-		return r.RoleID + "|" + p.Type + "|" + *p.PrincipalID + "|" + *p.PrincipalType
-	}
-
-	for _, r := range oldResourceRoles {
-		oldMap[makeKey(r)] = r
-	}
-	for _, r := range newResourceRoles {
-		newMap[makeKey(r)] = r
-	}
-
-	// Find added
-	for k, r := range newMap {
-		if _, exists := oldMap[k]; !exists {
-			added = append(added, r)
+// principalEntriesToResourceRoles converts principalRoleEntry items to resourceRolePayload
+// items with type "principalWithId".
+func principalEntriesToResourceRoles(entries []principalRoleEntry) []resourceRolePayload {
+	result := make([]resourceRolePayload, len(entries))
+	for i, e := range entries {
+		pid := e.PrincipalID
+		result[i] = resourceRolePayload{
+			principalType: constants.PrincipalWithID,
+			principalID:   &pid,
+			roleID:        e.RoleID,
 		}
 	}
-	// Find removed
-	for k, r := range oldMap {
-		if _, exists := newMap[k]; !exists {
-			removed = append(removed, r)
+	return result
+}
+
+// defaultRolesToResourceRoles converts a list of role IDs to resourceRolePayload items
+// with type "everyone".
+func defaultRolesToResourceRoles(roleIDs []string) []resourceRolePayload {
+	result := make([]resourceRolePayload, len(roleIDs))
+	for i, roleID := range roleIDs {
+		result[i] = resourceRolePayload{
+			principalType: constants.Everyone,
+			roleID:        roleID,
+		}
+	}
+	return result
+}
+
+// diffStringSlices computes added and removed items between two string slices.
+func diffStringSlices(oldSlice, newSlice []string) (added, removed []string) {
+	oldSet := make(map[string]bool, len(oldSlice))
+	newSet := make(map[string]bool, len(newSlice))
+
+	for _, s := range oldSlice {
+		oldSet[s] = true
+	}
+	for _, s := range newSlice {
+		newSet[s] = true
+	}
+
+	newKeys := make([]string, 0, len(newSet))
+	for k := range newSet {
+		newKeys = append(newKeys, k)
+	}
+	sort.Strings(newKeys)
+
+	oldKeys := make([]string, 0, len(oldSet))
+	for k := range oldSet {
+		oldKeys = append(oldKeys, k)
+	}
+	sort.Strings(oldKeys)
+
+	for _, k := range newKeys {
+		if !oldSet[k] {
+			added = append(added, k)
+		}
+	}
+	for _, k := range oldKeys {
+		if !newSet[k] {
+			removed = append(removed, k)
 		}
 	}
 	return added, removed

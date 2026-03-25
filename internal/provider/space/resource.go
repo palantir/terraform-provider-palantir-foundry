@@ -366,11 +366,24 @@ func (r *spaceResource) UpdateSpace(ctx context.Context, resp *resource.UpdateRe
 
 	filesystemReplaceSpaceParams := v2.FilesystemReplaceSpaceParams{Preview: &previewMode}
 
+	var usageAccountRID *string
+	if plan.UsageAccountRID.IsUnknown() {
+		usageAccountRID = state.UsageAccountRID.ValueStringPointer()
+	} else {
+		usageAccountRID = plan.UsageAccountRID.ValueStringPointer()
+	}
+	var defaultRoleSetID *string
+	if plan.DefaultRoleSetID.IsUnknown() {
+		defaultRoleSetID = state.DefaultRoleSetID.ValueStringPointer()
+	} else {
+		defaultRoleSetID = plan.DefaultRoleSetID.ValueStringPointer()
+	}
+
 	httpResp, err := r.client.FilesystemReplaceSpace(ctx, state.RID.ValueString(), &filesystemReplaceSpaceParams, v2.FilesystemReplaceSpaceJSONRequestBody{
 		DisplayName:      plan.DisplayName.ValueString(),
 		Description:      plan.Description.ValueStringPointer(),
-		UsageAccountRid:  plan.UsageAccountRID.ValueStringPointer(),
-		DefaultRoleSetID: plan.DefaultRoleSetID.ValueStringPointer(),
+		UsageAccountRid:  usageAccountRID,
+		DefaultRoleSetID: defaultRoleSetID,
 	})
 
 	if err != nil {
