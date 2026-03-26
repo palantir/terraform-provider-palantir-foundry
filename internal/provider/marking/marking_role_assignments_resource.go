@@ -20,16 +20,14 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"slices"
 
 	"github.com/google/uuid"
+	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	v2 "github.com/palantir/terraform-provider-palantir-foundry/gateway-client/v2"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/constants"
@@ -40,8 +38,9 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces
 var (
-	_ resource.Resource              = &markingRoleAssignmentsResource{}
-	_ resource.ResourceWithConfigure = &markingRoleAssignmentsResource{}
+	_ resource.Resource                 = &markingRoleAssignmentsResource{}
+	_ resource.ResourceWithConfigure    = &markingRoleAssignmentsResource{}
+	_ resource.ResourceWithUpgradeState = &markingRoleAssignmentsResource{}
 )
 
 // NewMarkingRoleAssignmentsResource is a helper function to simplify provider implementation.
@@ -83,31 +82,23 @@ func (r *markingRoleAssignmentsResource) Metadata(_ context.Context, req resourc
 
 // Schema defines the schema for the resource.
 func (r *markingRoleAssignmentsResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	markingRoleAssignmentsSchema := helper.RoleAssignmentMapSchema("Map of Role to set of Principal IDs for this Marking. " +
+		"The following Roles can be assigned to a Marking: \n - ADMINISTER: The user can add and remove members from the Marking, update Marking Role Assignments, and change Marking metadata.\n - DECLASSIFY: The user can remove the Marking from resources in the platform and stop the propagation of the Marking during a transform.\n - USE: The user can apply the Marking to resources in the platform.")
+	markingRoleAssignmentsSchema.Required = false
+	markingRoleAssignmentsSchema.Optional = true
+	markingRoleAssignmentsSchema.Validators = []validator.Map{
+		mapvalidator.KeysAre(stringvalidator.OneOf("ADMINISTER", "DECLASSIFY", "USE")),
+	}
+
 	resp.Schema = schema.Schema{
 		Description: "Manages a Foundry Marking's Role Assignments.",
+		Version:     1,
 		Attributes: map[string]schema.Attribute{
 			"marking_id": schema.StringAttribute{
 				Description: "ID of the Marking.",
 				Required:    true,
 			},
-			"marking_role_assignments": schema.SetNestedAttribute{
-				Description: "Set of Role Assignments for this Marking. " +
-					"The following Roles can be assigned to a Marking: \n - ADMINISTER: The user can add and remove members from the Marking, update Marking Role Assignments, and change Marking metadata.\n - DECLASSIFY: The user can remove the Marking from resources in the platform and stop the propagation of the Marking during a transform.\n - USE: The user can apply the Marking to resources in the platform.",
-				Optional: true,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"role": schema.StringAttribute{
-							Required: true,
-							Validators: []validator.String{
-								stringvalidator.OneOf("ADMINISTER", "DECLASSIFY", "USE"),
-							},
-						},
-						"principal_id": schema.StringAttribute{
-							Required: true,
-						},
-					},
-				},
-			},
+			"marking_role_assignments": markingRoleAssignmentsSchema,
 		},
 	}
 }
@@ -137,11 +128,9 @@ func (r *markingRoleAssignmentsResource) Create(ctx context.Context, req resourc
 }
 
 func (r *markingRoleAssignmentsResource) CreateMarkingRoleAssignments(ctx context.Context, resp *resource.CreateResponse, plan *markingRoleAssignmentsResourceModel) error {
-	var newRoleAssignments []markingRolesRequestBodyEntry
-	diags := plan.MarkingRoleAssignments.ElementsAs(context.Background(), &newRoleAssignments, false)
-
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert planned role_assignments to Go slice")
+	newGenericEntries, err := helper.FlattenRoleAssignmentMap(ctx, plan.MarkingRoleAssignments)
+	if err != nil {
+		return fmt.Errorf("failed to convert planned role_assignments to Go slice: %w", err)
 	}
 
 	oldRoleAssignments, err := r.ReadMarkingRoleAssignmentsOnCreation(ctx, plan)
@@ -150,25 +139,27 @@ func (r *markingRoleAssignmentsResource) CreateMarkingRoleAssignments(ctx contex
 		return fmt.Errorf("failed to read marking orgs on creation: %w", err)
 	}
 
-	if !slices.Equal(oldRoleAssignments, newRoleAssignments) {
-		// Determine orgs to add and remove
-		rolesToAdd, rolesToRemove := FindMarkingRolesDiff(oldRoleAssignments, newRoleAssignments)
-		if len(rolesToAdd) != 0 {
-			err := r.AddMarkingRoleAssignments(ctx, rolesToAdd, plan.MarkingID.ValueString())
-			if err != nil {
-				return err
-			}
-		}
-		if len(rolesToRemove) != 0 && !r.deletionsDisabled {
-			err := r.RemoveMarkingRoleAssignments(ctx, rolesToRemove, plan.MarkingID.ValueString())
-			if err != nil {
-				return err
-			}
-		} else if len(rolesToRemove) != 0 {
-			resp.Diagnostics.AddWarning("Found Role Assignments defined in the state that are not in the plan.",
-				"Since `deletions_disabled` is set to true, Role Assignments removal operations will not be applied.")
+	oldGenericEntries := markingEntriesToGeneric(oldRoleAssignments)
+	genericToAdd, genericToRemove := helper.FindRoleAssignmentsDiff(oldGenericEntries, newGenericEntries)
+	rolesToAdd := genericToMarkingEntries(genericToAdd)
+	rolesToRemove := genericToMarkingEntries(genericToRemove)
+
+	if len(rolesToAdd) != 0 {
+		err := r.AddMarkingRoleAssignments(ctx, rolesToAdd, plan.MarkingID.ValueString())
+		if err != nil {
+			return err
 		}
 	}
+	if len(rolesToRemove) != 0 && !r.deletionsDisabled {
+		err := r.RemoveMarkingRoleAssignments(ctx, rolesToRemove, plan.MarkingID.ValueString())
+		if err != nil {
+			return err
+		}
+	} else if len(rolesToRemove) != 0 {
+		resp.Diagnostics.AddWarning("Found Role Assignments defined in the state that are not in the plan.",
+			"Since `deletions_disabled` is set to true, Role Assignments removal operations will not be applied.")
+	}
+
 	return nil
 }
 
@@ -222,26 +213,16 @@ func (r *markingRoleAssignmentsResource) ReadMarkingRoleAssignments(ctx context.
 		return fmt.Errorf("error decoding response: %w", err)
 	}
 
-	roleAssignmentType := types.ObjectType{
-		AttrTypes: map[string]attr.Type{
-			"principal_id": types.StringType,
-			"role":         types.StringType,
-		},
+	entries := make([]helper.RoleAssignmentEntry, len(httpMarkingRolesResponseBody.Data))
+	for i, entry := range httpMarkingRolesResponseBody.Data {
+		entries[i] = helper.RoleAssignmentEntry{RoleIdentifier: entry.Role, PrincipalID: entry.PrincipalID}
 	}
 
-	roleAssignments := make([]attr.Value, 0)
-	for _, entry := range httpMarkingRolesResponseBody.Data {
-		roleAssignment, _ := types.ObjectValue(
-			roleAssignmentType.AttrTypes,
-			map[string]attr.Value{
-				"principal_id": types.StringValue(entry.PrincipalID),
-				"role":         types.StringValue(entry.Role),
-			},
-		)
-		roleAssignments = append(roleAssignments, roleAssignment)
+	roleMap, err := helper.BuildRoleAssignmentMap(ctx, entries)
+	if err != nil {
+		return fmt.Errorf("failed to build role assignment map: %w", err)
 	}
-
-	state.MarkingRoleAssignments, _ = types.SetValueFrom(ctx, roleAssignmentType, roleAssignments)
+	state.MarkingRoleAssignments = roleMap
 	return nil
 }
 
@@ -274,7 +255,6 @@ func (r *markingRoleAssignmentsResource) ReadMarkingRoleAssignmentsOnCreation(ct
 
 	rolesToReturn := make([]markingRolesRequestBodyEntry, 0)
 
-	//var objects []attr.Value
 	for _, entry := range httpMarkingRolesResponseBody.Data {
 		roleAssignment := markingRolesRequestBodyEntry{Role: entry.Role, PrincipalID: entry.PrincipalID}
 		rolesToReturn = append(rolesToReturn, roleAssignment)
@@ -314,22 +294,22 @@ func (r *markingRoleAssignmentsResource) Update(ctx context.Context, req resourc
 }
 
 func (r *markingRoleAssignmentsResource) UpdateMarkingRoleAssignments(ctx context.Context, plan *markingRoleAssignmentsResourceModel, state *markingRoleAssignmentsResourceModel, resp *resource.UpdateResponse) error {
-	var oldRoleAssignments []markingRolesRequestBodyEntry
-	var newRoleAssignments []markingRolesRequestBodyEntry
-
-	diags := state.MarkingRoleAssignments.ElementsAs(ctx, &oldRoleAssignments, false)
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert org roles to Go slice")
+	oldGenericEntries, err := helper.FlattenRoleAssignmentMap(ctx, state.MarkingRoleAssignments)
+	if err != nil {
+		return fmt.Errorf("failed to convert marking roles to Go slice: %w", err)
 	}
 
-	diags = plan.MarkingRoleAssignments.ElementsAs(ctx, &newRoleAssignments, false)
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert org roles to Go slice")
+	newGenericEntries, err := helper.FlattenRoleAssignmentMap(ctx, plan.MarkingRoleAssignments)
+	if err != nil {
+		return fmt.Errorf("failed to convert marking roles to Go slice: %w", err)
 	}
 
-	if !slices.Equal(oldRoleAssignments, newRoleAssignments) {
-		// Determine orgs to add and remove
-		rolesToAdd, rolesToRemove := FindMarkingRolesDiff(oldRoleAssignments, newRoleAssignments)
+	if !plan.MarkingRoleAssignments.Equal(state.MarkingRoleAssignments) {
+		// Determine roles to add and remove
+		genericToAdd, genericToRemove := helper.FindRoleAssignmentsDiff(oldGenericEntries, newGenericEntries)
+		rolesToAdd := genericToMarkingEntries(genericToAdd)
+		rolesToRemove := genericToMarkingEntries(genericToRemove)
+
 		if len(rolesToAdd) != 0 {
 			err := r.AddMarkingRoleAssignments(ctx, rolesToAdd, plan.MarkingID.ValueString())
 			if err != nil {
@@ -367,25 +347,25 @@ func (r *markingRoleAssignmentsResource) Delete(ctx context.Context, req resourc
 
 // ImportState imports existing marking role_assignments into Terraform state.
 func (r *markingRoleAssignmentsResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// The import ID is expected to be the marking RID
-	markingRID := req.ID
+	// The import ID is expected to be the marking ID
+	markingID := req.ID
 
-	// Validate the ID format (optional, can add your own validation logic)
-	if markingRID == "" {
+	// Validate the ID format
+	if markingID == "" {
 		resp.Diagnostics.AddError(
 			"Invalid Import ID",
-			"The import ID must be the marking RID",
+			"The import ID must be the marking ID",
 		)
 		return
 	}
 
-	tflog.Info(ctx, fmt.Sprintf("Importing marking role_assignments for marking with ID %s", markingRID))
+	tflog.Info(ctx, fmt.Sprintf("Importing marking role_assignments for marking with ID %s", markingID))
 
-	// Set the Marking RID in state
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("marking_rid"), markingRID)...)
+	// Set the Marking ID in state
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("marking_id"), markingID)...)
 
 	// The Read method will be called automatically after ImportState
-	// to refresh all the other attributes based on the RID
+	// to refresh all the other attributes based on the ID
 }
 
 func (r *markingRoleAssignmentsResource) AddMarkingRoleAssignments(ctx context.Context, rolesToAdd []markingRolesRequestBodyEntry, id string) error {
@@ -449,34 +429,18 @@ func (r *markingRoleAssignmentsResource) RemoveMarkingRoleAssignments(ctx contex
 	return nil
 }
 
-func FindMarkingRolesDiff(oldSlice, newSlice []markingRolesRequestBodyEntry) (added, removed []markingRolesRequestBodyEntry) {
-	// Create maps for quick lookup
-	oldMap := make(map[string]markingRolesRequestBodyEntry)
-	newMap := make(map[string]markingRolesRequestBodyEntry)
-
-	// Populate the maps with elements from the slices
-	for _, item := range oldSlice {
-		key := item.PrincipalID + "|" + item.Role
-		oldMap[key] = item
+func markingEntriesToGeneric(entries []markingRolesRequestBodyEntry) []helper.RoleAssignmentEntry {
+	result := make([]helper.RoleAssignmentEntry, len(entries))
+	for i, e := range entries {
+		result[i] = helper.RoleAssignmentEntry{RoleIdentifier: e.Role, PrincipalID: e.PrincipalID}
 	}
-	for _, item := range newSlice {
-		key := item.PrincipalID + "|" + item.Role
-		newMap[key] = item
-	}
+	return result
+}
 
-	// Find added elements (in newSlice but not in oldSlice)
-	for key, item := range newMap {
-		if _, exists := oldMap[key]; !exists {
-			added = append(added, item)
-		}
+func genericToMarkingEntries(entries []helper.RoleAssignmentEntry) []markingRolesRequestBodyEntry {
+	result := make([]markingRolesRequestBodyEntry, len(entries))
+	for i, e := range entries {
+		result[i] = markingRolesRequestBodyEntry{Role: e.RoleIdentifier, PrincipalID: e.PrincipalID}
 	}
-
-	// Find removed elements (in oldSlice but not in newSlice)
-	for key, item := range oldMap {
-		if _, exists := newMap[key]; !exists {
-			removed = append(removed, item)
-		}
-	}
-
-	return added, removed
+	return result
 }

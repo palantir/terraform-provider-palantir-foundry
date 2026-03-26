@@ -20,14 +20,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"slices"
 
 	"github.com/google/uuid"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	v2 "github.com/palantir/terraform-provider-palantir-foundry/gateway-client/v2"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/constants"
@@ -38,8 +35,9 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces
 var (
-	_ resource.Resource              = &organizationRoleAssignmentsResource{}
-	_ resource.ResourceWithConfigure = &organizationRoleAssignmentsResource{}
+	_ resource.Resource                 = &organizationRoleAssignmentsResource{}
+	_ resource.ResourceWithConfigure    = &organizationRoleAssignmentsResource{}
+	_ resource.ResourceWithUpgradeState = &organizationRoleAssignmentsResource{}
 )
 
 // NewOrganizationRoleAssignmentsResource is a helper function to simplify provider implementation.
@@ -83,21 +81,13 @@ func (r *organizationRoleAssignmentsResource) Metadata(_ context.Context, req re
 func (r *organizationRoleAssignmentsResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Manages a Foundry Organization's Role Assignments.",
+		Version:     1,
 		Attributes: map[string]schema.Attribute{
 			"organization_rid": schema.StringAttribute{
 				Description: "RID of the Organization.",
 				Required:    true,
 			},
-			"organization_role_assignments": schema.SetAttribute{
-				Description: "List of Role Assignments for this Organization.",
-				Required:    true,
-				ElementType: types.ObjectType{
-					AttrTypes: map[string]attr.Type{
-						"role_id":      types.StringType,
-						"principal_id": types.StringType,
-					},
-				},
-			},
+			"organization_role_assignments": helper.RoleAssignmentMapSchema("Map of Role ID to set of Principal IDs for this Organization."),
 		},
 	}
 }
@@ -127,49 +117,41 @@ func (r *organizationRoleAssignmentsResource) Create(ctx context.Context, req re
 }
 
 func (r *organizationRoleAssignmentsResource) CreateOrganizationRoleAssignments(ctx context.Context, resp *resource.CreateResponse, plan *organizationRoleAssignmentsResourceModel) error {
-	var newRoleAssignments []organizationRolesRequestBodyEntry
-	diags := plan.OrganizationRoleAssignments.ElementsAs(context.Background(), &newRoleAssignments, false)
-
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert planned role_assignments to Go slice")
+	newGenericEntries, err := helper.FlattenRoleAssignmentMap(ctx, plan.OrganizationRoleAssignments)
+	if err != nil {
+		return fmt.Errorf("failed to convert planned role_assignments to Go slice: %w", err)
 	}
-
-	hasAdmin := false
-	for _, role := range newRoleAssignments {
-		if role.RoleID == constants.OrganizationAdministratorRoleID {
-			hasAdmin = true
-			break
-		}
-	}
-	if !hasAdmin && !r.deletionsDisabled {
+	if !helper.MapHasRole(plan.OrganizationRoleAssignments, constants.OrganizationAdministratorRoleID) && !r.deletionsDisabled {
 		return fmt.Errorf("the Organization must have at least one administrator")
 	}
 
 	oldRoleAssignments, err := r.ReadOrganizationRoleAssignmentsOnCreation(ctx, plan)
 
 	if err != nil {
-		return fmt.Errorf("failed to read organization orgs on creation: %w", err)
+		return fmt.Errorf("failed to read organization roles on creation: %w", err)
 	}
 
-	if !slices.Equal(oldRoleAssignments, newRoleAssignments) {
-		// Determine orgs to add and remove
-		rolesToAdd, rolesToRemove := findOrganizationRolesDiff(oldRoleAssignments, newRoleAssignments)
-		if len(rolesToAdd) != 0 {
-			err := r.AddOrganizationRoleAssignments(ctx, rolesToAdd, plan.OrganizationRID.ValueString())
-			if err != nil {
-				return err
-			}
-		}
-		if len(rolesToRemove) != 0 && !r.deletionsDisabled {
-			err := r.RemoveOrganizationRoleAssignments(ctx, rolesToRemove, plan.OrganizationRID.ValueString())
-			if err != nil {
-				return err
-			}
-		} else if len(rolesToRemove) != 0 {
-			resp.Diagnostics.AddWarning("Found Role Assignments defined in the state that are not in the plan.",
-				"Since `deletions_disabled` is set to true, Role Assignments removal operations will not be applied.")
+	oldGenericEntries := organizationEntriesToGeneric(oldRoleAssignments)
+	genericToAdd, genericToRemove := helper.FindRoleAssignmentsDiff(oldGenericEntries, newGenericEntries)
+	rolesToAdd := genericToOrganizationEntries(genericToAdd)
+	rolesToRemove := genericToOrganizationEntries(genericToRemove)
+
+	if len(rolesToAdd) != 0 {
+		err := r.AddOrganizationRoleAssignments(ctx, rolesToAdd, plan.OrganizationRID.ValueString())
+		if err != nil {
+			return err
 		}
 	}
+	if len(rolesToRemove) != 0 && !r.deletionsDisabled {
+		err := r.RemoveOrganizationRoleAssignments(ctx, rolesToRemove, plan.OrganizationRID.ValueString())
+		if err != nil {
+			return err
+		}
+	} else if len(rolesToRemove) != 0 {
+		resp.Diagnostics.AddWarning("Found Role Assignments defined in the state that are not in the plan.",
+			"Since `deletions_disabled` is set to true, Role Assignments removal operations will not be applied.")
+	}
+
 	return nil
 }
 
@@ -197,9 +179,7 @@ func (r *organizationRoleAssignmentsResource) Read(ctx context.Context, req reso
 }
 
 func (r *organizationRoleAssignmentsResource) ReadOrganizationRoleAssignments(ctx context.Context, state *organizationRoleAssignmentsResourceModel) error {
-	previewMode := constants.PreviewMode
-	adminOrganizationRoleAssignmentParams := v2.AdminListOrganizationRoleAssignmentsParams{Preview: &previewMode}
-	httpResp, err := r.client.AdminListOrganizationRoleAssignments(ctx, state.OrganizationRID.ValueString(), &adminOrganizationRoleAssignmentParams)
+	httpResp, err := r.client.AdminListOrganizationRoleAssignments(ctx, state.OrganizationRID.ValueString())
 
 	if err != nil {
 		return fmt.Errorf("AdminListOrganizationRoleAssignments request failed: %w", err)
@@ -223,35 +203,21 @@ func (r *organizationRoleAssignmentsResource) ReadOrganizationRoleAssignments(ct
 		return fmt.Errorf("error decoding response: %w", err)
 	}
 
-	roleAssignmentType := types.ObjectType{
-		AttrTypes: map[string]attr.Type{
-			"principal_id": types.StringType,
-			"role_id":      types.StringType,
-		},
+	entries := make([]helper.RoleAssignmentEntry, len(httpOrganizationRolesResponseBody.Data))
+	for i, entry := range httpOrganizationRolesResponseBody.Data {
+		entries[i] = helper.RoleAssignmentEntry{RoleIdentifier: entry.RoleID, PrincipalID: entry.PrincipalID}
 	}
 
-	// Convert each entry to a map of attribute values
-	roleAssignments := make([]attr.Value, 0)
-	//var objects []attr.Value
-	for _, entry := range httpOrganizationRolesResponseBody.Data {
-		roleAssignment, _ := types.ObjectValue(
-			roleAssignmentType.AttrTypes,
-			map[string]attr.Value{
-				"principal_id": types.StringValue(entry.PrincipalID),
-				"role_id":      types.StringValue(entry.RoleID),
-			},
-		)
-		roleAssignments = append(roleAssignments, roleAssignment)
+	roleMap, err := helper.BuildRoleAssignmentMap(ctx, entries)
+	if err != nil {
+		return fmt.Errorf("failed to build role assignment map: %w", err)
 	}
-
-	state.OrganizationRoleAssignments, _ = types.SetValueFrom(ctx, roleAssignmentType, roleAssignments)
+	state.OrganizationRoleAssignments = roleMap
 	return nil
 }
 
 func (r *organizationRoleAssignmentsResource) ReadOrganizationRoleAssignmentsOnCreation(ctx context.Context, plan *organizationRoleAssignmentsResourceModel) ([]organizationRolesRequestBodyEntry, error) {
-	previewMode := constants.PreviewMode
-	adminOrganizationRoleAssignmentParams := v2.AdminListOrganizationRoleAssignmentsParams{Preview: &previewMode}
-	httpResp, err := r.client.AdminListOrganizationRoleAssignments(ctx, plan.OrganizationRID.ValueString(), &adminOrganizationRoleAssignmentParams)
+	httpResp, err := r.client.AdminListOrganizationRoleAssignments(ctx, plan.OrganizationRID.ValueString())
 
 	if err != nil {
 		return nil, fmt.Errorf("AdminListOrganizationRoleAssignments request failed: %w", err)
@@ -317,33 +283,26 @@ func (r *organizationRoleAssignmentsResource) Update(ctx context.Context, req re
 }
 
 func (r *organizationRoleAssignmentsResource) UpdateOrganizationRoleAssignments(ctx context.Context, plan *organizationRoleAssignmentsResourceModel, state *organizationRoleAssignmentsResourceModel, resp *resource.UpdateResponse) error {
-	var oldRoleAssignments []organizationRolesRequestBodyEntry
-	var newRoleAssignments []organizationRolesRequestBodyEntry
-
-	diags := state.OrganizationRoleAssignments.ElementsAs(ctx, &oldRoleAssignments, false)
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert org roles to Go slice")
+	oldGenericEntries, err := helper.FlattenRoleAssignmentMap(ctx, state.OrganizationRoleAssignments)
+	if err != nil {
+		return fmt.Errorf("failed to convert organization roles to Go slice: %w", err)
 	}
 
-	diags = plan.OrganizationRoleAssignments.ElementsAs(ctx, &newRoleAssignments, false)
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert org roles to Go slice")
+	newGenericEntries, err := helper.FlattenRoleAssignmentMap(ctx, plan.OrganizationRoleAssignments)
+	if err != nil {
+		return fmt.Errorf("failed to convert organization roles to Go slice: %w", err)
 	}
 
-	hasAdmin := false
-	for _, role := range newRoleAssignments {
-		if role.RoleID == constants.OrganizationAdministratorRoleID {
-			hasAdmin = true
-			break
-		}
-	}
-	if !hasAdmin && !r.deletionsDisabled {
+	if !helper.MapHasRole(plan.OrganizationRoleAssignments, constants.OrganizationAdministratorRoleID) && !r.deletionsDisabled {
 		return fmt.Errorf("the Organization must have at least one administrator")
 	}
 
-	if !slices.Equal(oldRoleAssignments, newRoleAssignments) {
-		// Determine orgs to add and remove
-		rolesToAdd, rolesToRemove := findOrganizationRolesDiff(oldRoleAssignments, newRoleAssignments)
+	if !plan.OrganizationRoleAssignments.Equal(state.OrganizationRoleAssignments) {
+		// Determine roles to add and remove
+		genericToAdd, genericToRemove := helper.FindRoleAssignmentsDiff(oldGenericEntries, newGenericEntries)
+		rolesToAdd := genericToOrganizationEntries(genericToAdd)
+		rolesToRemove := genericToOrganizationEntries(genericToRemove)
+
 		if len(rolesToAdd) != 0 {
 			err := r.AddOrganizationRoleAssignments(ctx, rolesToAdd, plan.OrganizationRID.ValueString())
 			if err != nil {
@@ -403,8 +362,6 @@ func (r *organizationRoleAssignmentsResource) ImportState(ctx context.Context, r
 }
 
 func (r *organizationRoleAssignmentsResource) AddOrganizationRoleAssignments(ctx context.Context, rolesToAdd []organizationRolesRequestBodyEntry, rid string) error {
-	previewMode := constants.PreviewMode
-
 	roleUpdates := make([]v2.CoreRoleAssignmentUpdate, len(rolesToAdd))
 	for i, role := range rolesToAdd {
 
@@ -420,8 +377,7 @@ func (r *organizationRoleAssignmentsResource) AddOrganizationRoleAssignments(ctx
 		}
 	}
 
-	adminAddOrganizationRoleAssignmentParams := v2.AdminAddOrganizationRoleAssignmentsParams{Preview: &previewMode}
-	httpResp, err := r.client.AdminAddOrganizationRoleAssignments(ctx, rid, &adminAddOrganizationRoleAssignmentParams, v2.AdminAddOrganizationRoleAssignmentsJSONRequestBody{
+	httpResp, err := r.client.AdminAddOrganizationRoleAssignments(ctx, rid, v2.AdminAddOrganizationRoleAssignmentsJSONRequestBody{
 		RoleAssignments: &roleUpdates,
 	})
 
@@ -442,8 +398,6 @@ func (r *organizationRoleAssignmentsResource) AddOrganizationRoleAssignments(ctx
 }
 
 func (r *organizationRoleAssignmentsResource) RemoveOrganizationRoleAssignments(ctx context.Context, rolesToRemove []organizationRolesRequestBodyEntry, rid string) error {
-	previewMode := constants.PreviewMode
-
 	roleUpdates := make([]v2.CoreRoleAssignmentUpdate, len(rolesToRemove))
 	for i, role := range rolesToRemove {
 
@@ -459,8 +413,7 @@ func (r *organizationRoleAssignmentsResource) RemoveOrganizationRoleAssignments(
 		}
 	}
 
-	adminRemoveOrganizationRoleAssignmentsParams := v2.AdminRemoveOrganizationRoleAssignmentsParams{Preview: &previewMode}
-	httpResp, err := r.client.AdminRemoveOrganizationRoleAssignments(ctx, rid, &adminRemoveOrganizationRoleAssignmentsParams, v2.AdminRemoveOrganizationRoleAssignmentsJSONRequestBody{
+	httpResp, err := r.client.AdminRemoveOrganizationRoleAssignments(ctx, rid, v2.AdminRemoveOrganizationRoleAssignmentsJSONRequestBody{
 		RoleAssignments: &roleUpdates,
 	})
 
@@ -480,34 +433,18 @@ func (r *organizationRoleAssignmentsResource) RemoveOrganizationRoleAssignments(
 	return nil
 }
 
-func findOrganizationRolesDiff(oldSlice, newSlice []organizationRolesRequestBodyEntry) (added, removed []organizationRolesRequestBodyEntry) {
-	// Create maps for quick lookup
-	oldMap := make(map[string]organizationRolesRequestBodyEntry)
-	newMap := make(map[string]organizationRolesRequestBodyEntry)
-
-	// Populate the maps with elements from the slices
-	for _, item := range oldSlice {
-		key := item.PrincipalID + "|" + item.RoleID
-		oldMap[key] = item
+func organizationEntriesToGeneric(entries []organizationRolesRequestBodyEntry) []helper.RoleAssignmentEntry {
+	result := make([]helper.RoleAssignmentEntry, len(entries))
+	for i, e := range entries {
+		result[i] = helper.RoleAssignmentEntry{RoleIdentifier: e.RoleID, PrincipalID: e.PrincipalID}
 	}
-	for _, item := range newSlice {
-		key := item.PrincipalID + "|" + item.RoleID
-		newMap[key] = item
-	}
+	return result
+}
 
-	// Find added elements (in newSlice but not in oldSlice)
-	for key, item := range newMap {
-		if _, exists := oldMap[key]; !exists {
-			added = append(added, item)
-		}
+func genericToOrganizationEntries(entries []helper.RoleAssignmentEntry) []organizationRolesRequestBodyEntry {
+	result := make([]organizationRolesRequestBodyEntry, len(entries))
+	for i, e := range entries {
+		result[i] = organizationRolesRequestBodyEntry{RoleID: e.RoleIdentifier, PrincipalID: e.PrincipalID}
 	}
-
-	// Find removed elements (in oldSlice but not in newSlice)
-	for key, item := range oldMap {
-		if _, exists := newMap[key]; !exists {
-			removed = append(removed, item)
-		}
-	}
-
-	return added, removed
+	return result
 }

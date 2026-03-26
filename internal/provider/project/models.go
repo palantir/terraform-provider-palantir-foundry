@@ -19,13 +19,13 @@ import (
 )
 
 type projectResourceModel struct {
-	RID                  types.String `tfsdk:"rid"`
-	DisplayName          types.String `tfsdk:"display_name"`
-	SpaceRID             types.String `tfsdk:"space_rid"`
-	Description          types.String `tfsdk:"description"`
-	TrashStatus          types.String `tfsdk:"trash_status"`
-	InitialResourceRoles types.Set    `tfsdk:"initial_resource_roles"`
-	InitialOrganizations types.Set    `tfsdk:"initial_organizations"`
+	RID                   types.String `tfsdk:"rid"`
+	DisplayName           types.String `tfsdk:"display_name"`
+	SpaceRID              types.String `tfsdk:"space_rid"`
+	Description           types.String `tfsdk:"description"`
+	TrashStatus           types.String `tfsdk:"trash_status"`
+	InitialPrincipalRoles types.Map    `tfsdk:"initial_principal_roles"`
+	InitialOrganizations  types.Set    `tfsdk:"initial_organizations"`
 }
 
 type projectMarkingsResourceModel struct {
@@ -39,8 +39,9 @@ type projectOrganizationsResourceModel struct {
 }
 
 type projectResourceRolesResourceModel struct {
-	ProjectRid           types.String `tfsdk:"project_rid"`
-	ProjectResourceRoles types.Set    `tfsdk:"project_resource_roles"`
+	ProjectRid     types.String `tfsdk:"project_rid"`
+	PrincipalRoles types.Map    `tfsdk:"principal_roles"`
+	DefaultRoles   types.Set    `tfsdk:"default_roles"`
 }
 
 // requestBody contains the schema for request body
@@ -56,26 +57,19 @@ type listOrganizationsResponseBody struct {
 	Data []string `json:"data"`
 }
 
-type ResourceRolesResponse struct {
-	Roles []struct {
-		ResourceRolePrincipal struct {
-			Type          string `json:"type"`
-			PrincipalID   string `json:"principalId"`
-			PrincipalType string `json:"principalType"`
-		} `json:"resourceRolePrincipal"`
-		RoleID string `json:"roleId"`
-	} `json:"data"`
+type resourceRolesResponse struct {
+	Roles []resourceRolesEntry `json:"data"`
+}
+
+type resourceRolesEntry struct {
+	ResourceRolePrincipal struct {
+		Type          string `json:"type"`
+		PrincipalID   string `json:"principalId"`
+		PrincipalType string `json:"principalType"`
+	} `json:"resourceRolePrincipal"`
+	RoleID string `json:"roleId"`
 }
 
 type listMarkingsResponseBody struct {
 	Data []string `json:"data"`
-}
-
-type ResourceRole struct {
-	ResourceRolePrincipal struct {
-		Type          string  `json:"type" tfsdk:"type"`
-		PrincipalID   *string `json:"principalId" tfsdk:"principal_id"`
-		PrincipalType *string `json:"principalType" tfsdk:"principal_type"`
-	} `tfsdk:"resource_role_principal" json:"resourceRolePrincipal"`
-	RoleID string `json:"roleId" tfsdk:"role_id"`
 }

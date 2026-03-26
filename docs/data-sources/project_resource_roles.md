@@ -25,21 +25,13 @@ data "foundry_project_resource_roles" "example" {
 
 ### Read-Only
 
-- `project_resource_roles` (Attributes Set) Set of Roles applied to this Project. (see [below for nested schema](#nestedatt--project_resource_roles))
+- `default_roles` (Set of String) Set of Role IDs applied to everyone for this Project.
+- `principal_roles` (Attributes Map) Map of Role ID to groups and users for this Project. Only applies to roles assigned to specific users or groups (principalWithId). (see [below for nested schema](#nestedatt--principal_roles))
 
-<a id="nestedatt--project_resource_roles"></a>
-### Nested Schema for `project_resource_roles`
-
-Read-Only:
-
-- `resource_role_principal` (Attributes) (see [below for nested schema](#nestedatt--project_resource_roles--resource_role_principal))
-- `role_id` (String) The unique ID for a Role.
-
-<a id="nestedatt--project_resource_roles--resource_role_principal"></a>
-### Nested Schema for `project_resource_roles.resource_role_principal`
+<a id="nestedatt--principal_roles"></a>
+### Nested Schema for `principal_roles`
 
 Read-Only:
 
-- `principal_id` (String) The ID of a Foundry Group or User.
-- `principal_type` (String) Enum values: USER, GROUP.
-- `type` (String)
+- `groups` (Set of String) Set of Group IDs assigned to this role.
+- `users` (Set of String) Set of User IDs assigned to this role.

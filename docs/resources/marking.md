@@ -3,8 +3,10 @@
 # template basis poached from https://github.com/hashicorp/terraform-plugin-docs/blob/main/internal/provider/template.go#L246
 page_title: "Palantir Foundry Marking"
 subcategory: "Markings"
-description: |-
-  Manages a Marking.
+---
+# Marking
+
+Manages a [Marking](https://www.palantir.com/docs/foundry/security/markings/).
 
   The following operations are currently supported:
 
@@ -14,28 +16,16 @@ description: |-
 
     Note: the provider does not support deleting a Marking. Additionally, a Marking's categoryId is immutable after creation.
 
----
-# Marking
-
 ```terraform
 resource "foundry_marking" "example-marking" {
-  name = "Example Marking name"
+  name        = "Example Marking name"
   description = "Example Marking description"
-  category_id="example-marking-category-id"
-  initial_role_assignments = [
-    {
-      role = "ADMINISTER"
-      principal_id = "example-user-id"
-    },
-    {
-      role = "DECLASSIFY"
-      principal_id = "example-user-id"
-    },
-    {
-      role = "USE"
-      principal_id = "example-group-id"
-    }
-  ]
+  category_id = "example-marking-category-id"
+  initial_role_assignments = {
+    "ADMINISTER" = ["example-user-id"]
+    "DECLASSIFY" = ["example-user-id"]
+    "USE"        = ["example-group-id"]
+  }
 }
 ```
 
@@ -45,24 +35,16 @@ resource "foundry_marking" "example-marking" {
 ### Required
 
 - `category_id` (String) The ID of a Marking Category. For user-created Categories, this will be a UUID. Markings associated with Organizations are placed in a category with ID "Organization". This field is immutable after creation.
+- `initial_role_assignments` (Map of Set of String) Map of Role to set of Principal IDs for the initial role assignments. Any changes to this field after Marking creation will not be applied; instead, use the marking_role_assignments resource to manage Role Assignments. The following Roles can be assigned to a Marking: 
+ - ADMINISTER: The user can add and remove members from the Marking, update Marking Role Assignments, and change Marking metadata.
+ - DECLASSIFY: The user can remove the Marking from resources in the platform and stop the propagation of the Marking during a transform.
+ - USE: The user can apply the Marking to resources in the platform.
 - `name` (String) Name of the Marking.
 
 ### Optional
 
 - `description` (String) Description of the Marking.
-- `initial_role_assignments` (Attributes Set) The initial set of Role Assignments to be applied when creating the Marking. Any changes to this field after Marking creation will not be applied; instead, use the marking_role_assignments resource to manage Role Assignments. The following Roles can be assigned to a Marking: 
- - ADMINISTER: The user can add and remove members from the Marking, update Marking Role Assignments, and change Marking metadata.
- - DECLASSIFY: The user can remove the Marking from resources in the platform and stop the propagation of the Marking during a transform.
- - USE: The user can apply the Marking to resources in the platform. (see [below for nested schema](#nestedatt--initial_role_assignments))
 
 ### Read-Only
 
 - `id` (String) ID of the Marking.
-
-<a id="nestedatt--initial_role_assignments"></a>
-### Nested Schema for `initial_role_assignments`
-
-Required:
-
-- `principal_id` (String)
-- `role` (String)

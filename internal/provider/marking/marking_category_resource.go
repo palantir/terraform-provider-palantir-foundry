@@ -21,6 +21,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -38,8 +39,9 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces
 var (
-	_ resource.Resource              = &markingCategoryResource{}
-	_ resource.ResourceWithConfigure = &markingCategoryResource{}
+	_ resource.Resource                 = &markingCategoryResource{}
+	_ resource.ResourceWithConfigure    = &markingCategoryResource{}
+	_ resource.ResourceWithUpgradeState = &markingCategoryResource{}
 )
 
 // NewMarkingCategoryResource is a helper function to simplify provider implementation.
@@ -83,6 +85,7 @@ func (r *markingCategoryResource) Metadata(_ context.Context, req resource.Metad
 func (r *markingCategoryResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Manages a Foundry Marking Category.",
+		Version:     1,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "ID of the Marking Category. For user-created categories, this will be a UUID.",
@@ -130,27 +133,7 @@ func (r *markingCategoryResource) Schema(_ context.Context, _ resource.SchemaReq
 						Required:    true,
 						ElementType: types.StringType,
 					},
-					"roles": schema.SetNestedAttribute{
-						Description: "The initial set of Role Assignments to be applied when creating the Marking Category. " +
-							"At least one role assignment with the ADMINISTER role must be provided. " +
-							"The following Roles can be assigned: ADMINISTER (can manage the category) or VIEW (can view markings in the category).",
-						Required: true,
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"role": schema.StringAttribute{
-									Description: "The role to assign. Must be either ADMINISTER or VIEW.",
-									Required:    true,
-									Validators: []validator.String{
-										stringvalidator.OneOf("ADMINISTER", "VIEW"),
-									},
-								},
-								"principal_id": schema.StringAttribute{
-									Description: "The ID of the principal (user or group) to assign the role to.",
-									Required:    true,
-								},
-							},
-						},
-					},
+					"roles": markingCategoryRolesSchema(),
 				},
 			},
 		},
@@ -193,27 +176,29 @@ func (r *markingCategoryResource) CreateMarkingCategory(ctx context.Context, res
 		return fmt.Errorf("failed to convert organization_rids to Go slice")
 	}
 
-	// Convert roles to API format
-	var roleAssignments []markingCategoryRoleAssignment
-	diags = plan.InitialPermissions.Roles.ElementsAs(ctx, &roleAssignments, false)
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
-		return fmt.Errorf("failed to convert roles to Go slice")
+	// Convert roles map to API format
+	roleEntries, err := helper.FlattenRoleAssignmentMap(ctx, plan.InitialPermissions.Roles)
+	if err != nil {
+		return fmt.Errorf("failed to convert roles to Go slice: %w", err)
 	}
 
-	if len(roleAssignments) == 0 {
+	if len(roleEntries) == 0 {
 		return fmt.Errorf("initial_permissions.roles must contain at least one role assignment")
 	}
 
+	if !helper.MapHasRole(plan.InitialPermissions.Roles, "ADMINISTER") {
+		return fmt.Errorf("initial_permissions.roles must contain at least one ADMINISTER role assignment")
+	}
+
 	var apiRoleAssignments []v2.AdminMarkingCategoryRoleAssignment
-	for _, role := range roleAssignments {
+	for _, role := range roleEntries {
 		principalIDAsUUID, err := uuid.Parse(role.PrincipalID)
 		if err != nil {
 			return fmt.Errorf("invalid UUID format for principal ID %s: %w", role.PrincipalID, err)
 		}
 
 		apiRoleAssignments = append(apiRoleAssignments, v2.AdminMarkingCategoryRoleAssignment{
-			Role:        v2.AdminMarkingCategoryRole(role.Role),
+			Role:        v2.AdminMarkingCategoryRole(role.RoleIdentifier),
 			PrincipalID: principalIDAsUUID,
 		})
 	}
@@ -322,10 +307,7 @@ func (r *markingCategoryResource) Read(ctx context.Context, req resource.ReadReq
 }
 
 func (r *markingCategoryResource) ReadMarkingCategory(ctx context.Context, resp *resource.ReadResponse, state *markingCategoryResourceModel, markingCategoryID string) error {
-	previewMode := constants.PreviewMode
-	httpResp, err := r.client.AdminGetMarkingCategory(ctx, markingCategoryID, &v2.AdminGetMarkingCategoryParams{
-		Preview: &previewMode,
-	})
+	httpResp, err := r.client.AdminGetMarkingCategory(ctx, markingCategoryID)
 
 	if err != nil {
 		resp.Diagnostics.AddError("AdminGetMarkingCategory request failed", err.Error())
@@ -507,12 +489,8 @@ func (r *markingCategoryResource) ImportState(ctx context.Context, req resource.
 		return
 	}
 
-	// Create empty roles set with the correct element type
-	rolesAttrTypes := map[string]attr.Type{
-		"role":         types.StringType,
-		"principal_id": types.StringType,
-	}
-	emptyRoles, diags := types.SetValue(types.ObjectType{AttrTypes: rolesAttrTypes}, []attr.Value{})
+	// Create empty roles map with the correct element type
+	emptyRoles, diags := types.MapValue(helper.RoleAssignmentMapElementType, map[string]attr.Value{})
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -528,4 +506,14 @@ func (r *markingCategoryResource) ImportState(ctx context.Context, req resource.
 
 	// The Read method will be called automatically after ImportState
 	// to refresh all the other attributes based on the ID
+}
+
+func markingCategoryRolesSchema() schema.MapAttribute {
+	rolesSchema := helper.RoleAssignmentMapSchema("Map of Role to set of Principal IDs for initial role assignments. " +
+		"At least one role assignment with the ADMINISTER role must be provided. " +
+		"The following Roles can be assigned: ADMINISTER (can manage the category) or VIEW (can view markings in the category).")
+	rolesSchema.Validators = []validator.Map{
+		mapvalidator.KeysAre(stringvalidator.OneOf("ADMINISTER", "VIEW")),
+	}
+	return rolesSchema
 }

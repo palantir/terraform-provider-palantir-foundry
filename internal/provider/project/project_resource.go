@@ -35,8 +35,9 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces
 var (
-	_ resource.Resource              = &projectResource{}
-	_ resource.ResourceWithConfigure = &projectResource{}
+	_ resource.Resource                 = &projectResource{}
+	_ resource.ResourceWithConfigure    = &projectResource{}
+	_ resource.ResourceWithUpgradeState = &projectResource{}
 )
 
 // NewProjectResource is a helper function to simplify provider implementation.
@@ -48,6 +49,7 @@ func NewProjectResource() resource.Resource {
 type projectResource struct {
 	client            *v2.ClientWithResponses
 	deletionsDisabled bool
+	deleteMode        string
 }
 
 // Configure adds the provider data to the resource.
@@ -68,6 +70,7 @@ func (r *projectResource) Configure(_ context.Context, req resource.ConfigureReq
 
 	r.client = providerData.Client
 	r.deletionsDisabled = providerData.Flags.DeletionsDisabled
+	r.deleteMode = providerData.Flags.DeleteMode
 }
 
 // Metadata returns the resource type name.
@@ -79,6 +82,7 @@ func (r *projectResource) Metadata(_ context.Context, req resource.MetadataReque
 func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Manages a Foundry Project.",
+		Version:     1,
 		Attributes: map[string]schema.Attribute{
 			"rid": schema.StringAttribute{
 				Description: "RID of the Project.",
@@ -100,36 +104,11 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: "Current trash status of the Project.",
 				Computed:    true,
 			},
-			"initial_resource_roles": schema.SetNestedAttribute{
-				Description: "The initial set of Roles to be applied when creating the Project. " +
+			"initial_principal_roles": principalRolesMapSchema(
+				"The initial map of principal Role assignments to be applied when creating the Project. " +
+					"Keys are Role IDs, values are objects with groups and users sets. " +
 					"Any changes to this field after Project creation will not be applied; " +
-					"instead, use the project_resource_roles resource to manage Roles.",
-				Optional: true,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"resource_role_principal": schema.SingleNestedAttribute{
-							Required: true,
-							Attributes: map[string]schema.Attribute{
-								"type": schema.StringAttribute{
-									Required: true,
-								},
-								"principal_id": schema.StringAttribute{
-									Optional:    true,
-									Description: "The ID of a Foundry Group or User.",
-								},
-								"principal_type": schema.StringAttribute{
-									Optional:    true,
-									Description: "Enum values: USER, GROUP.",
-								},
-							},
-						},
-						"role_id": schema.StringAttribute{
-							Required:    true,
-							Description: "The unique ID for a Role.",
-						},
-					},
-				},
-			},
+					"instead, use the project_resource_roles resource to manage Roles."),
 			"initial_organizations": schema.SetAttribute{
 				Description: "The initial list of Organizations to be applied when creating the Project. " +
 					"Any changes to this field after Project creation will not be applied; " +
@@ -173,46 +152,27 @@ func (r *projectResource) CreateProject(ctx context.Context, resp *resource.Crea
 	resourceRoles := make(map[string][]v2.FilesystemPrincipalWithID)
 	defaultRoles := make([]v2.CoreRoleID, 0)
 
-	var initialResourceRoles []ResourceRole
-
-	diags := plan.InitialResourceRoles.ElementsAs(ctx, &initialResourceRoles, false)
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert initial resource roles to Go map")
-	}
-
-	// Unmarshal the map into a generic map
-
-	// Iterate through each role grant
-	for _, roleGrant := range initialResourceRoles {
-
-		//if type = everyone, pass into default roles
-		if roleGrant.ResourceRolePrincipal.Type == constants.Everyone {
-			defaultRoles = append(defaultRoles, roleGrant.RoleID)
+	if !plan.InitialPrincipalRoles.IsNull() {
+		entries, err := flattenPrincipalRolesMap(ctx, plan.InitialPrincipalRoles)
+		if err != nil {
+			return fmt.Errorf("failed to convert initial principal roles: %w", err)
 		}
-		if roleGrant.ResourceRolePrincipal.Type == constants.PrincipalWithID {
-			if roleGrant.ResourceRolePrincipal.PrincipalID == nil {
-				return fmt.Errorf("principal ID must be provided for principal type %s", constants.PrincipalWithID)
-			}
-			if roleGrant.ResourceRolePrincipal.PrincipalType == nil {
-				return fmt.Errorf("principal type must be provided for principal type %s", constants.PrincipalWithID)
-			}
-			principalIDAsUUID, err := uuid.Parse(*roleGrant.ResourceRolePrincipal.PrincipalID)
-
+		for _, entry := range entries {
+			principalIDAsUUID, err := uuid.Parse(entry.PrincipalID)
 			if err != nil {
-				return fmt.Errorf("invalid UUID format for principal ID %s: %w", principalIDAsUUID, err)
+				return fmt.Errorf("invalid UUID format for principal ID %s: %w", entry.PrincipalID, err)
 			}
-
 			principal := v2.FilesystemPrincipalWithID{
 				PrincipalID:   principalIDAsUUID,
-				PrincipalType: v2.CorePrincipalType(*roleGrant.ResourceRolePrincipal.PrincipalType),
-				Type:          roleGrant.ResourceRolePrincipal.Type,
+				PrincipalType: v2.CorePrincipalType(entry.PrincipalType),
+				Type:          constants.PrincipalWithID,
 			}
-			resourceRoles[roleGrant.RoleID] = append(resourceRoles[roleGrant.RoleID], principal)
+			resourceRoles[entry.RoleID] = append(resourceRoles[entry.RoleID], principal)
 		}
 	}
 
 	var organizations []string
-	diags = plan.InitialOrganizations.ElementsAs(ctx, &organizations, false)
+	diags := plan.InitialOrganizations.ElementsAs(ctx, &organizations, false)
 
 	if diags.HasError() {
 		resp.Diagnostics.Append(diags...)
@@ -371,9 +331,9 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	//three cases for errors here. We should throw an error here, as if we let the provider continue, it will throw an error due to discrepancy between plan (which has changed value) and state (which has not)
-	if !plan.InitialResourceRoles.Equal(state.InitialResourceRoles) {
-		resp.Diagnostics.AddError("Initial Roles cannot be updated after creation. Any changes will not be applied.",
-			"Initial Roles cannot be updated after creation. Any changes will not be applied.")
+	if !plan.InitialPrincipalRoles.Equal(state.InitialPrincipalRoles) {
+		resp.Diagnostics.AddError("Initial Principal Roles cannot be updated after creation. Any changes will not be applied.",
+			"Initial Principal Roles cannot be updated after creation. Any changes will not be applied.")
 	}
 
 	if !plan.InitialOrganizations.Equal(state.InitialOrganizations) {
@@ -460,25 +420,20 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	if state.TrashStatus.ValueString() == string(v2.NOTTRASHED) {
-		err := r.DeleteResource(ctx, resp, &state)
-		if err != nil {
-			resp.Diagnostics.AddError("Error deleting the Project", err.Error())
-			return
+	if r.deleteMode == shared.DeleteModeTrash {
+		if state.TrashStatus.ValueString() == string(v2.NOTTRASHED) {
+			err := r.DeleteResource(ctx, resp, &state)
+			if err != nil {
+				resp.Diagnostics.AddError("Error deleting the Project", err.Error())
+			}
 		}
+		return
 	}
 
-	//if initial delete is successful, now we can check and permanently delete the resource.
-	//this should also work for if the resource was already trashed directly or by ancestor outside of TF
-	// and we are just permanently deleting it now. we should return if this fails
-	if state.TrashStatus.ValueString() == string(v2.DIRECTLYTRASHED) || state.TrashStatus.ValueString() == string(v2.ANCESTORTRASHED) {
-		err := r.PermanentlyDeleteResource(ctx, resp, &state)
-		if err != nil {
-			resp.Diagnostics.AddError("Error permanently deleting the project resource", err.Error())
-		}
-		// we want to return here as we do not want to destroy the resource if the permanent delete fails. since trash_status is a
-		// computed value, we do not need to worry in case it doesn't get persisted in state now as it will on the next read of the resource
-		return
+	// PERMANENTLY_DELETE mode: call permanent delete directly, skipping the trash endpoint.
+	err := r.PermanentlyDeleteResource(ctx, resp, &state)
+	if err != nil {
+		resp.Diagnostics.AddError("Error permanently deleting the project resource", err.Error())
 	}
 }
 

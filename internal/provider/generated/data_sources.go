@@ -19,6 +19,7 @@ package generated
 import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/enrollment"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/folder"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/group"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/marking"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/organization"
@@ -32,6 +33,7 @@ func DataSources() []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		enrollment.NewEnrollmentDataSource,
 		enrollment.NewEnrollmentRoleAssignmentsDataSource,
+		folder.NewFolderDataSource,
 		group.NewGroupDataSource,
 		group.NewGroupMembershipDataSource,
 		marking.NewMarkingCategoryDataSource,

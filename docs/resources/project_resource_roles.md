@@ -3,39 +3,21 @@
 # template basis poached from https://github.com/hashicorp/terraform-plugin-docs/blob/main/internal/provider/template.go#L246
 page_title: "Palantir Foundry Project Roles"
 subcategory: "Projects"
-
-description: |-
-  Manages a Project's Roles.
-
 ---
 # Project Roles
+
+Manages a [Project's Roles](https://www.palantir.com/docs/foundry/security/projects-and-roles/).
 
 ```terraform
 resource "foundry_project_resource_roles" "example-project-resource-roles" {
   project_rid = foundry_project.example-project.rid
-  project_resource_roles = [
-    {
-      resource_role_principal = {
-        principal_id = "example-group-id"
-        principal_type = "GROUP"
-        type = "principalWithId"
-      }
-      role_id: "example-project-role-id"
-    },
-    {
-      resource_role_principal = {
-        principal_id = "example-user-id"
-        principal_type = "USER"
-        type = "principalWithId"
-      }
-      role_id: "example-project-role-id"
-    },
-    {
-      resource_role_principal = {
-        type = "everyone"
-      }
-      role_id: "example-project-role-id"
-    }]
+  principal_roles = {
+    "example-project-role-id" = {
+      groups = ["example-group-id"]
+      users  = ["example-user-id"]
+    }
+  }
+  default_roles = ["example-project-role-id"]
 }
 ```
 
@@ -48,24 +30,13 @@ resource "foundry_project_resource_roles" "example-project-resource-roles" {
 
 ### Optional
 
-- `project_resource_roles` (Attributes Set) Set of Roles applied to this Project. (see [below for nested schema](#nestedatt--project_resource_roles))
+- `default_roles` (Set of String) Set of Role IDs applied to everyone for this Project.
+- `principal_roles` (Attributes Map) Map of Role ID to groups and users for this Project. Only applies to roles assigned to specific users or groups (principalWithId). (see [below for nested schema](#nestedatt--principal_roles))
 
-<a id="nestedatt--project_resource_roles"></a>
-### Nested Schema for `project_resource_roles`
-
-Required:
-
-- `resource_role_principal` (Attributes) (see [below for nested schema](#nestedatt--project_resource_roles--resource_role_principal))
-- `role_id` (String) The unique ID for a Role.
-
-<a id="nestedatt--project_resource_roles--resource_role_principal"></a>
-### Nested Schema for `project_resource_roles.resource_role_principal`
-
-Required:
-
-- `type` (String)
+<a id="nestedatt--principal_roles"></a>
+### Nested Schema for `principal_roles`
 
 Optional:
 
-- `principal_id` (String) The ID of a Foundry Group or User.
-- `principal_type` (String) Enum values: USER, GROUP.
+- `groups` (Set of String) Set of Group IDs assigned to this role.
+- `users` (Set of String) Set of User IDs assigned to this role.

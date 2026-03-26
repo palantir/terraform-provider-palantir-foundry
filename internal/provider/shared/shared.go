@@ -25,4 +25,13 @@ type FoundryProviderData struct {
 
 type Flags struct {
 	DeletionsDisabled bool
+	DeleteMode        string
 }
+
+const (
+	DeleteModeTrash             = "TRASH"
+	DeleteModePermanentlyDelete = "PERMANENTLY_DELETE"
+	DeleteModeDefault           = DeleteModeTrash
+)
+
+var DeleteModes = []string{DeleteModeTrash, DeleteModePermanentlyDelete}

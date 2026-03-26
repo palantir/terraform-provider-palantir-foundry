@@ -3,24 +3,18 @@
 # template basis poached from https://github.com/hashicorp/terraform-plugin-docs/blob/main/internal/provider/template.go#L246
 page_title: "Palantir Foundry Organization Role Assignments"
 subcategory: "Organizations"
-description: |-
-  Manages an Organization's Role Assignments.
 ---
 # Organization Role Assignments
+
+Manages an [Organization's Role Assignments](https://www.palantir.com/docs/foundry/administration/enrollments-and-organizations-permissions/).
 
 ```terraform
 resource "foundry_organization_role_assignments" "example-organization-role-assignments" {
   organization_rid = foundry_organization.example-organization.id
-  organization_roles = [
-    {
-      "role_id" : "organization:example-role",
-      "principal_id" : "example-user-id",
-    },
-    {
-      "role_id" : "organization:example-role",
-      "principal_id" : "example-group-id",
-    },
-  ]
+  organization_role_assignments = {
+    "organization:example-role" = ["example-user-id", "example-group-id"],
+    "organization:second-example-role" = ["example-group-id"],
+  }
 }
 ```
 
@@ -30,12 +24,4 @@ resource "foundry_organization_role_assignments" "example-organization-role-assi
 ### Required
 
 - `organization_rid` (String) RID of the Organization.
-- `organization_role_assignments` (Set of Object) List of Role Assignments for this Organization. (see [below for nested schema](#nestedatt--organization_role_assignments))
-
-<a id="nestedatt--organization_role_assignments"></a>
-### Nested Schema for `organization_role_assignments`
-
-Required:
-
-- `principal_id` (String)
-- `role_id` (String)
+- `organization_role_assignments` (Map of Set of String) Map of Role ID to set of Principal IDs for this Organization.

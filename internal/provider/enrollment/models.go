@@ -20,7 +20,7 @@ import (
 
 type enrollmentRoleAssignmentsResourceModel struct {
 	EnrollmentRID             types.String `tfsdk:"enrollment_rid"`
-	EnrollmentRoleAssignments types.Set    `tfsdk:"enrollment_role_assignments"`
+	EnrollmentRoleAssignments types.Map    `tfsdk:"enrollment_role_assignments"`
 }
 
 type enrollmentRolesRequestBodyEntry struct {

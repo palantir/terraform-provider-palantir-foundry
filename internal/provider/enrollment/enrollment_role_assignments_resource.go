@@ -20,14 +20,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"slices"
 
 	"github.com/google/uuid"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	v2 "github.com/palantir/terraform-provider-palantir-foundry/gateway-client/v2"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/constants"
@@ -38,8 +35,9 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces
 var (
-	_ resource.Resource              = &enrollmentRoleAssignmentsResource{}
-	_ resource.ResourceWithConfigure = &enrollmentRoleAssignmentsResource{}
+	_ resource.Resource                 = &enrollmentRoleAssignmentsResource{}
+	_ resource.ResourceWithConfigure    = &enrollmentRoleAssignmentsResource{}
+	_ resource.ResourceWithUpgradeState = &enrollmentRoleAssignmentsResource{}
 )
 
 // NewEnrollmentRoleAssignmentsResource is a helper function to simplify provider implementation.
@@ -83,21 +81,13 @@ func (r *enrollmentRoleAssignmentsResource) Metadata(_ context.Context, req reso
 func (r *enrollmentRoleAssignmentsResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Manages a Foundry Enrollment's Role Assignments.",
+		Version:     1,
 		Attributes: map[string]schema.Attribute{
 			"enrollment_rid": schema.StringAttribute{
 				Description: "RID of the Enrollment.",
 				Required:    true,
 			},
-			"enrollment_role_assignments": schema.SetAttribute{
-				Description: "List of Role Assignments for this Enrollment.",
-				Required:    true,
-				ElementType: types.ObjectType{
-					AttrTypes: map[string]attr.Type{
-						"role_id":      types.StringType,
-						"principal_id": types.StringType,
-					},
-				},
-			},
+			"enrollment_role_assignments": helper.RoleAssignmentMapSchema("Map of Role ID to set of Principal IDs for this Enrollment."),
 		},
 	}
 }
@@ -127,21 +117,11 @@ func (r *enrollmentRoleAssignmentsResource) Create(ctx context.Context, req reso
 }
 
 func (r *enrollmentRoleAssignmentsResource) CreateEnrollmentRoleAssignments(ctx context.Context, resp *resource.CreateResponse, plan *enrollmentRoleAssignmentsResourceModel) error {
-	var newRoleAssignments []enrollmentRolesRequestBodyEntry
-	diags := plan.EnrollmentRoleAssignments.ElementsAs(context.Background(), &newRoleAssignments, false)
-
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert planned role_assignments to Go slice")
+	newGenericEntries, err := helper.FlattenRoleAssignmentMap(ctx, plan.EnrollmentRoleAssignments)
+	if err != nil {
+		return fmt.Errorf("failed to convert planned role_assignments to Go slice: %w", err)
 	}
-
-	hasAdmin := false
-	for _, role := range newRoleAssignments {
-		if role.RoleID == constants.EnrollmentAdministratorRoleID {
-			hasAdmin = true
-			break
-		}
-	}
-	if !hasAdmin && !r.deletionsDisabled {
+	if !helper.MapHasRole(plan.EnrollmentRoleAssignments, constants.EnrollmentAdministratorRoleID) && !r.deletionsDisabled {
 		return fmt.Errorf("the Enrollment must have at least one administrator")
 	}
 
@@ -151,25 +131,27 @@ func (r *enrollmentRoleAssignmentsResource) CreateEnrollmentRoleAssignments(ctx 
 		return fmt.Errorf("failed to read enrollment roles on creation: %w", err)
 	}
 
-	if !slices.Equal(oldRoleAssignments, newRoleAssignments) {
-		// Determine roles to add and remove
-		rolesToAdd, rolesToRemove := findEnrollmentRolesDiff(oldRoleAssignments, newRoleAssignments)
-		if len(rolesToAdd) != 0 {
-			err := r.AddEnrollmentRoleAssignments(ctx, rolesToAdd, plan.EnrollmentRID.ValueString())
-			if err != nil {
-				return err
-			}
-		}
-		if len(rolesToRemove) != 0 && !r.deletionsDisabled {
-			err := r.RemoveEnrollmentRoleAssignments(ctx, rolesToRemove, plan.EnrollmentRID.ValueString())
-			if err != nil {
-				return err
-			}
-		} else if len(rolesToRemove) != 0 {
-			resp.Diagnostics.AddWarning("Found Role Assignments defined in the state that are not in the plan.",
-				"Since `deletions_disabled` is set to true, Role Assignments removal operations will not be applied.")
+	oldGenericEntries := enrollmentEntriesToGeneric(oldRoleAssignments)
+	genericToAdd, genericToRemove := helper.FindRoleAssignmentsDiff(oldGenericEntries, newGenericEntries)
+	rolesToAdd := genericToEnrollmentEntries(genericToAdd)
+	rolesToRemove := genericToEnrollmentEntries(genericToRemove)
+
+	if len(rolesToAdd) != 0 {
+		err := r.AddEnrollmentRoleAssignments(ctx, rolesToAdd, plan.EnrollmentRID.ValueString())
+		if err != nil {
+			return err
 		}
 	}
+	if len(rolesToRemove) != 0 && !r.deletionsDisabled {
+		err := r.RemoveEnrollmentRoleAssignments(ctx, rolesToRemove, plan.EnrollmentRID.ValueString())
+		if err != nil {
+			return err
+		}
+	} else if len(rolesToRemove) != 0 {
+		resp.Diagnostics.AddWarning("Found Role Assignments defined in the state that are not in the plan.",
+			"Since `deletions_disabled` is set to true, Role Assignments removal operations will not be applied.")
+	}
+
 	return nil
 }
 
@@ -223,27 +205,16 @@ func (r *enrollmentRoleAssignmentsResource) ReadEnrollmentRoleAssignments(ctx co
 		return fmt.Errorf("error decoding response: %w", err)
 	}
 
-	roleAssignmentType := types.ObjectType{
-		AttrTypes: map[string]attr.Type{
-			"principal_id": types.StringType,
-			"role_id":      types.StringType,
-		},
+	entries := make([]helper.RoleAssignmentEntry, len(httpEnrollmentRolesResponseBody.Data))
+	for i, entry := range httpEnrollmentRolesResponseBody.Data {
+		entries[i] = helper.RoleAssignmentEntry{RoleIdentifier: entry.RoleID, PrincipalID: entry.PrincipalID}
 	}
 
-	// Convert each entry to a map of attribute values
-	roleAssignments := make([]attr.Value, 0)
-	for _, entry := range httpEnrollmentRolesResponseBody.Data {
-		roleAssignment, _ := types.ObjectValue(
-			roleAssignmentType.AttrTypes,
-			map[string]attr.Value{
-				"principal_id": types.StringValue(entry.PrincipalID),
-				"role_id":      types.StringValue(entry.RoleID),
-			},
-		)
-		roleAssignments = append(roleAssignments, roleAssignment)
+	roleMap, err := helper.BuildRoleAssignmentMap(ctx, entries)
+	if err != nil {
+		return fmt.Errorf("failed to build role assignment map: %w", err)
 	}
-
-	state.EnrollmentRoleAssignments, _ = types.SetValueFrom(ctx, roleAssignmentType, roleAssignments)
+	state.EnrollmentRoleAssignments = roleMap
 	return nil
 }
 
@@ -315,33 +286,26 @@ func (r *enrollmentRoleAssignmentsResource) Update(ctx context.Context, req reso
 }
 
 func (r *enrollmentRoleAssignmentsResource) UpdateEnrollmentRoleAssignments(ctx context.Context, plan *enrollmentRoleAssignmentsResourceModel, state *enrollmentRoleAssignmentsResourceModel, resp *resource.UpdateResponse) error {
-	var oldRoleAssignments []enrollmentRolesRequestBodyEntry
-	var newRoleAssignments []enrollmentRolesRequestBodyEntry
-
-	diags := state.EnrollmentRoleAssignments.ElementsAs(ctx, &oldRoleAssignments, false)
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert enrollment roles to Go slice")
+	oldGenericEntries, err := helper.FlattenRoleAssignmentMap(ctx, state.EnrollmentRoleAssignments)
+	if err != nil {
+		return fmt.Errorf("failed to convert enrollment roles to Go slice: %w", err)
 	}
 
-	diags = plan.EnrollmentRoleAssignments.ElementsAs(ctx, &newRoleAssignments, false)
-	if diags.HasError() {
-		return fmt.Errorf("failed to convert enrollment roles to Go slice")
+	newGenericEntries, err := helper.FlattenRoleAssignmentMap(ctx, plan.EnrollmentRoleAssignments)
+	if err != nil {
+		return fmt.Errorf("failed to convert enrollment roles to Go slice: %w", err)
 	}
 
-	hasAdmin := false
-	for _, role := range newRoleAssignments {
-		if role.RoleID == constants.EnrollmentAdministratorRoleID {
-			hasAdmin = true
-			break
-		}
-	}
-	if !hasAdmin && !r.deletionsDisabled {
+	if !helper.MapHasRole(plan.EnrollmentRoleAssignments, constants.EnrollmentAdministratorRoleID) && !r.deletionsDisabled {
 		return fmt.Errorf("the Enrollment must have at least one administrator")
 	}
 
-	if !slices.Equal(oldRoleAssignments, newRoleAssignments) {
+	if !plan.EnrollmentRoleAssignments.Equal(state.EnrollmentRoleAssignments) {
 		// Determine roles to add and remove
-		rolesToAdd, rolesToRemove := findEnrollmentRolesDiff(oldRoleAssignments, newRoleAssignments)
+		genericToAdd, genericToRemove := helper.FindRoleAssignmentsDiff(oldGenericEntries, newGenericEntries)
+		rolesToAdd := genericToEnrollmentEntries(genericToAdd)
+		rolesToRemove := genericToEnrollmentEntries(genericToRemove)
+
 		if len(rolesToAdd) != 0 {
 			err := r.AddEnrollmentRoleAssignments(ctx, rolesToAdd, plan.EnrollmentRID.ValueString())
 			if err != nil {
@@ -477,34 +441,18 @@ func (r *enrollmentRoleAssignmentsResource) RemoveEnrollmentRoleAssignments(ctx 
 	return nil
 }
 
-func findEnrollmentRolesDiff(oldSlice, newSlice []enrollmentRolesRequestBodyEntry) (added, removed []enrollmentRolesRequestBodyEntry) {
-	// Create maps for quick lookup
-	oldMap := make(map[string]enrollmentRolesRequestBodyEntry)
-	newMap := make(map[string]enrollmentRolesRequestBodyEntry)
-
-	// Populate the maps with elements from the slices
-	for _, item := range oldSlice {
-		key := item.PrincipalID + "|" + item.RoleID
-		oldMap[key] = item
+func enrollmentEntriesToGeneric(entries []enrollmentRolesRequestBodyEntry) []helper.RoleAssignmentEntry {
+	result := make([]helper.RoleAssignmentEntry, len(entries))
+	for i, e := range entries {
+		result[i] = helper.RoleAssignmentEntry{RoleIdentifier: e.RoleID, PrincipalID: e.PrincipalID}
 	}
-	for _, item := range newSlice {
-		key := item.PrincipalID + "|" + item.RoleID
-		newMap[key] = item
-	}
+	return result
+}
 
-	// Find added elements (in newSlice but not in oldSlice)
-	for key, item := range newMap {
-		if _, exists := oldMap[key]; !exists {
-			added = append(added, item)
-		}
+func genericToEnrollmentEntries(entries []helper.RoleAssignmentEntry) []enrollmentRolesRequestBodyEntry {
+	result := make([]enrollmentRolesRequestBodyEntry, len(entries))
+	for i, e := range entries {
+		result[i] = enrollmentRolesRequestBodyEntry{RoleID: e.RoleIdentifier, PrincipalID: e.PrincipalID}
 	}
-
-	// Find removed elements (in oldSlice but not in newSlice)
-	for key, item := range oldMap {
-		if _, exists := newMap[key]; !exists {
-			removed = append(removed, item)
-		}
-	}
-
-	return added, removed
+	return result
 }

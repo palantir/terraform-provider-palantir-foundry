@@ -25,12 +25,4 @@ data "foundry_enrollment_role_assignments" "example" {
 
 ### Read-Only
 
-- `enrollment_role_assignments` (Set of Object) List of Role Assignments for this Enrollment. (see [below for nested schema](#nestedatt--enrollment_role_assignments))
-
-<a id="nestedatt--enrollment_role_assignments"></a>
-### Nested Schema for `enrollment_role_assignments`
-
-Read-Only:
-
-- `principal_id` (String)
-- `role_id` (String)
+- `enrollment_role_assignments` (Map of Set of String) Map of Role ID to set of Principal IDs for this Enrollment.
