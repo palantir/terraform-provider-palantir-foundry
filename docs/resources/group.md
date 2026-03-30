@@ -11,10 +11,9 @@ Manages a [Group](https://www.palantir.com/docs/foundry/platform-security-manage
 The following operations are currently supported:
 
 - Create a group
+- Update a group's name, description, and organizations
 - Delete a group
 - Import a group
-
-Note: currently, the provider does not have the ability to update its name or description. Additionally, the provider does not have support for updating the organizations a group belongs to after creation.
 
 ## Creating Groups
 
@@ -57,5 +56,6 @@ Note: When preregistering a group, the `description` field is not supported by t
 
 ### Read-Only
 
+- `attributes` (Map of Set of String) A map of the Group's attributes. Attributes prefixed with "multipass:" are reserved for internal use by Foundry and are subject to change.
 - `id` (String) ID of the Group.
 - `realm` (String) Realm of the Group.

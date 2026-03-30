@@ -25,6 +25,7 @@ data "foundry_group" "example" {
 
 ### Read-Only
 
+- `attributes` (Map of Set of String) A map of the Group's attributes. Attributes prefixed with "multipass:" are reserved for internal use by Foundry and are subject to change.
 - `authentication_provider_rid` (String) The RID of the Authentication Provider (required to preregister a group).
 - `description` (String) Description of the Group.
 - `enrollment_rid` (String) The RID of the Enrollment (required to preregister a group).
