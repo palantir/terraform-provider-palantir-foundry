@@ -41,6 +41,7 @@ func DataSources() []func() datasource.DataSource {
 		marking.NewMarkingMembershipDataSource,
 		marking.NewMarkingRoleAssignmentsDataSource,
 		organization.NewOrganizationDataSource,
+		organization.NewOrganizationGuestMembershipDataSource,
 		organization.NewOrganizationRoleAssignmentsDataSource,
 		project.NewProjectDataSource,
 		project.NewProjectMarkingsDataSource,

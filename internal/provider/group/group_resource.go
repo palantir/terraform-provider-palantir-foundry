@@ -21,6 +21,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -101,6 +102,11 @@ func (r *groupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 			"realm": schema.StringAttribute{
 				Description: "Realm of the Group.",
 				Computed:    true,
+			},
+			"attributes": schema.MapAttribute{
+				Description: "A map of the Group's attributes. Attributes prefixed with \"multipass:\" are reserved for internal use by Foundry and are subject to change.",
+				Computed:    true,
+				ElementType: types.SetType{ElemType: types.StringType},
 			},
 			"enrollment_rid": schema.StringAttribute{
 				Description: "The RID of the Enrollment (required to preregister a group).",
@@ -228,6 +234,7 @@ func (r *groupResource) CreateOrPreregisterGroup(ctx context.Context, resp *reso
 
 		plan.ID = types.StringValue(groupID)
 		plan.Realm = types.StringValue("")
+		plan.Attributes = types.MapNull(types.SetType{ElemType: types.StringType})
 		return nil
 	} else {
 		var httpResponseBody responseBody
@@ -247,6 +254,13 @@ func (r *groupResource) CreateOrPreregisterGroup(ctx context.Context, resp *reso
 
 		plan.ID = types.StringValue(httpResponseBody.ID)
 		plan.Realm = types.StringValue(httpResponseBody.Realm)
+
+		attributesMap, err := attributesToMapValue(httpResponseBody.Attributes)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to convert group attributes", err.Error())
+			return fmt.Errorf("failed to convert group attributes: %w", err)
+		}
+		plan.Attributes = attributesMap
 
 		return nil
 	}
@@ -329,11 +343,18 @@ func (r *groupResource) ReadGroup(ctx context.Context, resp *resource.ReadRespon
 	state.Description = helper.HandleEmptyFieldString(httpResponseBody.Description)
 	state.Realm = types.StringValue(httpResponseBody.Realm)
 	state.Organizations, _ = types.ListValueFrom(ctx, types.StringType, httpResponseBody.Organizations)
+
+	attributesMap, err := attributesToMapValue(httpResponseBody.Attributes)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to convert group attributes", err.Error())
+		return fmt.Errorf("failed to convert group attributes: %w", err)
+	}
+	state.Attributes = attributesMap
+
 	return nil
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
-// TODO: add updating group to API-GATEWAY and implement here.
 func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// Retrieve values from plan
 	var plan groupResourceModel
@@ -375,14 +396,75 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
-	//TODO (epanjwani): remove this temporary check preventing updates to a group's name, description or organizations once upstream endpoint is available
-
-	if (plan.Name != state.Name) || (plan.Description != state.Description) || !plan.Organizations.Equal(state.Organizations) {
-		resp.Diagnostics.AddError("Updating a Group's name, description or organizations in currently unsupported in Terraform.", "Updating a Group's name, description or organizations in currently unsupported in Terraform. Please revert the changes in your plan and re-apply")
+	var organizationsGoSlice []v2.CoreOrganizationRid
+	diags = plan.Organizations.ElementsAs(ctx, &organizationsGoSlice, false)
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
 		return
 	}
 
-	diags = resp.State.Set(ctx, state)
+	description := plan.Description.ValueStringPointer()
+
+	attributes, err := mapValueToAttributes(ctx, state.Attributes)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to convert group attributes", err.Error())
+		return
+	}
+
+	groupIdAsUUID, err := uuid.Parse(state.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid UUID format for group ID", fmt.Sprintf("The provided group ID %s could not be parsed as a UUID: %s", state.ID.ValueString(), err.Error()))
+		return
+	}
+
+	httpResp, err := r.client.AdminReplaceGroup(ctx, groupIdAsUUID, v2.AdminReplaceGroupJSONRequestBody{
+		Name:          plan.Name.ValueString(),
+		Description:   description,
+		Organizations: &organizationsGoSlice,
+		Attributes:    attributes,
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("AdminReplaceGroup request failed", err.Error())
+		return
+	}
+
+	if httpResp.StatusCode != http.StatusOK {
+		returnString, err := providerError.FormatHTTPError(httpResp)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to format error logging from AdminReplaceGroup response", err.Error())
+			return
+		}
+		resp.Diagnostics.AddError("Response from AdminReplaceGroup was unsuccessful", returnString)
+		return
+	}
+
+	bodyBytes, err := helper.ExtractBodyFromResponse(httpResp)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to parse response from AdminReplaceGroup", err.Error())
+		return
+	}
+
+	var httpResponseBody responseBody
+	if err := json.Unmarshal(bodyBytes, &httpResponseBody); err != nil {
+		resp.Diagnostics.AddError("Error decoding AdminReplaceGroup response",
+			fmt.Sprintf("Could not decode response body: %s", err))
+		return
+	}
+
+	plan.ID = types.StringValue(httpResponseBody.ID)
+	plan.Name = types.StringValue(httpResponseBody.Name)
+	plan.Description = helper.HandleEmptyFieldString(httpResponseBody.Description)
+	plan.Realm = types.StringValue(httpResponseBody.Realm)
+	plan.Organizations, _ = types.ListValueFrom(ctx, types.StringType, httpResponseBody.Organizations)
+
+	attributesMap, err := attributesToMapValue(httpResponseBody.Attributes)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to convert group attributes", err.Error())
+		return
+	}
+	plan.Attributes = attributesMap
+
+	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -453,4 +535,53 @@ func (r *groupResource) ImportState(ctx context.Context, req resource.ImportStat
 
 	// The Read method will be called automatically after ImportState
 	// to refresh all the other attributes based on the RID
+}
+
+var attributesMapElementType = types.SetType{ElemType: types.StringType}
+
+// attributesToMapValue converts a map[string][]string from the API response into a types.Map
+// with set<string> values suitable for Terraform state.
+func attributesToMapValue(attributes map[string][]string) (types.Map, error) {
+	if attributes == nil {
+		return types.MapNull(attributesMapElementType), nil
+	}
+
+	mapValues := make(map[string]attr.Value, len(attributes))
+	for key, values := range attributes {
+		setValues := make([]attr.Value, len(values))
+		for i, v := range values {
+			setValues[i] = types.StringValue(v)
+		}
+		setValue, diags := types.SetValue(types.StringType, setValues)
+		if diags.HasError() {
+			return types.MapNull(attributesMapElementType), fmt.Errorf("failed to create set for attribute %s", key)
+		}
+		mapValues[key] = setValue
+	}
+
+	mapValue, diags := types.MapValue(attributesMapElementType, mapValues)
+	if diags.HasError() {
+		return types.MapNull(attributesMapElementType), fmt.Errorf("failed to create attributes map")
+	}
+	return mapValue, nil
+}
+
+// mapValueToAttributes converts a types.Map with set<string> values from Terraform state
+// back into *map[string]v2.AdminAttributeValues for the API request.
+func mapValueToAttributes(ctx context.Context, m types.Map) (*map[string]v2.AdminAttributeValues, error) {
+	if m.IsNull() || m.IsUnknown() {
+		return nil, nil
+	}
+
+	var raw map[string][]string
+	diags := m.ElementsAs(ctx, &raw, false)
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to convert attributes map")
+	}
+
+	result := make(map[string]v2.AdminAttributeValues, len(raw))
+	for key, values := range raw {
+		result[key] = values
+	}
+	return &result, nil
 }

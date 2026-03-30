@@ -24,6 +24,7 @@ type groupResourceModel struct {
 	Description               types.String `tfsdk:"description"`
 	Realm                     types.String `tfsdk:"realm"`
 	Organizations             types.List   `tfsdk:"organizations"`
+	Attributes                types.Map    `tfsdk:"attributes"`
 	EnrollmentRID             types.String `tfsdk:"enrollment_rid"`
 	AuthenticationProviderRID types.String `tfsdk:"authentication_provider_rid"`
 }
@@ -35,11 +36,12 @@ type groupMembershipResourceModel struct {
 
 // responseBody contains the schema for response body for groups endpoint
 type responseBody struct {
-	ID            string   `json:"id"`
-	Name          string   `json:"name"`
-	Description   string   `json:"description"`
-	Realm         string   `json:"realm"`
-	Organizations []string `json:"organizations"`
+	ID            string              `json:"id"`
+	Name          string              `json:"name"`
+	Description   string              `json:"description"`
+	Realm         string              `json:"realm"`
+	Organizations []string            `json:"organizations"`
+	Attributes    map[string][]string `json:"attributes,omitempty"`
 }
 
 // groupMembersResponseBody contains the schema for response body for groups endpoint

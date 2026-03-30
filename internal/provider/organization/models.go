@@ -56,3 +56,8 @@ type organizationRoleAssignmentsResourceModel struct {
 	OrganizationRID             types.String `tfsdk:"organization_rid"`
 	OrganizationRoleAssignments types.Map    `tfsdk:"organization_role_assignments"`
 }
+
+type organizationGuestMembershipResourceModel struct {
+	OrganizationRID types.String `tfsdk:"organization_rid"`
+	GuestMembers    types.Set    `tfsdk:"organization_guest_members"`
+}
