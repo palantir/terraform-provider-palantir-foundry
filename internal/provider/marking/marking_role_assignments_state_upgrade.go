@@ -36,7 +36,7 @@ func (r *markingRoleAssignmentsResource) UpgradeState(_ context.Context) map[int
 }
 
 func markingRoleAssignmentsV0ToV1StateUpgrader(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
-	var markingID string
+	var markingID types.String
 	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("marking_id"), &markingID)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -62,8 +62,11 @@ func markingRoleAssignmentsV0ToV1StateUpgrader(ctx context.Context, req resource
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("marking_id"), markingID)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("marking_role_assignments"), newMap)...)
+	v1 := markingRoleAssignmentsResourceModel{
+		MarkingID:              markingID,
+		MarkingRoleAssignments: newMap,
+	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, v1)...)
 }
 
 func markingRoleAssignmentsV0Schema() *schema.Schema {

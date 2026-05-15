@@ -35,7 +35,7 @@ func (r *projectResource) UpgradeState(_ context.Context) map[int64]resource.Sta
 
 func projectV0ToV1StateUpgrader(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
 	// Read all existing scalar attributes
-	var rid, displayName, spaceRid, description, trashStatus *string
+	var rid, displayName, spaceRid, description, trashStatus types.String
 	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("rid"), &rid)...)
 	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("display_name"), &displayName)...)
 	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("space_rid"), &spaceRid)...)
@@ -50,6 +50,9 @@ func projectV0ToV1StateUpgrader(ctx context.Context, req resource.UpgradeStateRe
 	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("initial_organizations"), &initialOrganizations)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+	if initialOrganizations.IsNull() || initialOrganizations.ElementType(ctx) == nil {
+		initialOrganizations = types.SetNull(types.StringType)
 	}
 
 	// Read initial_resource_roles (the old V0 field)
@@ -88,14 +91,16 @@ func projectV0ToV1StateUpgrader(ctx context.Context, req resource.UpgradeStateRe
 		return
 	}
 
-	// Set all attributes in the new V1 state
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("rid"), rid)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("display_name"), displayName)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("space_rid"), spaceRid)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("description"), description)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("trash_status"), trashStatus)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("initial_principal_roles"), principalRolesMap)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("initial_organizations"), initialOrganizations)...)
+	v1 := projectResourceModel{
+		RID:                   rid,
+		DisplayName:           displayName,
+		SpaceRID:              spaceRid,
+		Description:           description,
+		TrashStatus:           trashStatus,
+		InitialPrincipalRoles: principalRolesMap,
+		InitialOrganizations:  initialOrganizations,
+	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, v1)...)
 }
 
 func projectV0Schema() *schema.Schema {

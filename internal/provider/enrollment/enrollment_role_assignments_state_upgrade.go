@@ -36,7 +36,7 @@ func (r *enrollmentRoleAssignmentsResource) UpgradeState(_ context.Context) map[
 }
 
 func v0ToV1StateUpgrader(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
-	var enrollmentRID string
+	var enrollmentRID types.String
 	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("enrollment_rid"), &enrollmentRID)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -62,8 +62,11 @@ func v0ToV1StateUpgrader(ctx context.Context, req resource.UpgradeStateRequest, 
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("enrollment_rid"), enrollmentRID)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("enrollment_role_assignments"), newMap)...)
+	v1 := enrollmentRoleAssignmentsResourceModel{
+		EnrollmentRID:             enrollmentRID,
+		EnrollmentRoleAssignments: newMap,
+	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, v1)...)
 }
 
 func V0Schema() *schema.Schema {
