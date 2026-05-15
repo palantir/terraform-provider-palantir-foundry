@@ -20,6 +20,7 @@ import (
 	"sort"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -117,7 +118,14 @@ func flattenPrincipalRolesMap(ctx context.Context, m types.Map) ([]principalRole
 
 // buildPrincipalRolesMap groups flat principalRoleEntry values by role ID,
 // splits by principal type, and builds a types.Map suitable for Terraform state.
+// Returns a null map when entries is empty, and null sets for any role with
+// zero groups or zero users, so the produced value matches the shape Terraform
+// would derive from HCL where those fields are omitted.
 func buildPrincipalRolesMap(entries []principalRoleEntry) (types.Map, error) {
+	if len(entries) == 0 {
+		return types.MapNull(principalRoleEntryObjectType), nil
+	}
+
 	type roleData struct {
 		groups []string
 		users  []string
@@ -142,22 +150,30 @@ func buildPrincipalRolesMap(entries []principalRoleEntry) (types.Map, error) {
 
 	mapValues := make(map[string]attr.Value, len(grouped))
 	for roleID, rd := range grouped {
-		groupValues := make([]attr.Value, len(rd.groups))
-		for i, g := range rd.groups {
-			groupValues[i] = types.StringValue(g)
-		}
-		groupsSet, diags := types.SetValue(types.StringType, groupValues)
-		if diags.HasError() {
-			return types.MapNull(principalRoleEntryObjectType), fmt.Errorf("failed to create groups set for role %s", roleID)
+		groupsSet := types.SetNull(types.StringType)
+		if len(rd.groups) > 0 {
+			groupValues := make([]attr.Value, len(rd.groups))
+			for i, g := range rd.groups {
+				groupValues[i] = types.StringValue(g)
+			}
+			var diags diag.Diagnostics
+			groupsSet, diags = types.SetValue(types.StringType, groupValues)
+			if diags.HasError() {
+				return types.MapNull(principalRoleEntryObjectType), fmt.Errorf("failed to create groups set for role %s", roleID)
+			}
 		}
 
-		userValues := make([]attr.Value, len(rd.users))
-		for i, u := range rd.users {
-			userValues[i] = types.StringValue(u)
-		}
-		usersSet, diags := types.SetValue(types.StringType, userValues)
-		if diags.HasError() {
-			return types.MapNull(principalRoleEntryObjectType), fmt.Errorf("failed to create users set for role %s", roleID)
+		usersSet := types.SetNull(types.StringType)
+		if len(rd.users) > 0 {
+			userValues := make([]attr.Value, len(rd.users))
+			for i, u := range rd.users {
+				userValues[i] = types.StringValue(u)
+			}
+			var diags diag.Diagnostics
+			usersSet, diags = types.SetValue(types.StringType, userValues)
+			if diags.HasError() {
+				return types.MapNull(principalRoleEntryObjectType), fmt.Errorf("failed to create users set for role %s", roleID)
+			}
 		}
 
 		objVal, diags := types.ObjectValue(

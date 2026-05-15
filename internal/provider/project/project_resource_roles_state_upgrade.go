@@ -35,7 +35,7 @@ func (r *projectResourceRolesResource) UpgradeState(_ context.Context) map[int64
 }
 
 func projectResourceRolesV0ToV1StateUpgrader(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
-	var projectRid string
+	var projectRid types.String
 	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("project_rid"), &projectRid)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -89,9 +89,12 @@ func projectResourceRolesV0ToV1StateUpgrader(ctx context.Context, req resource.U
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_rid"), projectRid)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("principal_roles"), principalRolesMap)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("default_roles"), defaultRolesSet)...)
+	v1 := projectResourceRolesResourceModel{
+		ProjectRid:     projectRid,
+		PrincipalRoles: principalRolesMap,
+		DefaultRoles:   defaultRolesSet,
+	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, v1)...)
 }
 
 func projectResourceRolesV0Schema() *schema.Schema {

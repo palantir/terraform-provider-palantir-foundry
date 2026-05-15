@@ -36,7 +36,7 @@ func (r *organizationRoleAssignmentsResource) UpgradeState(_ context.Context) ma
 }
 
 func v0ToV1StateUpgrader(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
-	var organizationRID string
+	var organizationRID types.String
 	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("organization_rid"), &organizationRID)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -62,8 +62,11 @@ func v0ToV1StateUpgrader(ctx context.Context, req resource.UpgradeStateRequest, 
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("organization_rid"), organizationRID)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("organization_role_assignments"), newMap)...)
+	v1 := organizationRoleAssignmentsResourceModel{
+		OrganizationRID:             organizationRID,
+		OrganizationRoleAssignments: newMap,
+	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, v1)...)
 }
 
 func V0Schema() *schema.Schema {

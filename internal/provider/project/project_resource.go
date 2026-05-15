@@ -330,7 +330,6 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	//three cases for errors here. We should throw an error here, as if we let the provider continue, it will throw an error due to discrepancy between plan (which has changed value) and state (which has not)
 	if !plan.InitialPrincipalRoles.Equal(state.InitialPrincipalRoles) {
 		resp.Diagnostics.AddError("Initial Principal Roles cannot be updated after creation. Any changes will not be applied.",
 			"Initial Principal Roles cannot be updated after creation. Any changes will not be applied.")
