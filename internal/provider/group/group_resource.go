@@ -19,6 +19,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -255,7 +257,7 @@ func (r *groupResource) CreateOrPreregisterGroup(ctx context.Context, resp *reso
 		plan.ID = types.StringValue(httpResponseBody.ID)
 		plan.Realm = types.StringValue(httpResponseBody.Realm)
 
-		attributesMap, err := attributesToMapValue(httpResponseBody.Attributes)
+		attributesMap, err := attributesToMapValue(filterMultipassAttributes(httpResponseBody.Attributes))
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to convert group attributes", err.Error())
 			return fmt.Errorf("failed to convert group attributes: %w", err)
@@ -342,9 +344,11 @@ func (r *groupResource) ReadGroup(ctx context.Context, resp *resource.ReadRespon
 	state.Name = types.StringValue(httpResponseBody.Name)
 	state.Description = helper.HandleEmptyFieldString(httpResponseBody.Description)
 	state.Realm = types.StringValue(httpResponseBody.Realm)
+	sort.Strings(httpResponseBody.Organizations)
 	state.Organizations, _ = types.ListValueFrom(ctx, types.StringType, httpResponseBody.Organizations)
 
-	attributesMap, err := attributesToMapValue(httpResponseBody.Attributes)
+	filteredAttributes := filterMultipassAttributes(httpResponseBody.Attributes)
+	attributesMap, err := attributesToMapValue(filteredAttributes)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to convert group attributes", err.Error())
 		return fmt.Errorf("failed to convert group attributes: %w", err)
@@ -352,6 +356,87 @@ func (r *groupResource) ReadGroup(ctx context.Context, resp *resource.ReadRespon
 	state.Attributes = attributesMap
 
 	return nil
+}
+
+// filterMultipassAttributes removes any attributes whose keys start with "multipass:".
+// These are reserved for internal use by Foundry and should not be stored in Terraform state.
+func filterMultipassAttributes(attributes map[string][]string) map[string][]string {
+	if attributes == nil {
+		return nil
+	}
+	filtered := make(map[string][]string, len(attributes))
+	for key, values := range attributes {
+		if strings.HasPrefix(key, "multipass:") {
+			continue
+		}
+		filtered[key] = values
+	}
+	return filtered
+}
+
+// fetchMultipassAttributes retrieves the current group from the server and returns
+// only the attributes whose keys start with "multipass:". These are managed by
+// Foundry and must be preserved across replace calls. Organization and realm
+// multipass attributes are excluded because multipass ignores updates to them
+// and echoing them back would be wasted payload.
+func (r *groupResource) fetchMultipassAttributes(ctx context.Context, resp *resource.UpdateResponse, groupID uuid.UUID) (map[string]v2.AdminAttributeValues, error) {
+	httpResp, err := r.client.AdminGetGroup(ctx, groupID)
+	if err != nil {
+		resp.Diagnostics.AddError("AdminGetGroup request failed", err.Error())
+		return nil, err
+	}
+	if httpResp.StatusCode != http.StatusOK {
+		returnString, formatErr := providerError.FormatHTTPError(httpResp)
+		if formatErr != nil {
+			resp.Diagnostics.AddError("Failed to format error logging from AdminGetGroup response", formatErr.Error())
+			return nil, formatErr
+		}
+		resp.Diagnostics.AddError("Response from AdminGetGroup was unsuccessful", returnString)
+		return nil, fmt.Errorf("response from AdminGetGroup was unsuccessful: %s", returnString)
+	}
+
+	bodyBytes, err := helper.ExtractBodyFromResponse(httpResp)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to parse response from AdminGetGroup", err.Error())
+		return nil, err
+	}
+
+	var body responseBody
+	if err := json.Unmarshal(bodyBytes, &body); err != nil {
+		resp.Diagnostics.AddError("Error decoding AdminGetGroup response", err.Error())
+		return nil, err
+	}
+
+	result := make(map[string]v2.AdminAttributeValues)
+	for key, values := range body.Attributes {
+		if !strings.HasPrefix(key, "multipass:") {
+			continue
+		}
+		if strings.HasPrefix(key, "multipass:organization") || strings.HasPrefix(key, "multipass:realm") {
+			continue
+		}
+		result[key] = values
+	}
+	return result, nil
+}
+
+// mergeAttributes combines plan-supplied (non-multipass) attributes with multipass
+// attributes pulled from the server, producing the payload for AdminReplaceGroup.
+// Returns nil when the merged result is empty so the field is omitted from the request.
+func mergeAttributes(planAttributes *map[string]v2.AdminAttributeValues, multipassAttributes map[string]v2.AdminAttributeValues) *map[string]v2.AdminAttributeValues {
+	merged := make(map[string]v2.AdminAttributeValues)
+	if planAttributes != nil {
+		for key, values := range *planAttributes {
+			merged[key] = values
+		}
+	}
+	for key, values := range multipassAttributes {
+		merged[key] = values
+	}
+	if len(merged) == 0 {
+		return nil
+	}
+	return &merged
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
@@ -405,17 +490,26 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 
 	description := plan.Description.ValueStringPointer()
 
-	attributes, err := mapValueToAttributes(ctx, state.Attributes)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to convert group attributes", err.Error())
-		return
-	}
-
 	groupIdAsUUID, err := uuid.Parse(state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid UUID format for group ID", fmt.Sprintf("The provided group ID %s could not be parsed as a UUID: %s", state.ID.ValueString(), err.Error()))
 		return
 	}
+
+	// Fetch the current group from the server to preserve "multipass:" attributes,
+	// which are managed by Foundry and must be sent back on the replace call.
+	multipassAttributes, err := r.fetchMultipassAttributes(ctx, resp, groupIdAsUUID)
+	if err != nil {
+		return
+	}
+
+	planAttributes, err := mapValueToAttributes(ctx, plan.Attributes)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to convert group attributes", err.Error())
+		return
+	}
+
+	attributes := mergeAttributes(planAttributes, multipassAttributes)
 
 	httpResp, err := r.client.AdminReplaceGroup(ctx, groupIdAsUUID, v2.AdminReplaceGroupJSONRequestBody{
 		Name:          plan.Name.ValueString(),
@@ -455,9 +549,10 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	plan.Name = types.StringValue(httpResponseBody.Name)
 	plan.Description = helper.HandleEmptyFieldString(httpResponseBody.Description)
 	plan.Realm = types.StringValue(httpResponseBody.Realm)
+	sort.Strings(httpResponseBody.Organizations)
 	plan.Organizations, _ = types.ListValueFrom(ctx, types.StringType, httpResponseBody.Organizations)
 
-	attributesMap, err := attributesToMapValue(httpResponseBody.Attributes)
+	attributesMap, err := attributesToMapValue(filterMultipassAttributes(httpResponseBody.Attributes))
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to convert group attributes", err.Error())
 		return
