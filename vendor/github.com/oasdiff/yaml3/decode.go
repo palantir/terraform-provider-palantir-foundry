@@ -30,12 +30,13 @@ import (
 // Parser, produces a node tree out of a libyaml event stream.
 
 type parser struct {
-	parser   yaml_parser_t
-	event    yaml_event_t
-	doc      *Node
-	anchors  map[string]*Node
-	doneInit bool
-	textless bool
+	parser            yaml_parser_t
+	event             yaml_event_t
+	doc               *Node
+	anchors           map[string]*Node
+	doneInit          bool
+	textless          bool
+	disableTimestamps bool
 }
 
 func newParser(b []byte) *parser {
@@ -175,7 +176,7 @@ func (p *parser) node(kind Kind, defaultTag, tag, value string) *Node {
 	} else if defaultTag != "" {
 		tag = defaultTag
 	} else if kind == ScalarNode {
-		tag, _ = resolve("", value)
+		tag, _ = resolve("", value, p.disableTimestamps)
 	}
 	n := &Node{
 		Kind:  kind,
@@ -318,12 +319,14 @@ type decoder struct {
 	stringMapType  reflect.Type
 	generalMapType reflect.Type
 
-	knownFields bool
-	origin      bool
-	uniqueKeys  bool
-	decodeCount int
-	aliasCount  int
-	aliasDepth  int
+	knownFields       bool
+	origin            bool
+	file              string
+	uniqueKeys        bool
+	decodeCount       int
+	aliasCount        int
+	aliasDepth        int
+	disableTimestamps bool
 
 	mergedFields map[interface{}]bool
 }
@@ -525,6 +528,24 @@ func (d *decoder) unmarshal(n *Node, out reflect.Value) (good bool) {
 func (d *decoder) document(n *Node, out reflect.Value) (good bool) {
 	if len(n.Content) == 1 {
 		d.doc = n
+		if d.origin && d.aliasDepth == 0 {
+			root := n.Content[0]
+			if root.Kind == MappingNode && len(root.Content) >= 2 {
+				// Inject __origin__ into the root mapping of the document so that
+				// $ref-rooted YAML files (e.g. schemas/pet.yaml) expose origin
+				// metadata on their top-level schema, just like nested mappings do.
+				// Use the first key's position as the anchor for line-delta calculations.
+				firstKey := root.Content[0]
+				syntheticKey := &Node{
+					Kind:   ScalarNode,
+					Tag:    "!!str",
+					Value:  "",
+					Line:   firstKey.Line,
+					Column: firstKey.Column,
+				}
+				addOriginInMap(syntheticKey, root, d.file)
+			}
+		}
 		d.unmarshal(n.Content[0], out)
 		return true
 	}
@@ -570,7 +591,7 @@ func (d *decoder) scalar(n *Node, out reflect.Value) bool {
 		tag = strTag
 		resolved = n.Value
 	} else {
-		tag, resolved = resolve(n.Tag, n.Value)
+		tag, resolved = resolve(n.Tag, n.Value, d.disableTimestamps)
 		if tag == binaryTag {
 			data, err := base64.StdEncoding.DecodeString(resolved.(string))
 			if err != nil {
@@ -751,8 +772,8 @@ func (d *decoder) sequence(n *Node, out reflect.Value) (good bool) {
 	j := 0
 	for i := 0; i < l; i++ {
 		e := reflect.New(et).Elem()
-		if d.origin {
-			addOriginInSeq(n.Content[i])
+		if d.origin && d.aliasDepth == 0 {
+			addOriginInSeq(n.Content[i], d.file)
 		}
 		if ok := d.unmarshal(n.Content[i], e); ok {
 			out.Index(j).Set(e)
@@ -832,6 +853,24 @@ func (d *decoder) mapping(n *Node, out reflect.Value) (good bool) {
 			mergeNode = n.Content[i+1]
 			continue
 		}
+		// __origin__ metadata entries are injected when the anchor is first processed.
+		// Decoding them through the normal path would count toward aliasCount and
+		// could spuriously trigger the excessive-aliasing check on large specs.
+		// Decode them with aliasDepth temporarily zeroed so they don't count
+		// toward aliasCount, but the origin data is still present in the output.
+		if d.aliasDepth > 0 && isOrigin(n.Content[i]) {
+			savedAliasDepth := d.aliasDepth
+			d.aliasDepth = 0
+			k := reflect.New(kt).Elem()
+			if d.unmarshal(n.Content[i], k) {
+				e := reflect.New(et).Elem()
+				if d.unmarshal(n.Content[i+1], e) {
+					out.SetMapIndex(k, e)
+				}
+			}
+			d.aliasDepth = savedAliasDepth
+			continue
+		}
 		k := reflect.New(kt).Elem()
 		if d.unmarshal(n.Content[i], k) {
 			if mergedFields != nil {
@@ -850,8 +889,8 @@ func (d *decoder) mapping(n *Node, out reflect.Value) (good bool) {
 			}
 			e := reflect.New(et).Elem()
 
-			if d.origin {
-				addOriginInMap(n.Content[i], n.Content[i+1])
+			if d.origin && d.aliasDepth == 0 {
+				addOriginInMap(n.Content[i], n.Content[i+1], d.file)
 			}
 			if d.unmarshal(n.Content[i+1], e) || n.Content[i+1].ShortTag() == nullTag && (mapIsNew || !out.MapIndex(k).IsValid()) {
 				out.SetMapIndex(k, e)

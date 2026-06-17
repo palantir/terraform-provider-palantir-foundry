@@ -2,7 +2,27 @@ package overlay
 
 import (
 	"bytes"
+
+	"github.com/speakeasy-api/openapi/internal/version"
 	"gopkg.in/yaml.v3"
+)
+
+// Version constants for the Overlay specification
+const (
+	// LatestVersion is the latest supported overlay version
+	LatestVersion = "1.1.0"
+	// Version100 is the Overlay 1.0.0 version
+	Version100 = "1.0.0"
+	// Version110 is the Overlay 1.1.0 version
+	Version110 = "1.1.0"
+)
+
+// JSONPath implementation constants
+const (
+	// JSONPathRFC9535 enables RFC 9535 JSONPath implementation
+	JSONPathRFC9535 = "rfc9535"
+	// JSONPathLegacy enables legacy yamlpath implementation (for backward compatibility)
+	JSONPathLegacy = "legacy"
 )
 
 // Extensible provides a place for extensions to be added to components of the
@@ -13,10 +33,12 @@ type Extensions map[string]any
 type Overlay struct {
 	Extensions `yaml:"-,inline"`
 
-	// Version is the version of the overlay configuration. This is only ever expected to be 1.0.0
+	// Version is the version of the overlay configuration (1.0.0 or 1.1.0)
 	Version string `yaml:"overlay"`
 
-	// JSONPathVersion should be set to rfc9535, and is used for backwards compatability purposes
+	// JSONPathVersion controls the JSONPath implementation used.
+	// For version 1.0.0: default is legacy, use "rfc9535" to opt-in to RFC 9535
+	// For version 1.1.0: default is RFC 9535, use "legacy" to opt-out
 	JSONPathVersion string `yaml:"x-speakeasy-jsonpath,omitempty"`
 
 	// Info describes the metadata for the overlay.
@@ -27,6 +49,18 @@ type Overlay struct {
 
 	// Actions is the list of actions to perform to apply the overlay.
 	Actions []Action `yaml:"actions"`
+}
+
+// IsV110OrLater returns true if the overlay version is 1.1.0 or later.
+// Invalid or missing versions default to false (1.0.0 behavior) for safety.
+func (o *Overlay) IsV110OrLater() bool {
+	overlayVersion, err := version.Parse(o.Version)
+	if err != nil {
+		return false
+	}
+
+	v110 := version.MustParse(Version110)
+	return !overlayVersion.LessThan(*v110)
 }
 
 func (o *Overlay) ToString() (string, error) {
@@ -46,6 +80,9 @@ type Info struct {
 
 	// Version is the version of the overlay.
 	Version string `yaml:"version"`
+
+	// Description is an optional description of the overlay (new in Overlay 1.1.0).
+	Description string `yaml:"description,omitempty"`
 }
 
 type Action struct {
@@ -63,4 +100,8 @@ type Action struct {
 
 	// Remove marks the target node for removal rather than update.
 	Remove bool `yaml:"remove,omitempty"`
+
+	// Copy is a JSONPath to the source node to copy to the target. This is
+	// mutually exclusive with Update and Remove.
+	Copy string `yaml:"copy,omitempty"`
 }

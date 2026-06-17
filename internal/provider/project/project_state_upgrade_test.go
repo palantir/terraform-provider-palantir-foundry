@@ -193,9 +193,9 @@ func TestProjectUpgradeStateV0ToV1(t *testing.T) {
 			description: "A description",
 			trashStatus: "NOT_TRASHED",
 			v0Roles: []projectV0RoleEntry{
-				{principalType: "principalWithId", principalID: strPtr("user-1"), principalKind: strPtr("USER"), roleID: "role-viewer"},
-				{principalType: "principalWithId", principalID: strPtr("group-2"), principalKind: strPtr("GROUP"), roleID: "role-viewer"},
-				{principalType: "principalWithId", principalID: strPtr("user-3"), principalKind: strPtr("USER"), roleID: "role-editor"},
+				{principalType: "principalWithId", principalID: new("user-1"), principalKind: new("USER"), roleID: "role-viewer"},
+				{principalType: "principalWithId", principalID: new("group-2"), principalKind: new("GROUP"), roleID: "role-viewer"},
+				{principalType: "principalWithId", principalID: new("user-3"), principalKind: new("USER"), roleID: "role-editor"},
 			},
 			orgs: []string{},
 			expectedGroups: map[string][]string{
@@ -214,7 +214,7 @@ func TestProjectUpgradeStateV0ToV1(t *testing.T) {
 			description: "A description",
 			trashStatus: "NOT_TRASHED",
 			v0Roles: []projectV0RoleEntry{
-				{principalType: "principalWithId", principalID: strPtr("user-1"), principalKind: strPtr("USER"), roleID: "role-editor"},
+				{principalType: "principalWithId", principalID: new("user-1"), principalKind: new("USER"), roleID: "role-editor"},
 				{principalType: "everyone", roleID: "role-viewer"},
 				{principalType: "everyone", roleID: "role-discoverer"},
 			},
@@ -232,7 +232,7 @@ func TestProjectUpgradeStateV0ToV1(t *testing.T) {
 			description: "Specific description",
 			trashStatus: "DIRECTLY_TRASHED",
 			v0Roles: []projectV0RoleEntry{
-				{principalType: "principalWithId", principalID: strPtr("user-1"), principalKind: strPtr("USER"), roleID: "role-viewer"},
+				{principalType: "principalWithId", principalID: new("user-1"), principalKind: new("USER"), roleID: "role-viewer"},
 			},
 			orgs:           []string{"org-1", "org-2"},
 			expectedGroups: map[string][]string{},
@@ -248,7 +248,7 @@ func TestProjectUpgradeStateV0ToV1(t *testing.T) {
 			description: "A description",
 			trashStatus: "NOT_TRASHED",
 			v0Roles: []projectV0RoleEntry{
-				{principalType: "principalWithId", principalID: strPtr("user-1"), principalKind: nil, roleID: "role-viewer"},
+				{principalType: "principalWithId", principalID: new("user-1"), principalKind: nil, roleID: "role-viewer"},
 			},
 			orgs:           []string{},
 			expectedGroups: map[string][]string{},

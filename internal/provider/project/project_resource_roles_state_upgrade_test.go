@@ -133,10 +133,6 @@ func buildEmptyResourceRolesV1State() tfsdk.State {
 	return tfsdk.State{Schema: resourceRolesTestV1Schema(), Raw: raw}
 }
 
-func strPtr(s string) *string {
-	return &s
-}
-
 func TestProjectResourceRolesUpgradeStateV0ToV1(t *testing.T) {
 	tests := []struct {
 		name                 string
@@ -150,7 +146,7 @@ func TestProjectResourceRolesUpgradeStateV0ToV1(t *testing.T) {
 			name:       "single principal role single user",
 			projectRid: "ri.foundry.main.project.abc123",
 			v0Entries: []resourceRolesV0Entry{
-				{principalType: "principalWithId", principalID: strPtr("user-1"), principalKind: strPtr("USER"), roleID: "role-viewer"},
+				{principalType: "principalWithId", principalID: new("user-1"), principalKind: new("USER"), roleID: "role-viewer"},
 			},
 			expectedGroups: map[string][]string{},
 			expectedUsers: map[string][]string{
@@ -162,9 +158,9 @@ func TestProjectResourceRolesUpgradeStateV0ToV1(t *testing.T) {
 			name:       "single role mixed users and groups are separated",
 			projectRid: "ri.foundry.main.project.abc123",
 			v0Entries: []resourceRolesV0Entry{
-				{principalType: "principalWithId", principalID: strPtr("user-1"), principalKind: strPtr("USER"), roleID: "role-editor"},
-				{principalType: "principalWithId", principalID: strPtr("group-2"), principalKind: strPtr("GROUP"), roleID: "role-editor"},
-				{principalType: "principalWithId", principalID: strPtr("user-3"), principalKind: strPtr("USER"), roleID: "role-editor"},
+				{principalType: "principalWithId", principalID: new("user-1"), principalKind: new("USER"), roleID: "role-editor"},
+				{principalType: "principalWithId", principalID: new("group-2"), principalKind: new("GROUP"), roleID: "role-editor"},
+				{principalType: "principalWithId", principalID: new("user-3"), principalKind: new("USER"), roleID: "role-editor"},
 			},
 			expectedGroups: map[string][]string{
 				"role-editor": {"group-2"},
@@ -178,11 +174,11 @@ func TestProjectResourceRolesUpgradeStateV0ToV1(t *testing.T) {
 			name:       "multiple principal roles with multiple principals",
 			projectRid: "ri.foundry.main.project.abc123",
 			v0Entries: []resourceRolesV0Entry{
-				{principalType: "principalWithId", principalID: strPtr("user-1"), principalKind: strPtr("USER"), roleID: "role-viewer"},
-				{principalType: "principalWithId", principalID: strPtr("group-2"), principalKind: strPtr("GROUP"), roleID: "role-editor"},
-				{principalType: "principalWithId", principalID: strPtr("user-3"), principalKind: strPtr("USER"), roleID: "role-viewer"},
-				{principalType: "principalWithId", principalID: strPtr("group-4"), principalKind: strPtr("GROUP"), roleID: "role-editor"},
-				{principalType: "principalWithId", principalID: strPtr("user-5"), principalKind: strPtr("USER"), roleID: "role-owner"},
+				{principalType: "principalWithId", principalID: new("user-1"), principalKind: new("USER"), roleID: "role-viewer"},
+				{principalType: "principalWithId", principalID: new("group-2"), principalKind: new("GROUP"), roleID: "role-editor"},
+				{principalType: "principalWithId", principalID: new("user-3"), principalKind: new("USER"), roleID: "role-viewer"},
+				{principalType: "principalWithId", principalID: new("group-4"), principalKind: new("GROUP"), roleID: "role-editor"},
+				{principalType: "principalWithId", principalID: new("user-5"), principalKind: new("USER"), roleID: "role-owner"},
 			},
 			expectedGroups: map[string][]string{
 				"role-editor": {"group-2", "group-4"},
@@ -208,9 +204,9 @@ func TestProjectResourceRolesUpgradeStateV0ToV1(t *testing.T) {
 			name:       "mix of principal roles and default roles",
 			projectRid: "ri.foundry.main.project.abc123",
 			v0Entries: []resourceRolesV0Entry{
-				{principalType: "principalWithId", principalID: strPtr("user-1"), principalKind: strPtr("USER"), roleID: "role-editor"},
+				{principalType: "principalWithId", principalID: new("user-1"), principalKind: new("USER"), roleID: "role-editor"},
 				{principalType: "everyone", roleID: "role-viewer"},
-				{principalType: "principalWithId", principalID: strPtr("group-2"), principalKind: strPtr("GROUP"), roleID: "role-editor"},
+				{principalType: "principalWithId", principalID: new("group-2"), principalKind: new("GROUP"), roleID: "role-editor"},
 				{principalType: "everyone", roleID: "role-discoverer"},
 			},
 			expectedGroups: map[string][]string{
@@ -233,7 +229,7 @@ func TestProjectResourceRolesUpgradeStateV0ToV1(t *testing.T) {
 			name:       "project rid is preserved",
 			projectRid: "ri.foundry.main.project.some-specific-id-value",
 			v0Entries: []resourceRolesV0Entry{
-				{principalType: "principalWithId", principalID: strPtr("user-1"), principalKind: strPtr("USER"), roleID: "role-viewer"},
+				{principalType: "principalWithId", principalID: new("user-1"), principalKind: new("USER"), roleID: "role-viewer"},
 			},
 			expectedGroups: map[string][]string{},
 			expectedUsers: map[string][]string{
@@ -245,7 +241,7 @@ func TestProjectResourceRolesUpgradeStateV0ToV1(t *testing.T) {
 			name:       "nil principal_type defaults to USER",
 			projectRid: "ri.foundry.main.project.abc123",
 			v0Entries: []resourceRolesV0Entry{
-				{principalType: "principalWithId", principalID: strPtr("user-1"), principalKind: nil, roleID: "role-viewer"},
+				{principalType: "principalWithId", principalID: new("user-1"), principalKind: nil, roleID: "role-viewer"},
 			},
 			expectedGroups: map[string][]string{},
 			expectedUsers: map[string][]string{

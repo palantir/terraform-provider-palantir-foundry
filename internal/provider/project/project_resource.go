@@ -145,8 +145,6 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 
 func (r *projectResource) CreateProject(ctx context.Context, resp *resource.CreateResponse, plan *projectResourceModel) error {
 
-	previewMode := constants.PreviewMode
-	filesystemCreateProjectParams := v2.FilesystemCreateProjectParams{Preview: &previewMode}
 	description := plan.Description.ValueString()
 
 	resourceRoles := make(map[string][]v2.FilesystemPrincipalWithID)
@@ -180,7 +178,6 @@ func (r *projectResource) CreateProject(ctx context.Context, resp *resource.Crea
 	}
 
 	httpResp, err := r.client.FilesystemCreateProject(ctx,
-		&filesystemCreateProjectParams,
 		v2.FilesystemCreateProjectJSONRequestBody{
 			Description:      &description,
 			DisplayName:      plan.DisplayName.ValueString(),
@@ -437,9 +434,7 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 }
 
 func (r *projectResource) DeleteResource(ctx context.Context, resp *resource.DeleteResponse, state *projectResourceModel) error {
-	previewMode := constants.PreviewMode
-	filesystemDeleteResourceParams := v2.FilesystemDeleteResourceParams{Preview: &previewMode}
-	httpResp, err := r.client.FilesystemDeleteResource(ctx, state.RID.ValueString(), &filesystemDeleteResourceParams)
+	httpResp, err := r.client.FilesystemDeleteResource(ctx, state.RID.ValueString())
 
 	if err != nil {
 		resp.Diagnostics.AddError("FilesystemDeleteResource request failed", err.Error())
@@ -461,9 +456,7 @@ func (r *projectResource) DeleteResource(ctx context.Context, resp *resource.Del
 }
 
 func (r *projectResource) PermanentlyDeleteResource(ctx context.Context, resp *resource.DeleteResponse, state *projectResourceModel) error {
-	previewMode := constants.PreviewMode
-	filesystemPermanentlyDeleteResourceParams := v2.FilesystemPermanentlyDeleteResourceParams{Preview: &previewMode}
-	httpResp, err := r.client.FilesystemPermanentlyDeleteResource(ctx, state.RID.ValueString(), &filesystemPermanentlyDeleteResourceParams)
+	httpResp, err := r.client.FilesystemPermanentlyDeleteResource(ctx, state.RID.ValueString())
 
 	if err != nil {
 		resp.Diagnostics.AddError("FilesystemPermanentlyDeleteResource request failed", err.Error())

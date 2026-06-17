@@ -2,11 +2,27 @@ package overlay
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"io"
 	"os"
 	"path/filepath"
+
+	"gopkg.in/yaml.v3"
 )
+
+// ParseReader parses an overlay from the given reader.
+func ParseReader(r io.Reader) (*Overlay, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read overlay data: %w", err)
+	}
+
+	var overlay Overlay
+	if err := yaml.Unmarshal(data, &overlay); err != nil {
+		return nil, err
+	}
+
+	return &overlay, nil
+}
 
 // Parse will parse the given reader as an overlay file.
 func Parse(path string) (*Overlay, error) {
@@ -15,21 +31,18 @@ func Parse(path string) (*Overlay, error) {
 		return nil, fmt.Errorf("failed to get absolute path for %q: %w", path, err)
 	}
 
-	ro, err := os.Open(filePath)
+	data, err := os.ReadFile(filePath) //nolint:gosec
 	if err != nil {
-		return nil, fmt.Errorf("failed to open overlay file at path %q: %w", path, err)
+		return nil, fmt.Errorf("failed to read overlay file at path %q: %w", path, err)
 	}
-	defer ro.Close()
 
 	var overlay Overlay
-	dec := yaml.NewDecoder(ro)
-
-	err = dec.Decode(&overlay)
+	err = yaml.Unmarshal(data, &overlay)
 	if err != nil {
 		return nil, err
 	}
 
-	return &overlay, err
+	return &overlay, nil
 }
 
 // Format will validate reformat the given file
@@ -47,7 +60,7 @@ func Format(path string) error {
 		return err
 	}
 
-	return os.WriteFile(filePath, []byte(formatted), 0644)
+	return os.WriteFile(filePath, []byte(formatted), 0600)
 }
 
 // Format writes the file back out as YAML.

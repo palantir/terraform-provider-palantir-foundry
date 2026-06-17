@@ -25,6 +25,7 @@ import (
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/organization"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/project"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/space"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/usage_account"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/user"
 )
 
@@ -48,6 +49,7 @@ func DataSources() []func() datasource.DataSource {
 		project.NewProjectOrganizationsDataSource,
 		project.NewProjectResourceRolesDataSource,
 		space.NewSpaceDataSource,
+		usage_account.NewUsageAccountDataSource,
 		user.NewCurrentUserDataSource,
 		user.NewUserDataSource,
 	}

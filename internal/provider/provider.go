@@ -42,6 +42,7 @@ import (
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/services"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/shared"
 	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/space"
+	"github.com/palantir/terraform-provider-palantir-foundry/internal/provider/usage_account"
 )
 
 // Ensure the implementation satisfies the expected interfaces
@@ -270,5 +271,6 @@ func (p *FoundryProvider) Resources(_ context.Context) []func() resource.Resourc
 		project.NewProjectResourceRolesResource,
 		project.NewProjectOrganizationsResource,
 		space.NewSpaceResource,
+		usage_account.NewUsageAccountResource,
 	}
 }

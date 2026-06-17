@@ -145,11 +145,7 @@ func (r *folderResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	previewMode := constants.PreviewMode
-	filesystemCreateFolderParams := v2.FilesystemCreateFolderParams{Preview: &previewMode}
-
 	httpResp, err := r.client.FilesystemCreateFolder(ctx,
-		&filesystemCreateFolderParams,
 		v2.FilesystemCreateFolderJSONRequestBody{
 			DisplayName:     plan.DisplayName.ValueString(),
 			ParentFolderRid: plan.ParentFolderRID.ValueString(),
@@ -215,9 +211,7 @@ func (r *folderResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	previewMode := constants.PreviewMode
-	filesystemGetFolderParams := v2.FilesystemGetFolderParams{Preview: &previewMode}
-	httpResp, err := r.client.FilesystemGetFolder(ctx, state.RID.ValueString(), &filesystemGetFolderParams)
+	httpResp, err := r.client.FilesystemGetFolder(ctx, state.RID.ValueString())
 
 	if err != nil {
 		resp.Diagnostics.AddError("FilesystemGetFolder request failed", err.Error())
@@ -361,9 +355,7 @@ func (r *folderResource) Delete(ctx context.Context, req resource.DeleteRequest,
 }
 
 func (r *folderResource) DeleteResource(ctx context.Context, resp *resource.DeleteResponse, state *folderResourceModel) error {
-	previewMode := constants.PreviewMode
-	filesystemDeleteResourceParams := v2.FilesystemDeleteResourceParams{Preview: &previewMode}
-	httpResp, err := r.client.FilesystemDeleteResource(ctx, state.RID.ValueString(), &filesystemDeleteResourceParams)
+	httpResp, err := r.client.FilesystemDeleteResource(ctx, state.RID.ValueString())
 
 	if err != nil {
 		resp.Diagnostics.AddError("FilesystemDeleteResource request failed", err.Error())
@@ -385,9 +377,7 @@ func (r *folderResource) DeleteResource(ctx context.Context, resp *resource.Dele
 }
 
 func (r *folderResource) PermanentlyDeleteResource(ctx context.Context, resp *resource.DeleteResponse, state *folderResourceModel) error {
-	previewMode := constants.PreviewMode
-	filesystemPermanentlyDeleteResourceParams := v2.FilesystemPermanentlyDeleteResourceParams{Preview: &previewMode}
-	httpResp, err := r.client.FilesystemPermanentlyDeleteResource(ctx, state.RID.ValueString(), &filesystemPermanentlyDeleteResourceParams)
+	httpResp, err := r.client.FilesystemPermanentlyDeleteResource(ctx, state.RID.ValueString())
 
 	if err != nil {
 		resp.Diagnostics.AddError("FilesystemPermanentlyDeleteResource request failed", err.Error())
