@@ -179,9 +179,8 @@ func (r *projectMarkingsResource) Read(ctx context.Context, req resource.ReadReq
 }
 
 func (r *projectMarkingsResource) ReadProjectMarkings(ctx context.Context, state *projectMarkingsResourceModel) error {
-	previewMode := constants.PreviewMode
 	pageSize := constants.PageSize
-	filesystemListMarkingsOfResourceParams := v2.FilesystemListMarkingsOfResourceParams{Preview: &previewMode, PageSize: &pageSize}
+	filesystemListMarkingsOfResourceParams := v2.FilesystemListMarkingsOfResourceParams{PageSize: &pageSize}
 	httpResp, err := r.client.FilesystemListMarkingsOfResource(ctx, state.ProjectRid.ValueString(), &filesystemListMarkingsOfResourceParams)
 
 	if err != nil {
@@ -213,9 +212,8 @@ func (r *projectMarkingsResource) ReadProjectMarkings(ctx context.Context, state
 }
 
 func (r *projectMarkingsResource) ReadProjectMarkingsOnCreation(ctx context.Context, plan *projectMarkingsResourceModel) ([]string, error) {
-	previewMode := constants.PreviewMode
 	pageSize := constants.PageSize
-	filesystemListMarkingsOfResourceParams := v2.FilesystemListMarkingsOfResourceParams{Preview: &previewMode, PageSize: &pageSize}
+	filesystemListMarkingsOfResourceParams := v2.FilesystemListMarkingsOfResourceParams{PageSize: &pageSize}
 	httpResp, err := r.client.FilesystemListMarkingsOfResource(ctx, plan.ProjectRid.ValueString(), &filesystemListMarkingsOfResourceParams)
 
 	if err != nil {
@@ -365,9 +363,7 @@ func (r *projectMarkingsResource) AddProjectMarkings(ctx context.Context, markin
 		markingIdsToAdd[i] = markingID
 	}
 
-	previewMode := constants.PreviewMode
-	filesystemAddMarkingParams := v2.FilesystemAddMarkingsParams{Preview: &previewMode}
-	httpResp, err := r.client.FilesystemAddMarkings(ctx, id, &filesystemAddMarkingParams, v2.FilesystemAddMarkingsJSONRequestBody{
+	httpResp, err := r.client.FilesystemAddMarkings(ctx, id, v2.FilesystemAddMarkingsJSONRequestBody{
 		MarkingIds: &markingIdsToAdd,
 	})
 
@@ -393,9 +389,7 @@ func (r *projectMarkingsResource) RemoveProjectMarkings(ctx context.Context, mar
 		markingIdsToRemove[i] = markingID
 	}
 
-	previewMode := constants.PreviewMode
-	filesystemRemoveMarkingParams := v2.FilesystemRemoveMarkingsParams{Preview: &previewMode}
-	httpResp, err := r.client.FilesystemRemoveMarkings(ctx, id, &filesystemRemoveMarkingParams, v2.FilesystemRemoveMarkingsJSONRequestBody{
+	httpResp, err := r.client.FilesystemRemoveMarkings(ctx, id, v2.FilesystemRemoveMarkingsJSONRequestBody{
 		MarkingIds: &markingIdsToRemove,
 	})
 

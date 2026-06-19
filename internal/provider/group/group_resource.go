@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"sort"
 	"strings"
@@ -426,13 +427,9 @@ func (r *groupResource) fetchMultipassAttributes(ctx context.Context, resp *reso
 func mergeAttributes(planAttributes *map[string]v2.AdminAttributeValues, multipassAttributes map[string]v2.AdminAttributeValues) *map[string]v2.AdminAttributeValues {
 	merged := make(map[string]v2.AdminAttributeValues)
 	if planAttributes != nil {
-		for key, values := range *planAttributes {
-			merged[key] = values
-		}
+		maps.Copy(merged, *planAttributes)
 	}
-	for key, values := range multipassAttributes {
-		merged[key] = values
-	}
+	maps.Copy(merged, multipassAttributes)
 	if len(merged) == 0 {
 		return nil
 	}
@@ -675,8 +672,6 @@ func mapValueToAttributes(ctx context.Context, m types.Map) (*map[string]v2.Admi
 	}
 
 	result := make(map[string]v2.AdminAttributeValues, len(raw))
-	for key, values := range raw {
-		result[key] = values
-	}
+	maps.Copy(result, raw)
 	return &result, nil
 }

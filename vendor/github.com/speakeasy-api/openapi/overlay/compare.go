@@ -117,13 +117,13 @@ func walkTreesAndCollectActions(path simplePath, y1 *yaml.Node, y2 yaml.Node) ([
 			return walkSequenceNode(path, y1, y2)
 		}
 
-		if len(y2.Content) == len(y1.Content)+1 &&
+		if len(y2.Content) > len(y1.Content) &&
 			yamlEquals(y2.Content[:len(y1.Content)], y1.Content) {
 			return []Action{{
 				Target: path.ToJSONPath(),
 				Update: yaml.Node{
 					Kind:    y1.Kind,
-					Content: []*yaml.Node{y2.Content[len(y1.Content)]},
+					Content: y2.Content[len(y1.Content):],
 				},
 			}}, nil
 		}
@@ -187,9 +187,13 @@ func walkSequenceNode(path simplePath, y1 *yaml.Node, y2 yaml.Node) ([]Action, e
 			c2 = y2.Content[i]
 		}
 
+		var y2Val yaml.Node
+		if c2 != nil {
+			y2Val = *c2
+		}
 		newActions, err := walkTreesAndCollectActions(
 			path.WithIndex(i),
-			c1, *c2)
+			c1, y2Val)
 		if err != nil {
 			return nil, err
 		}

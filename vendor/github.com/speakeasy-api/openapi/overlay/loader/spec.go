@@ -1,11 +1,17 @@
 package loader
 
 import (
+	"errors"
 	"fmt"
-	"github.com/speakeasy-api/openapi-overlay/pkg/overlay"
-	"gopkg.in/yaml.v3"
+	"io"
 	"net/url"
 	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+
+	"github.com/speakeasy-api/openapi/overlay"
+	"gopkg.in/yaml.v3"
 )
 
 // GetOverlayExtendsPath returns the path to file if the extends URL is a file
@@ -14,7 +20,24 @@ import (
 // malformed.
 func GetOverlayExtendsPath(o *overlay.Overlay) (string, error) {
 	if o.Extends == "" {
-		return "", fmt.Errorf("overlay does not specify an extends URL")
+		return "", errors.New("overlay does not specify an extends URL")
+	}
+
+	// Handle Windows file paths that might be formatted as file URLs
+	// file:///C:/path or file://C:/path on Windows need special handling
+	if runtime.GOOS == "windows" && strings.HasPrefix(o.Extends, "file://") {
+		// Remove the file:// or file:/// prefix
+		path := strings.TrimPrefix(o.Extends, "file:///")
+		if path == o.Extends {
+			path = strings.TrimPrefix(o.Extends, "file://")
+		}
+
+		// If it looks like a Windows path (e.g., C:/... or C:\...), use it directly
+		if len(path) >= 2 && path[1] == ':' {
+			// Convert forward slashes to backslashes for Windows
+			path = filepath.FromSlash(path)
+			return path, nil
+		}
 	}
 
 	specUrl, err := url.Parse(o.Extends)
@@ -26,7 +49,14 @@ func GetOverlayExtendsPath(o *overlay.Overlay) (string, error) {
 		return "", fmt.Errorf("only file:// extends URLs are supported, not %q", o.Extends)
 	}
 
-	return specUrl.Path, nil
+	// On Windows, url.Parse().Path for file:///C:/path returns /C:/path
+	// We need to strip the leading slash for Windows absolute paths
+	path := specUrl.Path
+	if runtime.GOOS == "windows" && len(path) >= 3 && path[0] == '/' && path[2] == ':' {
+		path = path[1:] // Remove leading slash
+	}
+
+	return path, nil
 }
 
 // LoadExtendsSpecification will load and parse a YAML or JSON file as specified
@@ -41,12 +71,23 @@ func LoadExtendsSpecification(o *overlay.Overlay) (*yaml.Node, error) {
 	return LoadSpecification(path)
 }
 
+// LoadSpecificationFromReader parses a YAML or JSON specification from the given reader.
+func LoadSpecificationFromReader(r io.Reader) (*yaml.Node, error) {
+	var ys yaml.Node
+	if err := yaml.NewDecoder(r).Decode(&ys); err != nil {
+		return nil, fmt.Errorf("failed to parse specification from reader: %w", err)
+	}
+
+	return &ys, nil
+}
+
 // LoadSpecification will load and parse a YAML or JSON file from the given path.
 func LoadSpecification(path string) (*yaml.Node, error) {
-	rs, err := os.Open(path)
+	rs, err := os.Open(path) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("failed to open schema from path %q: %w", path, err)
 	}
+	defer rs.Close()
 
 	var ys yaml.Node
 	err = yaml.NewDecoder(rs).Decode(&ys)

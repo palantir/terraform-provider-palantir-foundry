@@ -180,9 +180,8 @@ func (r *projectOrganizationsResource) Read(ctx context.Context, req resource.Re
 }
 
 func (r *projectOrganizationsResource) ReadProjectOrganizations(ctx context.Context, state *projectOrganizationsResourceModel) error {
-	previewMode := constants.PreviewMode
 	pageSize := constants.PageSize
-	filesystemListOrganizationsOfProjectParams := v2.FilesystemListOrganizationsOfProjectParams{Preview: &previewMode, PageSize: &pageSize}
+	filesystemListOrganizationsOfProjectParams := v2.FilesystemListOrganizationsOfProjectParams{PageSize: &pageSize}
 	httpResp, err := r.client.FilesystemListOrganizationsOfProject(ctx, state.ProjectRid.ValueString(), &filesystemListOrganizationsOfProjectParams)
 
 	if err != nil {
@@ -213,9 +212,8 @@ func (r *projectOrganizationsResource) ReadProjectOrganizations(ctx context.Cont
 }
 
 func (r *projectOrganizationsResource) ReadProjectOrganizationsOnCreation(ctx context.Context, plan *projectOrganizationsResourceModel) ([]string, error) {
-	previewMode := constants.PreviewMode
 	pageSize := constants.PageSize
-	filesystemListOrganizationsOfProjectParams := v2.FilesystemListOrganizationsOfProjectParams{Preview: &previewMode, PageSize: &pageSize}
+	filesystemListOrganizationsOfProjectParams := v2.FilesystemListOrganizationsOfProjectParams{PageSize: &pageSize}
 	httpResp, err := r.client.FilesystemListOrganizationsOfProject(ctx, plan.ProjectRid.ValueString(), &filesystemListOrganizationsOfProjectParams)
 
 	if err != nil {
@@ -355,9 +353,7 @@ func (r *projectOrganizationsResource) ImportState(ctx context.Context, req reso
 }
 
 func (r *projectOrganizationsResource) AddProjectOrganizations(ctx context.Context, organizationRidsToAdd []string, id string) error {
-	previewMode := constants.PreviewMode
-	filesystemAddOrganizationsParams := v2.FilesystemAddOrganizationsParams{Preview: &previewMode}
-	httpResp, err := r.client.FilesystemAddOrganizations(ctx, id, &filesystemAddOrganizationsParams, v2.FilesystemAddOrganizationsJSONRequestBody{
+	httpResp, err := r.client.FilesystemAddOrganizations(ctx, id, v2.FilesystemAddOrganizationsJSONRequestBody{
 		OrganizationRids: &organizationRidsToAdd,
 	})
 
@@ -378,9 +374,7 @@ func (r *projectOrganizationsResource) AddProjectOrganizations(ctx context.Conte
 }
 
 func (r *projectOrganizationsResource) RemoveProjectOrganizations(ctx context.Context, organizationRidsToRemove []string, id string) error {
-	previewMode := constants.PreviewMode
-	filesystemRemoveOrganizationsParams := v2.FilesystemRemoveOrganizationsParams{Preview: &previewMode}
-	httpResp, err := r.client.FilesystemRemoveOrganizations(ctx, id, &filesystemRemoveOrganizationsParams, v2.FilesystemRemoveOrganizationsJSONRequestBody{
+	httpResp, err := r.client.FilesystemRemoveOrganizations(ctx, id, v2.FilesystemRemoveOrganizationsJSONRequestBody{
 		OrganizationRids: &organizationRidsToRemove,
 	})
 
