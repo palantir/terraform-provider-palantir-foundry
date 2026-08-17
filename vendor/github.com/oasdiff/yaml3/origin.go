@@ -33,7 +33,7 @@ func addOriginInMap(key, n *Node, file string) *Node {
 
 // addOrigin injects a compact __origin__ sequence into the mapping node n.
 //
-// Format: [file, key_name, key_line, key_col, nf, f1_name, f1_delta, f1_col, ..., ns, s1_name, s1_count, s1_l0_delta, s1_c0, ...]
+// Format: [file, key_name, key_line, key_col, nf, f1_name, f1_delta, f1_col, ..., ns, s1_name, s1_count, s1_l0_delta, s1_c0, ..., end_delta, end_col]
 //
 //   - file: source file path
 //   - key_name:  the YAML key whose value is this mapping
@@ -42,6 +42,10 @@ func addOriginInMap(key, n *Node, file string) *Node {
 //   - per field: name (string), line delta from key_line (int), column (int)
 //   - ns: number of sequence fields that have item locations
 //   - per sequence: name (string), item count (int), then count × (line delta, col)
+//   - end_delta, end_col: end of the whole mapping block — line delta from
+//     key_line and absolute column of the position just past its last content.
+//     Appended last so a consumer that stops after the sequences section
+//     simply ignores it (backward compatible).
 func addOrigin(key, n *Node, file string) *Node {
 	if isOrigin(key) {
 		return n
@@ -108,6 +112,16 @@ func buildOriginSeq(key, n *Node, file string) []*Node {
 	nodes = append(nodes, fieldNodes...)
 	nodes = append(nodes, intNode(ns))
 	nodes = append(nodes, seqNodes...)
+
+	// Block end: line delta from key_line and absolute end column of the whole
+	// mapping. Lets a consumer reconstruct the full block span
+	// [key_line, key_line+end_delta] -- e.g. an entire endpoint operation block.
+	endDelta, endCol := 0, 0
+	if n.EndLine > 0 {
+		endDelta = n.EndLine - key.Line
+		endCol = n.EndColumn
+	}
+	nodes = append(nodes, intNode(endDelta), intNode(endCol))
 	return nodes
 }
 
