@@ -233,7 +233,7 @@ func parse[D []byte | string](d D, op Payload) (Decimal, error) {
 	return v, nil
 }
 
-func parseNumber[D []byte | string](d D, neg, sepallowed bool) (Decimal, error) {
+func parseNumber[D ~[]byte | ~string](d D, neg, sepallowed bool) (Decimal, error) {
 	var sig64 uint64
 	var nfrac int16
 	var trunc int8
