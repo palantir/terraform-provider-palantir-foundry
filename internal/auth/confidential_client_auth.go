@@ -53,7 +53,12 @@ func GetAuthToken(multipassApiUrl string, clientID string, clientSecret string) 
 	req.Header.Set("User-Agent", http2.CreateUserAgent())
 
 	// 5. Create an HTTP client and send the request.
-	client := &http.Client{}
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			// Prevent authentication credentials from being sent to a redirected endpoint.
+			return http.ErrUseLastResponse
+		},
+	}
 	httpResp, err := client.Do(req)
 
 	if err != nil {
@@ -62,6 +67,7 @@ func GetAuthToken(multipassApiUrl string, clientID string, clientSecret string) 
 	}
 
 	if httpResp.StatusCode != http.StatusOK {
+		_ = httpResp.Body.Close()
 		log.Printf("Error: received status code %d from the server\n", httpResp.StatusCode)
 		return "", fmt.Errorf("received status code %d from the server", httpResp.StatusCode)
 	}
