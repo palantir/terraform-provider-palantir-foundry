@@ -547,6 +547,23 @@ func SwaggerUriToIrisUri(uri string) string {
 	return pathParamRE.ReplaceAllString(uri, ":$1")
 }
 
+// escapeLiteralPathColons escapes literal ':' characters in an OpenAPI path so
+// that routers which use ':' to introduce a path parameter (Echo, Gin, Fiber)
+// treat them as literals rather than parameter delimiters. Without this, a path
+// like "/pets:validate" registers a parameter named "validate", so multiple
+// such paths collide on the same prefix (issue #1726).
+//
+// The escaped form is a single backslash before the colon (`\:`). The register
+// templates render the result through toGoString (strconv.Quote), which turns
+// the backslash into `\\` in the emitted Go source, so the value the router
+// sees at runtime is exactly `\:` — the escape those routers understand.
+//
+// It must run before parameter substitution, which introduces its own ':'
+// delimiters that must stay unescaped.
+func escapeLiteralPathColons(uri string) string {
+	return strings.ReplaceAll(uri, ":", `\:`)
+}
+
 // SwaggerUriToEchoUri converts a OpenAPI style path URI with parameters to an
 // Echo compatible path URI. We need to replace all of OpenAPI parameters with
 // ":param". Valid input parameters are:
@@ -560,6 +577,7 @@ func SwaggerUriToIrisUri(uri string) string {
 //	{?param}
 //	{?param*}
 func SwaggerUriToEchoUri(uri string) string {
+	uri = escapeLiteralPathColons(uri)
 	return pathParamRE.ReplaceAllString(uri, ":$1")
 }
 
@@ -576,6 +594,7 @@ func SwaggerUriToEchoUri(uri string) string {
 //	{?param}
 //	{?param*}
 func SwaggerUriToFiberUri(uri string) string {
+	uri = escapeLiteralPathColons(uri)
 	return pathParamRE.ReplaceAllString(uri, ":$1")
 }
 
@@ -608,6 +627,7 @@ func SwaggerUriToChiUri(uri string) string {
 //	{?param}
 //	{?param*}
 func SwaggerUriToGinUri(uri string) string {
+	uri = escapeLiteralPathColons(uri)
 	return pathParamRE.ReplaceAllString(uri, ":$1")
 }
 
@@ -641,16 +661,25 @@ func SwaggerUriToGorillaUri(uri string) string {
 //	{?param}
 //	{?param*}
 func SwaggerUriToStdHttpUri(uri string) string {
-	// https://pkg.go.dev/net/http#hdr-Patterns-ServeMux
-	// The special wildcard {$} matches only the end of the URL. For example, the pattern "/{$}" matches only the path "/", whereas the pattern "/" matches every path.
-	if uri == "/" {
-		return "/{$}"
-	}
-
-	return pathParamRE.ReplaceAllStringFunc(uri, func(match string) string {
+	uri = pathParamRE.ReplaceAllStringFunc(uri, func(match string) string {
 		sub := pathParamRE.FindStringSubmatch(match)
 		return "{" + SanitizeGoIdentifier(sub[1]) + "}"
 	})
+
+	// https://pkg.go.dev/net/http#hdr-Patterns-ServeMux
+	// A ServeMux pattern ending in '/' matches the whole subtree below it,
+	// while an OpenAPI path ending in '/' means exactly that path. The
+	// special wildcard {$} anchors the pattern to the end of the URL:
+	// "/foo/{$}" matches only "/foo/", whereas "/foo/" matches every path
+	// under it. Anchoring also prevents registration panics when subtree
+	// patterns from independent spec paths overlap ambiguously (#2065).
+	// Appended after parameter sanitization so the '$' is not treated as a
+	// parameter name.
+	if strings.HasSuffix(uri, "/") {
+		uri += "{$}"
+	}
+
+	return uri
 }
 
 // OrderedParamsFromUri returns the argument names, in order, in a given URI string, so for
@@ -905,10 +934,12 @@ func PathToTypeName(path []string) string {
 }
 
 // StringToGoString takes an arbitrary string and converts it to a valid Go string literal,
-// including the quotes. For instance, `foo "bar"` would be converted to `"foo \"bar\""`
+// including the quotes. For instance, `foo "bar"` would be converted to `"foo \"bar\""`.
+//
+// strconv.Quote escapes backslashes, newlines and other control characters too,
+// so untrusted spec text cannot break out of the generated string literal.
 func StringToGoString(in string) string {
-	esc := strings.ReplaceAll(in, "\"", "\\\"")
-	return fmt.Sprintf("\"%s\"", esc)
+	return strconv.Quote(in)
 }
 
 // StringToGoComment renders a possible multi-line string as a valid Go-Comment.
@@ -1160,4 +1191,11 @@ func isAdditionalPropertiesExplicitFalse(s *openapi3.Schema) bool {
 	}
 
 	return !*s.AdditionalProperties.Has
+}
+
+// normalizeWhitespace converts `\n`, `\r` and `\r\n` to `\n`, and removes any trailing newline(s)
+func normalizeWhitespace(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.ReplaceAll(s, "\r", "\n")
+	return strings.TrimRight(s, "\n\r")
 }

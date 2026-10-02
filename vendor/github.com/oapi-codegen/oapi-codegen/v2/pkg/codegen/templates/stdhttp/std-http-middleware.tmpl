@@ -30,7 +30,7 @@ func (siw *ServerInterfaceWrapper) {{$opid}}(w http.ResponseWriter, r *http.Requ
   }
   {{end}}
   {{if .IsStyled}}
-  err = runtime.BindStyledParameterWithOptions("{{.Style}}", "{{.ParamName}}", r.PathValue("{{.SanitizedParamName}}"), &{{$varName}}, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: {{.Explode}}, Required: {{.Required}}, Type: "{{.SchemaType}}", Format: "{{.SchemaFormat}}"})
+  err = runtime.BindStyledParameterWithOptions("{{.Style}}", "{{.ParamName}}", r.PathValue("{{.SanitizedParamName}}"), &{{$varName}}, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: {{.Explode}}, Required: {{.Required}}, Type: "{{.SchemaType}}", Format: "{{.SchemaFormat}}", ValueIsUnescaped: true})
   if err != nil {
     siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "{{.ParamName}}", Err: err})
     return
@@ -39,7 +39,7 @@ func (siw *ServerInterfaceWrapper) {{$opid}}(w http.ResponseWriter, r *http.Requ
 
   {{end}}
 
-  {{if .SecurityDefinitions -}}
+  {{if and .SecurityDefinitions opts.Compatibility.EnableAuthScopesOnContext -}}
   ctx := r.Context()
 {{range .SecurityDefinitions}}
   ctx = context.WithValue(ctx, {{.ProviderName | sanitizeGoIdentity | ucFirst}}Scopes, {{toStringArray .Scopes}})
@@ -104,7 +104,7 @@ func (siw *ServerInterfaceWrapper) {{$opid}}(w http.ResponseWriter, r *http.Requ
           }
 
         {{if .IsPassThrough}}
-          params.{{.GoName}} = {{if .HasOptionalPointer}}&{{end}}valueList[0]
+          {{.GoName}} = valueList[0]
         {{end}}
 
         {{if .IsJson}}
