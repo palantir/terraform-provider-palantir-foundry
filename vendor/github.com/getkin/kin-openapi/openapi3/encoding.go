@@ -3,15 +3,14 @@ package openapi3
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"slices"
+	"maps"
 )
 
 // Encoding is specified by OpenAPI/Swagger 3.0 standard.
 // See https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md#encoding-object
 type Encoding struct {
 	Extensions map[string]any `json:"-" yaml:"-"`
-	Origin     *Origin        `json:"__origin__,omitempty" yaml:"__origin__,omitempty"`
+	Origin     *Origin        `json:"-" yaml:"-"`
 
 	ContentType   string  `json:"contentType,omitempty" yaml:"contentType,omitempty"`
 	Headers       Headers `json:"headers,omitempty" yaml:"headers,omitempty"`
@@ -26,12 +25,6 @@ func NewEncoding() *Encoding {
 
 // Encodings is a map of encoding objects keyed by field name.
 type Encodings map[string]*Encoding
-
-// UnmarshalJSON sets Encodings to a copy of data.
-func (encodings *Encodings) UnmarshalJSON(data []byte) (err error) {
-	*encodings, err = unmarshalStringMapP[Encoding](data)
-	return
-}
 
 func (encoding *Encoding) WithHeader(name string, header *Header) *Encoding {
 	return encoding.WithHeaderRef(name, &HeaderRef{
@@ -61,9 +54,7 @@ func (encoding Encoding) MarshalJSON() ([]byte, error) {
 // MarshalYAML returns the YAML encoding of Encoding.
 func (encoding Encoding) MarshalYAML() (any, error) {
 	m := make(map[string]any, 5+len(encoding.Extensions))
-	for k, v := range encoding.Extensions {
-		m[k] = v
-	}
+	maps.Copy(m, encoding.Extensions)
 	if x := encoding.ContentType; x != "" {
 		m["contentType"] = x
 	}
@@ -126,12 +117,7 @@ func (encoding *Encoding) Validate(ctx context.Context, opts ...ValidationOption
 		return nil
 	}
 
-	headers := make([]string, 0, len(encoding.Headers))
-	for k := range encoding.Headers {
-		headers = append(headers, k)
-	}
-	slices.Sort(headers)
-	for _, k := range headers {
+	for _, k := range componentNames(encoding.Headers) {
 		v := encoding.Headers[k]
 		if err := ValidateIdentifier(k); err != nil {
 			return nil
@@ -152,8 +138,8 @@ func (encoding *Encoding) Validate(ctx context.Context, opts ...ValidationOption
 		sm.Style == SerializationPipeDelimited && !sm.Explode,
 		sm.Style == SerializationDeepObject && sm.Explode:
 	default:
-		return fmt.Errorf("serialization method with style=%q and explode=%v is not supported by media type", sm.Style, sm.Explode)
+		return newInvalidSerializationMethod("media type", sm.Style, sm.Explode, encoding.Origin)
 	}
 
-	return validateExtensions(ctx, encoding.Extensions)
+	return validateExtensions(ctx, encoding.Extensions, encoding.Origin)
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strings"
 )
 
 // defaultStreamingContentTypes are the regex patterns matched against
@@ -57,6 +58,9 @@ func (o Configuration) Validate() error {
 	if o.Generate.FiberServer {
 		nServers++
 	}
+	if o.Generate.FiberV3Server {
+		nServers++
+	}
 	if o.Generate.EchoServer {
 		nServers++
 	}
@@ -95,12 +99,50 @@ func (o Configuration) Validate() error {
 		}
 	}
 
+	// import-mapping keys are the paths of $ref'd documents (a relative
+	// file path or URL). A JSON pointer key can never match anything —
+	// references within the same document always resolve to the package
+	// being generated — so it is a configuration mistake, not a mapping.
+	for _, specPath := range SortedMapKeys(o.ImportMapping) {
+		if strings.HasPrefix(specPath, "#") {
+			errs = append(errs, fmt.Errorf("`import-mapping` key %q is a JSON pointer, but keys must be the path or URL of a $ref'd document; references within the same document cannot be remapped to another package — see https://github.com/oapi-codegen/oapi-codegen/tree/main/examples/import-mapping", specPath))
+		}
+	}
+
 	err := errors.Join(errs...)
 	if err != nil {
 		return fmt.Errorf("failed to validate configuration: %w", err)
 	}
 
 	return nil
+}
+
+// Warnings returns informational diagnostics about cross-field configuration
+// combinations that aren't outright errors but are likely to produce
+// generated code that doesn't compile, or that requires the user to know a
+// specific multi-config convention. The warnings are surfaced on stderr by
+// the CLI so the user notices before running `go build`.
+func (o Configuration) Warnings() map[string]string {
+	warnings := make(map[string]string)
+
+	// `generate-types-for-anonymous-schemas` hoists inline schemas into
+	// named Go types. The declarations of those named types are emitted
+	// only when `generate.models: true`. If the flag is set with
+	// `models: false` alongside a client or server generator, the
+	// generated code will reference type names that this config does
+	// not declare.
+	//
+	// This is fine when a sibling config (e.g. a `models: true` config
+	// emitting into the same Go package) declares the types, but is a
+	// hard compile failure if no sibling is present. We can't tell the
+	// two cases apart from a single config, so we warn rather than
+	// error — split-config users can ignore the warning; single-config
+	// users get a heads-up before `go build` fails.
+	if o.OutputOptions.GenerateTypesForAnonymousSchemas && !o.Generate.Models && o.Generate.AnyOperationGenerator() {
+		warnings["generate-types-for-anonymous-schemas"] = "the flag is set with `generate.models: false` and a client/server generator. The hoisted named types this config emits references to will not be declared by this config. If a sibling config emits `generate.models: true` into the same Go package with the same flag setting, you can ignore this warning. Otherwise, set `generate.models: true` in this config or remove the flag to fall back to anonymous structs."
+	}
+
+	return warnings
 }
 
 // UpdateDefaults sets reasonable default values for unset fields in Configuration
@@ -123,6 +165,8 @@ type GenerateOptions struct {
 	ChiServer bool `yaml:"chi-server,omitempty"`
 	// FiberServer specifies whether to generate fiber server boilerplate
 	FiberServer bool `yaml:"fiber-server,omitempty"`
+	// FiberV3Server specifies whether to generate fiber v3 server boilerplate
+	FiberV3Server bool `yaml:"fiber-v3-server,omitempty"`
 	// EchoServer specifies whether to generate echo server boilerplate
 	EchoServer bool `yaml:"echo-server,omitempty"`
 	// Echo5Server specifies whether to generate echo v5 server boilerplate
@@ -163,6 +207,8 @@ func (g GenerateOptions) RouterImports() []AdditionalImport {
 		imports = append(imports, AdditionalImport{Package: "github.com/gorilla/mux"})
 	case g.FiberServer:
 		imports = append(imports, AdditionalImport{Package: "github.com/gofiber/fiber/v2"})
+	case g.FiberV3Server:
+		imports = append(imports, AdditionalImport{Package: "github.com/gofiber/fiber/v3"})
 	case g.IrisServer:
 		imports = append(imports, AdditionalImport{Package: "github.com/kataras/iris/v12"})
 		imports = append(imports, AdditionalImport{Package: "github.com/kataras/iris/v12/core/router"})
@@ -170,6 +216,16 @@ func (g GenerateOptions) RouterImports() []AdditionalImport {
 	}
 
 	return imports
+}
+
+// AnyOperationGenerator returns true if any code generator that emits
+// per-operation Go code (clients, server frameworks, strict-server) is
+// enabled. Used to detect configurations where operation-derived type
+// references would be emitted without a corresponding declaration.
+func (g GenerateOptions) AnyOperationGenerator() bool {
+	return g.Client || g.IrisServer || g.EchoServer || g.Echo5Server ||
+		g.ChiServer || g.FiberServer || g.FiberV3Server || g.GinServer || g.GorillaServer ||
+		g.StdHTTPServer || g.Strict
 }
 
 func (oo GenerateOptions) Validate() map[string]string {
@@ -215,6 +271,19 @@ type CompatibilityOptions struct {
 	// than we have in the past. Set OldMergeSchemas to true for the old behavior.
 	// Please see https://github.com/oapi-codegen/oapi-codegen/issues/531
 	OldMergeSchemas bool `yaml:"old-merge-schemas,omitempty"`
+	// In the past, when a schema combined `allOf` with sibling fields at the
+	// same level (`properties`, `required`, `additionalProperties`,
+	// `description`), those siblings were silently discarded and the schema
+	// was emitted as a Go type alias to its sole `allOf` target. New behavior
+	// merges the parent's siblings with the `allOf` members so the generated
+	// type carries every field declared in the spec. This is a more accurate
+	// translation of OpenAPI semantics, but it changes the shape of generated
+	// types: a schema that previously produced `type X = Y` may now produce
+	// a distinct struct embedding Y with extra fields, which is not
+	// interchangeable with Y in downstream Go code. Set OldAllOfSiblingMerging
+	// to true to restore the prior behavior.
+	// Please see https://github.com/oapi-codegen/oapi-codegen/issues/697
+	OldAllOfSiblingMerging bool `yaml:"old-allof-sibling-merging,omitempty"`
 	// Enum values can generate conflicting typenames, so we've updated the
 	// code for enum generation to avoid these conflicts, but it will result
 	// in some enum types being renamed in existing code. Set OldEnumConflicts to true
@@ -237,6 +306,14 @@ type CompatibilityOptions struct {
 	// When set to true, always prefix enum values with their type name instead of only
 	// when typenames would be conflicting.
 	AlwaysPrefixEnumValues bool `yaml:"always-prefix-enum-values,omitempty"`
+	// DisableEnumValueConflictResolution turns off cross-enum value conflict
+	// resolution. By default, when two enums declare the same value, the
+	// generated constants are prefixed with their type name so they don't
+	// collide. Set this to true to disable that resolution and restore the
+	// prior behavior, in which conflict detection compared already-prefixed
+	// constant names and could miss overlaps depending on declaration order.
+	// Please see https://github.com/oapi-codegen/oapi-codegen/issues/2391
+	DisableEnumValueConflictResolution bool `yaml:"disable-enum-value-conflict-resolution,omitempty"`
 	// Our generated code for Chi has historically inverted the order in which Chi middleware is
 	// applied such that the last invoked middleware ends up executing first in the Chi chain
 	// This resolves the behavior such that middlewares are chained in the order they are invoked.
@@ -286,6 +363,39 @@ type CompatibilityOptions struct {
 	// are treated as required.
 	// Please see https://github.com/oapi-codegen/oapi-codegen/issues/2267
 	HeadersImplicitlyRequired bool `yaml:"headers-implicitly-required,omitempty"`
+
+	// EnableAuthScopesOnContext re-enables the legacy emission of security
+	// scheme scopes by generated server code: the per-scheme context key
+	// types (e.g. `bearerAuthContextKey`), the scope constants (e.g.
+	// `BearerAuthScopes`), and the per-operation calls that store the
+	// operation's scopes into the request context.
+	//
+	// A security scheme that is a $ref into a spec covered by import-mapping
+	// does not declare its own context key type; its scopes constant is an
+	// alias of the one in the mapped package, so `context.Value` lookups use
+	// the same key across the generated packages. This requires the mapped
+	// spec's config to also set this flag, so that the referenced constant
+	// exists. Please see
+	// https://github.com/oapi-codegen/oapi-codegen/issues/2383
+	//
+	// Deprecated: this mechanism is off by default because it flattens the
+	// OpenAPI `security` requirements into a per-scheme list of scopes, and
+	// cannot represent alternative schemes (OR), combined schemes (AND), or
+	// anonymous (`{}`) alternatives. Authentication and authorization should
+	// instead be performed at runtime using the request validation
+	// middleware, which evaluates the spec's security requirements directly.
+	// Please see https://github.com/oapi-codegen/oapi-codegen/issues/1524
+	EnableAuthScopesOnContext bool `yaml:"enable-auth-scopes-on-context,omitempty"`
+
+	// SortHandlerRegistrations restores the historical behavior of registering
+	// generated route handlers in sorted (lexicographic, by path then method)
+	// order. By default handlers are registered in the order their paths are
+	// declared in the spec, so that on routers which match in registration
+	// order (e.g. Fiber, Gorilla/mux) overlapping paths can be disambiguated by
+	// ordering them in the spec. Set this to true to opt out and go back to the
+	// old sorted registration order.
+	// Please see https://github.com/oapi-codegen/oapi-codegen/issues/1887
+	SortHandlerRegistrations bool `yaml:"sort-handler-registrations,omitempty"`
 }
 
 func (co CompatibilityOptions) Validate() map[string]string {
@@ -304,6 +414,12 @@ type OutputOptions struct {
 	// defined constants; set this to true to suppress that method when it
 	// conflicts with user-defined methods of the same name.
 	SkipEnumValidate bool `yaml:"skip-enum-validate,omitempty"`
+	// SkipEnumViaOneOf disables detection of the OpenAPI 3.1 enum-via-oneOf
+	// idiom: a schema with `type: string|integer` and `oneOf:` members that
+	// each carry `const` + `title` will normally be emitted as a Go enum with
+	// named constants. Set this to true to fall through to the standard union
+	// generator instead.
+	SkipEnumViaOneOf bool `yaml:"skip-enum-via-oneof,omitempty"`
 	// Only include operations that have one of these tags. Ignored when empty.
 	IncludeTags []string `yaml:"include-tags,omitempty"`
 	// Exclude operations that have one of these tags. Ignored when empty.
@@ -337,6 +453,9 @@ type OutputOptions struct {
 	// Currently supports:
 	//   "array"
 	DisableTypeAliasesForType []string `yaml:"disable-type-aliases-for-type"`
+
+	// SkipResponseBodyGetters decides whether to generate getter methods for response bodies.
+	SkipResponseBodyGetters bool `yaml:"skip-response-body-getters,omitempty"`
 
 	// NameNormalizer is the method used to normalize Go names and types, for instance converting the text `MyApi` to `MyAPI`. Corresponds with the constants defined for `codegen.NameNormalizerFunction`
 	NameNormalizer string `yaml:"name-normalizer,omitempty"`
@@ -375,6 +494,32 @@ type OutputOptions struct {
 	// codegen will error on duplicate type names, requiring manual resolution
 	// via x-go-name.
 	ResolveTypeNameCollisions bool `yaml:"resolve-type-name-collisions,omitempty"`
+
+	// GenerateTypesForAnonymousSchemas, when true, causes oapi-codegen to
+	// emit a named Go type for every inline schema that would otherwise
+	// generate as an anonymous `struct { ... }`. The type's name is derived
+	// from the schema path (e.g. `GetRolesIdResponseBody_Data`). Default
+	// false. Equivalent to adding `x-go-type-name` to every inline schema;
+	// when both are present at the same site, `x-go-type-name` wins.
+	//
+	// The hoisted named types are declared by the same emission path that
+	// `generate.models` controls. In a single-config setup, this flag is
+	// only effective when `generate.models: true` is also set in the same
+	// config — otherwise the generated client/server code will reference
+	// type names that no emission path declares, and `go build` will fail.
+	//
+	// In a multi-config setup where one config emits `models` and a
+	// sibling config emits a client or server framework into the same
+	// Go package, the flag must be set consistently across all configs.
+	// Mixing the flag (set in one config, omitted in the other) causes
+	// references and declarations to disagree on whether to use the
+	// hoisted name or the inline struct. The sibling config that does
+	// not emit `models` will produce a warning at codegen time noting
+	// that it does not declare the hoisted names; you can ignore the
+	// warning when the sibling models config will declare them.
+	//
+	// See https://github.com/oapi-codegen/oapi-codegen/issues/1139
+	GenerateTypesForAnonymousSchemas bool `yaml:"generate-types-for-anonymous-schemas,omitempty"`
 
 	// TypeMapping allows customizing OpenAPI type/format to Go type mappings.
 	// User-specified mappings are merged on top of the defaults.

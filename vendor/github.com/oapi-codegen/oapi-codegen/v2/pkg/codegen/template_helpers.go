@@ -47,28 +47,6 @@ var (
 	titleCaser = cases.Title(language.English)
 )
 
-// isMediaTypeSupported reports whether code generation produces a typed
-// body for this media type. Today this is the closed set of JSON / YAML /
-// XML variants the response and request templates know how to handle —
-// see the typeName switch in GetResponseTypeDefinitions and the body
-// definition switch in GenerateBodyDefinitions. A future configuration
-// option is intended to let users extend this list.
-func isMediaTypeSupported(mediaType string) bool {
-	switch {
-	case slices.Contains(contentTypesHalJSON, mediaType):
-		return true
-	case slices.Contains(contentTypesJSON, mediaType):
-		return true
-	case util.IsMediaTypeJson(mediaType):
-		return true
-	case slices.Contains(contentTypesYAML, mediaType):
-		return true
-	case slices.Contains(contentTypesXML, mediaType):
-		return true
-	}
-	return false
-}
-
 // genParamArgs takes an array of Parameter definition, and generates a valid
 // Go parameter declaration from them, eg:
 // ", foo int, bar string, baz float32". The preceding comma is there to save
@@ -146,6 +124,7 @@ func genResponseUnmarshal(op *OperationDefinition) string {
 	// Add a case for each possible response:
 	buffer := new(bytes.Buffer)
 	responses := op.Spec.Responses
+	handledResponseNames := make(map[string]struct{})
 	for _, typeDefinition := range typeDefinitions {
 
 		responseRef := responses.Value(typeDefinition.ResponseName)
@@ -158,6 +137,8 @@ func genResponseUnmarshal(op *OperationDefinition) string {
 			fmt.Fprintf(os.Stderr, "Response %s.%s has nil value\n", op.OperationId, typeDefinition.ResponseName)
 			continue
 		}
+
+		handledResponseNames[typeDefinition.ResponseName] = struct{}{}
 
 		// If there is no content-type then we have no unmarshaling to do:
 		if len(responseRef.Value.Content) == 0 {
@@ -244,6 +225,42 @@ func genResponseUnmarshal(op *OperationDefinition) string {
 		}
 	}
 
+	// Emit explicit case clauses for responses declared without content (e.g.
+	// "204 No Content"). These responses have no type definitions, so the loop
+	// above never visits them. Without an explicit case clause, the "default"
+	// catch-all (which matches with "&& true") would attempt to unmarshal an
+	// empty body and fail.
+	//
+	// Keys follow the same "<responseName>.<detail>" scheme as
+	// buildUnmarshalCase, so an exact bodyless code (e.g. "204") sorts among
+	// its numeric peers, a range wildcard (e.g. "2XX") sorts after every
+	// explicit content case it covers (preventing it from shadowing them) but
+	// before the default catch-all, which sorts last.
+	//
+	// "default" itself is skipped — a bodyless default would emit "case true:"
+	// which shadows everything. Such a spec is degenerate and the existing
+	// behaviour (no guard) is acceptable.
+	if responses != nil {
+		for _, responseName := range SortedMapKeys(responses.Map()) {
+			if _, handled := handledResponseNames[responseName]; handled {
+				continue
+			}
+			if responseName == "default" {
+				continue
+			}
+			responseRef := responses.Value(responseName)
+			if responseRef == nil || responseRef.Value == nil {
+				continue
+			}
+			if len(responseRef.Value.Content) == 0 {
+				caseCondition := getConditionOfResponseName("rsp.StatusCode", responseName)
+				caseClause := fmt.Sprintf("case %s:\nbreak // No content-type\n", caseCondition)
+				caseKey := fmt.Sprintf("%s.%s.nocontent", prefixLeastSpecific, responseName)
+				handledCaseClauses[caseKey] = caseClause
+			}
+		}
+	}
+
 	if len(handledCaseClauses)+len(unhandledCaseClauses) == 0 {
 		// switch would be empty.
 		return ""
@@ -266,17 +283,25 @@ func genResponseUnmarshal(op *OperationDefinition) string {
 	return buffer.String()
 }
 
-// buildUnmarshalCase builds an unmarshaling case clause for different content-types:
+// buildUnmarshalCase builds an unmarshaling case clause for different content-types.
+//
+// The sort key puts the response name before the content type so that
+// lexicographic ordering of the keys yields most-specific-first case clauses:
+// exact codes sort numerically ("200" < "204"), range wildcards sort after the
+// exact codes they cover ("204" < "2XX" since 'X' > '9') and before the next
+// tier ("2XX" < "300"), and "default" sorts after everything ('d' > 'X').
 func buildUnmarshalCase(typeDefinition ResponseTypeDefinition, caseAction string, contentType string) (caseKey string, caseClause string) {
-	caseKey = fmt.Sprintf("%s.%s.%s", prefixLeastSpecific, contentType, typeDefinition.ResponseName)
+	caseKey = fmt.Sprintf("%s.%s.%s", prefixLeastSpecific, typeDefinition.ResponseName, contentType)
 	caseClauseKey := getConditionOfResponseName("rsp.StatusCode", typeDefinition.ResponseName)
 	contentTypeLiteral := StringToGoString(contentType)
 	caseClause = fmt.Sprintf("case strings.Contains(rsp.Header.Get(\"%s\"), %s) && %s:\n%s\n", "Content-Type", contentTypeLiteral, caseClauseKey, caseAction)
 	return caseKey, caseClause
 }
 
+// buildUnmarshalCaseStrict is buildUnmarshalCase with an exact Content-Type
+// match; it uses the same "<responseName>.<contentType>" key scheme.
 func buildUnmarshalCaseStrict(typeDefinition ResponseTypeDefinition, caseAction string, contentType string) (caseKey string, caseClause string) {
-	caseKey = fmt.Sprintf("%s.%s.%s", prefixLeastSpecific, contentType, typeDefinition.ResponseName)
+	caseKey = fmt.Sprintf("%s.%s.%s", prefixLeastSpecific, typeDefinition.ResponseName, contentType)
 	caseClauseKey := getConditionOfResponseName("rsp.StatusCode", typeDefinition.ResponseName)
 	contentTypeLiteral := StringToGoString(contentType)
 	caseClause = fmt.Sprintf("case rsp.Header.Get(\"%s\") == %s && %s:\n%s\n", "Content-Type", contentTypeLiteral, caseClauseKey, caseAction)
@@ -313,6 +338,24 @@ func getConditionOfResponseName(statusCodeVar, responseName string) string {
 	}
 }
 
+// responsesWithHeaders returns the subset of responses that declare headers,
+// ordered most-specific-first for emission as switch case clauses: exact
+// status codes sort numerically, range wildcards after the exact codes they
+// cover ("204" < "2XX" since 'X' > '9'), and "default" (which compiles to
+// `case true:`) after everything ('d' > 'X').
+func responsesWithHeaders(responses []ResponseDefinition) []ResponseDefinition {
+	var out []ResponseDefinition
+	for _, response := range responses {
+		if len(response.Headers) > 0 {
+			out = append(out, response)
+		}
+	}
+	slices.SortFunc(out, func(a, b ResponseDefinition) int {
+		return strings.Compare(a.StatusCode, b.StatusCode)
+	})
+	return out
+}
+
 // This outputs a string array
 func toStringArray(sarr []string) string {
 	s := strings.Join(sarr, `","`)
@@ -322,8 +365,10 @@ func toStringArray(sarr []string) string {
 	return `[]string{` + s + `}`
 }
 
+// stripNewLines removes newlines so untrusted spec text stays inside a single
+// generated `//` line comment instead of breaking out into real Go source.
 func stripNewLines(s string) string {
-	r := strings.NewReplacer("\n", "")
+	r := strings.NewReplacer("\n", "", "\r", "")
 	return r.Replace(s)
 }
 
@@ -400,6 +445,8 @@ var TemplateFunctions = template.FuncMap{
 	"genResponsePayload":         genResponsePayload,
 	"genResponseTypeName":        genResponseTypeName,
 	"genResponseUnmarshal":       genResponseUnmarshal,
+	"getConditionOfResponseName": getConditionOfResponseName,
+	"responsesWithHeaders":       responsesWithHeaders,
 	"getResponseTypeDefinitions": getResponseTypeDefinitions,
 	"toStringArray":              toStringArray,
 	"lower":                      strings.ToLower,
