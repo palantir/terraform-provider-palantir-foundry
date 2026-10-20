@@ -31,7 +31,7 @@ type strictHandler struct {
 
         {{$multipleBodies := gt (len .Bodies) 1 -}}
         {{range .Bodies -}}
-            {{if $multipleBodies}}if strings.HasPrefix(ctx.GetHeader("Content-Type"), "{{.ContentType}}") { {{end}}
+            {{if $multipleBodies}}if strings.HasPrefix(ctx.GetHeader("Content-Type"), {{.ContentType | toGoString}}) { {{end}}
                 {{if .IsJSON }}
                     var body {{$opid}}{{.NameTag}}RequestBody
                     if err := ctx.ReadJSON(&body); err != nil {
@@ -107,15 +107,15 @@ type strictHandler struct {
         response, err := handler(ctx, request)
 
         if err != nil {
-            ctx.StopWithError(http.StatusBadRequest, err)
+            ctx.StopWithError(http.StatusInternalServerError, err)
             return
         } else if validResponse, ok := response.({{$opid | ucFirst}}ResponseObject); ok {
             if err := validResponse.Visit{{$opid}}Response(ctx); err != nil {
-                ctx.StopWithError(http.StatusBadRequest, err)
+                ctx.StopWithError(http.StatusInternalServerError, err)
                 return
             }
         } else if response != nil {
-            ctx.Writef("Unexpected response type: %T", response)
+            ctx.StopWithError(http.StatusInternalServerError, fmt.Errorf("unexpected response type: %T", response))
             return
         }
     }

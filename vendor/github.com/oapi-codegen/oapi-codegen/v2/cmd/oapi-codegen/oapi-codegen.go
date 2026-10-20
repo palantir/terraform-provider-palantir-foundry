@@ -102,7 +102,7 @@ func main() {
 	// All flags below are deprecated, and will be removed in a future release. Please do not
 	// update their behavior.
 	flag.StringVar(&flagGenerate, "generate", "types,client,server,spec",
-		`Comma-separated list of code to generate; valid options: "types", "client", "chi-server", "server", "gin", "gorilla", "spec", "skip-fmt", "skip-prune", "fiber", "iris", "std-http".`)
+		`Comma-separated list of code to generate; valid options: "types", "client", "chi-server", "server", "gin", "gorilla", "spec", "skip-fmt", "skip-prune", "fiber", "fiber-v3", "iris", "std-http".`)
 	flag.StringVar(&flagIncludeTags, "include-tags", "", "Only include operations with the given tags. Comma-separated list of tags.")
 	flag.StringVar(&flagExcludeTags, "exclude-tags", "", "Exclude operations that are tagged with the given tags. Comma-separated list of tags.")
 	flag.StringVar(&flagIncludeOperationIDs, "include-operation-ids", "", "Only include operations with the given operation-ids. Comma-separated list of operation-ids.")
@@ -284,6 +284,17 @@ func main() {
 		_, _ = fmt.Fprint(os.Stderr, out.String())
 	}
 
+	if warnings := opts.Warnings(); len(warnings) > 0 {
+		var out strings.Builder
+		out.WriteString("WARNING: A number of cross-field configuration warning(s) were returned:")
+		for k, v := range warnings {
+			out.WriteString("\n- " + k + ": " + v)
+		}
+		out.WriteString("\n")
+
+		_, _ = fmt.Fprint(os.Stderr, out.String())
+	}
+
 	// If the user asked to output configuration, output it to stdout and exit
 	if flagOutputConfig {
 		var buf bytes.Buffer
@@ -310,10 +321,6 @@ func main() {
 	swagger, err := util.LoadSwaggerWithOverlay(flag.Arg(0), overlayOpts)
 	if err != nil {
 		errExit("error loading swagger spec in %s\n: %s\n", flag.Arg(0), err)
-	}
-
-	if strings.HasPrefix(swagger.OpenAPI, "3.1.") {
-		fmt.Fprintln(os.Stderr, "WARNING: You are using an OpenAPI 3.1.x specification, which is not yet supported by oapi-codegen (https://github.com/oapi-codegen/oapi-codegen/issues/373) and so some functionality may not be available. Until oapi-codegen supports OpenAPI 3.1, it is recommended to downgrade your spec to 3.0.x")
 	}
 
 	if len(noVCSVersionOverride) > 0 {
@@ -520,6 +527,8 @@ func generationTargets(cfg *codegen.Configuration, targets []string) error {
 			opts.ChiServer = true
 		case "fiber-server", "fiber":
 			opts.FiberServer = true
+		case "fiber-v3-server", "fiber-v3":
+			opts.FiberV3Server = true
 		case "server", "echo-server", "echo":
 			opts.EchoServer = true
 		case "echo5", "echo5-server":
