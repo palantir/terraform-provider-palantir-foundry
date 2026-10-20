@@ -18,6 +18,16 @@ func NewStrictHandler(ssi StrictServerInterface, middlewares []StrictMiddlewareF
 }
 
 func NewStrictHandlerWithOptions(ssi StrictServerInterface, middlewares []StrictMiddlewareFunc, options StrictHTTPServerOptions) ServerInterface {
+    if options.RequestErrorHandlerFunc == nil {
+        options.RequestErrorHandlerFunc = func(w http.ResponseWriter, r *http.Request, err error) {
+            http.Error(w, err.Error(), http.StatusBadRequest)
+        }
+    }
+    if options.ResponseErrorHandlerFunc == nil {
+        options.ResponseErrorHandlerFunc = func(w http.ResponseWriter, r *http.Request, err error) {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+        }
+    }
     return &strictHandler{ssi: ssi, middlewares: middlewares, options: options}
 }
 
@@ -48,7 +58,7 @@ type strictHandler struct {
 
         {{$multipleBodies := gt (len .Bodies) 1 -}}
         {{range .Bodies -}}
-            {{if $multipleBodies}}if strings.HasPrefix(r.Header.Get("Content-Type"), "{{.ContentType}}") { {{end}}
+            {{if $multipleBodies}}if strings.HasPrefix(r.Header.Get("Content-Type"), {{.ContentType | toGoString}}) { {{end}}
                 {{if .IsJSON }}
                     var body {{$opid}}{{.NameTag}}RequestBody
                     if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
