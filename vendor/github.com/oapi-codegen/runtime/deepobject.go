@@ -83,7 +83,18 @@ func MarshalDeepObject(i interface{}, paramName string) (string, error) {
 	// can then walk the generic object structure to produce a deepObject. This
 	// isn't efficient and it would be more efficient to reflect on our own,
 	// but it's complicated, error-prone code.
-	buf, err := json.Marshal(i)
+
+	// Handle concrete-typed nil maps and nil slices via
+	// reflection. Without this, json.Marshal encodes them as "null", which
+	// round-trips to a nil interface{} and emits an undesired "param[]=null" pair.
+	v := reflect.ValueOf(i)
+	switch v.Kind() {
+	case reflect.Map, reflect.Slice:
+		if v.IsNil() {
+			return "", nil
+		}
+	}
+	buf, err := JSONMarshal(i)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal input to JSON: %w", err)
 	}
@@ -278,6 +289,12 @@ func assignPathValues(dst interface{}, pathValues fieldOrValue) error {
 		}
 		iv.Set(dstSlice)
 		return nil
+	case reflect.Array:
+		// Array-backed text types such as uuid.UUID.
+		if tu, ok := v.Interface().(encoding.TextUnmarshaler); ok {
+			return tu.UnmarshalText([]byte(pathValues.value))
+		}
+		return errors.New("unhandled type: " + it.String())
 	case reflect.Struct:
 		// Some special types we care about are structs. Handle them
 		// here. They may be redefined, so we need to do some hoop
@@ -327,7 +344,7 @@ func assignPathValues(dst interface{}, pathValues fieldOrValue) error {
 			dst.Set(reflect.ValueOf(tm))
 			return nil
 		}
-		// For other struct types that implement TextUnmarshaler (e.g. uuid.UUID),
+		// For other struct types that implement TextUnmarshaler,
 		// use that for binding. This comes after the legacy Date/time.Time checks
 		// above which have special fallback format handling.
 		if tu, ok := v.Interface().(encoding.TextUnmarshaler); ok {
