@@ -103,10 +103,6 @@ func toCamelCase(str string, isBig bool) string {
 		}
 	}
 
-	if isFirstRuneUpper && !isBig {
-		r0 = unicode.ToLower(r0)
-	}
-
 	buf.WriteRune(r0)
 	return buf.String()
 }
@@ -473,12 +469,13 @@ func FirstRuneToUpper(str string) string {
 
 	r, size := utf8.DecodeRuneInString(str)
 
-	if !unicode.IsLower(r) {
+	upper := unicode.ToUpper(r)
+	if upper == r {
 		return str
 	}
 
 	buf := &stringBuilder{}
-	buf.WriteRune(unicode.ToUpper(r))
+	buf.WriteRune(upper)
 	buf.WriteString(str[size:])
 	return buf.String()
 }
@@ -491,12 +488,13 @@ func FirstRuneToLower(str string) string {
 
 	r, size := utf8.DecodeRuneInString(str)
 
-	if !unicode.IsUpper(r) {
+	lower := unicode.ToLower(r)
+	if lower == r {
 		return str
 	}
 
 	buf := &stringBuilder{}
-	buf.WriteRune(unicode.ToLower(r))
+	buf.WriteRune(lower)
 	buf.WriteString(str[size:])
 	return buf.String()
 }

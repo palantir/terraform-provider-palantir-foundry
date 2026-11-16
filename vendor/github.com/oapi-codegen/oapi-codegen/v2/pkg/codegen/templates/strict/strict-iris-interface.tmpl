@@ -32,7 +32,8 @@
         {{if (and $hasHeaders (not $isRef)) -}}
             type {{$opid}}{{$statusCode}}ResponseHeaders struct {
                 {{range .Headers -}}
-                    {{.GoName}} {{.GoTypeDef}}
+                    {{with .DeprecationComment}}{{.}}
+                    {{end -}}{{.GoName}} {{.GoTypeDef}}
                 {{end -}}
             }
         {{end}}
@@ -95,7 +96,7 @@
                 {{if eq .NameTag "Multipart" -}}
                     writer := multipart.NewWriter(ctx.ResponseWriter())
                 {{end -}}
-                ctx.ResponseWriter().Header().Set("Content-Type", {{if eq .NameTag "Multipart"}}{{if eq .ContentType "multipart/form-data"}}writer.FormDataContentType(){{else}}mime.FormatMediaType("{{.ContentType}}", map[string]string{"boundary": writer.Boundary()}){{end}}{{else if .HasFixedContentType }}{{.ContentType | toGoString}}{{else}}response.ContentType{{end}})
+                ctx.ResponseWriter().Header().Set("Content-Type", {{if eq .NameTag "Multipart"}}{{if eq .ContentType "multipart/form-data"}}writer.FormDataContentType(){{else}}mime.FormatMediaType({{.ContentType | toGoString}}, map[string]string{"boundary": writer.Boundary()}){{end}}{{else if .HasFixedContentType }}{{.ContentType | toGoString}}{{else}}response.ContentType{{end}})
                 {{if not .IsSupported -}}
                     if response.ContentLength != 0 {
                         ctx.ResponseWriter().Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
@@ -107,7 +108,7 @@
                     {{$hasUnionElements := ne 0 (len .Schema.UnionElements)}}
                     return ctx.JSON(&{{if $hasBodyVar}}response.Body{{else}}response{{end}}{{if and $hasUnionElements (not .Schema.IsExternalRef)}}.union{{end}})
                 {{else if eq .NameTag "Text" -}}
-                    _, err := ctx.WriteString(string({{if $hasBodyVar}}response.Body{{else}}response{{end}}))
+                    _, err := ctx.WriteString(fmt.Sprint({{if $hasBodyVar}}response.Body{{else}}response{{end}}))
                     return err
                 {{else if eq .NameTag "Formdata" -}}
                     if form, err := runtime.MarshalForm({{if $hasBodyVar}}response.Body{{else}}response{{end}}, nil); err != nil {
@@ -193,9 +194,11 @@
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
-{{range .}}{{if not .IsAlias}}{{.SummaryAsComment }}
+{{range .}}{{if not .IsAlias}}{{.SummaryAsComment .OperationId }}
 // ({{.Method}} {{.Path}})
-{{$opid := .OperationId -}}
+{{with .DeprecationComment}}//
+{{.}}
+{{end}}{{$opid := .OperationId -}}
 {{$opid}}(ctx context.Context, request {{$opid | ucFirst}}RequestObject) ({{$opid | ucFirst}}ResponseObject, error)
 {{end}}{{end}}{{/* range . */ -}}
 }

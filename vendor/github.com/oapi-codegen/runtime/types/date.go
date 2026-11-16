@@ -1,8 +1,9 @@
 package types
 
 import (
-	"encoding/json"
 	"time"
+
+	"github.com/oapi-codegen/runtime/internal/jsoncodec"
 )
 
 const DateFormat = "2006-01-02"
@@ -12,12 +13,12 @@ type Date struct {
 }
 
 func (d Date) MarshalJSON() ([]byte, error) {
-	return json.Marshal(d.Format(DateFormat))
+	return jsoncodec.Marshal(d.Format(DateFormat))
 }
 
 func (d *Date) UnmarshalJSON(data []byte) error {
 	var dateStr string
-	err := json.Unmarshal(data, &dateStr)
+	err := jsoncodec.Unmarshal(data, &dateStr)
 	if err != nil {
 		return err
 	}
@@ -31,6 +32,10 @@ func (d *Date) UnmarshalJSON(data []byte) error {
 
 func (d Date) String() string {
 	return d.Format(DateFormat)
+}
+
+func (d Date) MarshalText() ([]byte, error) {
+	return []byte(d.Format(DateFormat)), nil
 }
 
 func (d *Date) UnmarshalText(data []byte) error {
